@@ -1,0 +1,42 @@
+{
+  "PreToolUse": [
+    {
+      "matcher": { "tools": ["BashTool"], "input_contains": "git commit" },
+      "hooks": [
+        {
+          "type": "command",
+          "command": "branch=$(git branch --show-current 2>/dev/null) && [ \"$branch\" != 'main' ] && [ \"$branch\" != 'master' ] || (echo 'BLOCKED: Direct commit to main/master is not allowed. Create a feature branch first.' && exit 1)"
+        }
+      ]
+    }
+  ],
+  "PostToolUse": [
+    {
+      "matcher": { "tools": ["WriteTool", "EditTool"], "input_contains": ".py" },
+      "hooks": [
+        {
+          "type": "command",
+          "command": "echo 'REMINDER: Run linter/formatter on changed Python files before committing.'"
+        }
+      ]
+    },
+    {
+      "matcher": { "tools": ["WriteTool", "EditTool"], "input_contains": ".ts" },
+      "hooks": [
+        {
+          "type": "command",
+          "command": "echo 'REMINDER: Run linter/formatter on changed TypeScript files before committing.'"
+        }
+      ]
+    },
+    {
+      "matcher": { "tools": ["BashTool"], "input_contains": "git commit" },
+      "hooks": [
+        {
+          "type": "command",
+          "command": "echo \"COMMIT SUMMARY:\" && git log -1 --format='%h %s' 2>/dev/null || true"
+        }
+      ]
+    }
+  ]
+}

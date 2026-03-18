@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(claude --cd /mnt/c/Users/Worker/.gemini/antigravity/playground/exo-galileo)",
+      "Bash(claude -w /mnt/c/Users/Worker/.gemini/antigravity/playground/exo-galileo --welcome)"
+    ]
+  }
+}
