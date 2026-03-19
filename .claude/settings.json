@@ -37,6 +37,15 @@
           "command": "echo \"COMMIT SUMMARY:\" && git log -1 --format='%h %s' 2>/dev/null || true"
         }
       ]
+    },
+    {
+      "matcher": { "tools": ["WriteTool", "EditTool"], "input_contains": ".claude/" },
+      "hooks": [
+        {
+          "type": "command",
+          "command": "echo '[Workflow Validation] File in .claude/ changed. Please ensure structural and format correctness as verified by workflow-validator.'"
+        }
+      ]
     }
   ]
 }
