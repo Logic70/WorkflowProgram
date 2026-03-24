@@ -1,0 +1,50 @@
+{
+  "commands": {
+    "develop": {
+      "description": "Design a new workflow from requirements",
+      "file": ".claude/commands/develop.md"
+    },
+    "ship": {
+      "description": "Ship current workflow changes",
+      "file": ".claude/commands/ship.md"
+    },
+    "preflight": {
+      "description": "Run parallel readiness checks before shipping",
+      "file": ".claude/commands/preflight.md"
+    },
+    "hotfix": {
+      "description": "Fast-track a hotfix with reduced scope",
+      "file": ".claude/commands/hotfix.md"
+    },
+    "evolve-workflow": {
+      "description": "Audit and evolve a workflow repository",
+      "file": ".claude/commands/evolve-workflow.md"
+    },
+    "iterate-workflow": {
+      "description": "Iterate a workflow from lessons with approval",
+      "file": ".claude/commands/iterate-workflow.md"
+    }
+  },
+  "skills": {
+    "review": {
+      "description": "Run parallel multi-agent review on current changes",
+      "file": ".claude/skills/review/SKILL.md"
+    },
+    "test": {
+      "description": "Run validation or tests related to current changes",
+      "file": ".claude/skills/test/SKILL.md"
+    },
+    "commit": {
+      "description": "Generate a conventional commit message",
+      "file": ".claude/skills/commit/SKILL.md"
+    },
+    "doc": {
+      "description": "Update documentation for changed workflow assets",
+      "file": ".claude/skills/doc/SKILL.md"
+    },
+    "workflow-audit": {
+      "description": "Audit workflow structure patterns and quality",
+      "file": ".claude/skills/workflow-audit/SKILL.md"
+    }
+  }
+}

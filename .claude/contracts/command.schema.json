@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Workflow Command Metadata",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "name",
+    "purpose",
+    "inputs",
+    "outputs",
+    "gates",
+    "depends_on",
+    "writes_to"
+  ],
+  "properties": {
+    "name": {
+      "type": "string",
+      "pattern": "^[a-z0-9-]+$"
+    },
+    "purpose": {
+      "type": "string",
+      "minLength": 8
+    },
+    "inputs": {
+      "type": "string"
+    },
+    "outputs": {
+      "type": "string"
+    },
+    "gates": {
+      "type": "string"
+    },
+    "depends_on": {
+      "type": "string"
+    },
+    "writes_to": {
+      "type": "string"
+    }
+  }
+}
