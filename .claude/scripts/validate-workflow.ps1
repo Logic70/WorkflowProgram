@@ -226,6 +226,11 @@ foreach ($file in $commandFiles) {
         }
 
         foreach ($target in (Split-ListField -Value $frontmatter["writes_to"])) {
+            # Skip variable-based paths (e.g. $OUTPUT_DIR/...) — resolved at runtime
+            if ($target -match '^\$') {
+                Add-Pass "Command '$($file.Name)' write target '$target' uses runtime variable (skipped)"
+                continue
+            }
             $fullTarget = Join-Path $Root $target
             $parent = Split-Path -Parent $fullTarget
             if ($parent -and (Test-Path $parent)) {
