@@ -36,7 +36,7 @@
 ## Quality Gates
 
 - 阻塞条件：
-- 必须验证：
+- 必需验证：
 - 完成定义：
 
 ## Roles and Expert Dimensions
@@ -44,7 +44,6 @@
 - 角色 1：
 - 角色 2：
 - 角色 3：
-- 角色 4（如需要）：
 
 ## Pattern Selection Notes
 
@@ -55,38 +54,15 @@
 - Test-Driven 循环：
 - Specialized Agent 需求：
 
-## Target Repository Conventions
+## Extraction Decision
 
-- 留在当前仓库还是抽取独立仓：
-- 若为 Claude 工作流仓：
-  - `.claude/settings.json` 注册格式：
-  - 用户命令文件格式：
-  - 用户技能文件格式：
-- 若与默认格式不同，差异是什么：
-
-## Extraction Boundary
-
-- 目标输出路径：
-- 是否在当前 Claude 工作区内：
-- 若不在，所需额外目录授权方式（例如 `--add-dir`）：
+- 留在当前仓库还是抽取：
+- 理由：
 
 ## File Plan
 
 - 需要创建的文件：
 - 需要修改的文件：
-
-## Toolchain Dependencies
-
-- 必需工具：
-- 可选工具：
-- 安装方式：
-- 不可用时的降级策略：
-
-## Security Scope (如适用)
-
-- 覆盖的 CWE 子集：
-- 嵌入式/IoT 专项检查：
-- 数据流/污点分析能力：
 
 ## Risks
 
@@ -98,4 +74,3 @@
 - [ ] 验收项 1
 - [ ] 验收项 2
 - [ ] 验收项 3
-- [ ] 若为独立工作流仓，命令可被本地 Claude 正确识别

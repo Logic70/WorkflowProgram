@@ -1,13 +1,3 @@
----
-name: ship
-purpose: Review validate and prepare a commit for current workflow changes.
-inputs: current git diff, optional scope
-outputs: review summary, validation result, approved commit message, optional git commit
-gates: stop-on-critical-review, stop-on-validation-failure, approve-before-commit
-depends_on: review, test, commit, core-review-pipeline, core-validation-pipeline, core-reporting
-writes_to: ./.git, ./lessons.md, ./validation-report.md
----
-
 按顺序交付当前变更：先审查，再校验，最后准备提交。
 
 ## Usage
@@ -16,60 +6,71 @@ writes_to: ./.git, ./lessons.md, ./validation-report.md
 /ship [<scope>]
 ```
 
+默认目标：当前所有变更。
+
 ## Stage 1: 预检查
 
-**Goal**: 确认存在可交付的变更范围。
+**Goal**: 确认当前存在明确的交付范围。
 
-1. 运行 `git status`。
-2. 确定 `$ARGUMENTS` 是否缩小交付范围。
+1. 运行 `git status`，确认存在已暂存或未暂存变更。
+2. 若提供了 `$ARGUMENTS`，据此缩小范围；否则默认覆盖当前全部变更。
 
-**Verify**: 当前存在有效 diff。
+**Verify**: 至少存在一项需要交付的变更。
 
-**On failure**: 输出 `Nothing to ship.`。
+**On failure**：输出 `Nothing to ship.` 并停止。
 
-## Stage 2: 审查
+## Stage 2: 代码审查 (Fan-out)
 
-**Goal**: 获取安全、性能、风格和逻辑审查结果。
+**Goal**: 收集当前 diff 的多维审查结果。
 
-1. 获取 diff。
-2. 并行运行四类审查。
-3. 汇总为统一报告。
+1. 通过 `git diff` 或 `git diff --cached` 获取差异。
+2. 在单条 Task 消息中并行启动 4 个审查代理：
+   - 安全审查
+   - 性能审查
+   - 风格审查
+   - 逻辑审查
+3. 所有子代理提示词必须完整内联，不能依赖外部 agent 文件。
+4. 收集 JSON Lines 输出，并按 `critical -> warning -> info` 汇总。
 
-**Verify**: 四条审查链路都返回结果。
+**Verify**: 四条审查链路都返回了结构化结果或明确的“无问题”结论。
 
-**On failure**: 记录审查失败。
+**On failure**：把审查失败记录到 `lessons.md` 并停止。
 
-**Gate**: 存在 critical 问题时必须暂停。
+**Gate**：若出现任何 critical 级问题，必须先停下来让用户决定是修复还是强制继续。
 
-## Stage 3: 校验
+## Stage 3: 运行校验
 
-**Goal**: 确认仓库结构与语义都通过检查。
+**Goal**: 确认仓库通过项目定义的测试命令。
 
-1. 运行 `validate-workflow.ps1`。
-2. 运行 `smoke-test-workflow.ps1`。
+1. 运行 `CLAUDE.md` 中定义的测试命令。
+2. 若失败，分析失败原因并给出修复建议。
+3. 在校验未通过前不得继续准备提交。
 
-**Verify**: 两个脚本均成功退出。
+**Verify**: 测试命令成功退出。
 
-**On failure**: 展示失败项并停止。
+**On failure**：展示失败原因并停止。
 
 ## Stage 4: 生成提交
 
-**Goal**: 生成并确认提交信息。
+**Goal**: 准备一条能准确说明“为什么改”的提交信息。
 
-1. 基于变更生成 Conventional Commit。
-2. 让用户确认。
-3. 获批后再提交。
+1. 如需暂存变更，先征求用户确认。
+2. 分析当前变更范围并撰写 Conventional Commit 信息。
+3. 将提交信息展示给用户审批。
+4. 只有审批通过后才真正创建提交。
 
-**Verify**: 提交信息已批准，且提交成功。
+**Verify**: 用户已批准提交信息，且 commit 成功。
 
-**On failure**: 在 commit 前停止。
+**On failure**：在提交前停止，并说明阻塞点。
 
 ## Stage 5: 汇总
 
-**Goal**: 输出可信的交付摘要。
+**Goal**: 输出简洁、可信的交付摘要。
 
-1. 汇总审查结果。
-2. 汇总校验结果。
-3. 输出 commit 信息。
+输出：
 
-**Verify**: 摘要内容与实际执行结果一致。
+- 按严重级别统计的审查摘要
+- 校验状态
+- 若已提交，则包含 commit hash 与 subject
+
+**Verify**: 摘要内容与前面各阶段的实际结果一致。

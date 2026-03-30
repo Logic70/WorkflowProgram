@@ -29,25 +29,12 @@ function Parse-Frontmatter {
     $result = @{}
     foreach ($line in ($Matches[1] -split "\r?\n")) {
         if ($line -match '^\s*([^:#]+):\s*(.+?)\s*$') {
-            $result[$Matches[1].Trim()] = $Matches[2].Trim().Trim("'`"")
+            $key = $Matches[1].Trim()
+            $value = $Matches[2].Trim()
+            $result[$key] = $value.Trim("'`"")
         }
     }
-
     return $result
-}
-
-function Split-ListField {
-    param([string]$Value)
-
-    if (-not $Value) {
-        return @()
-    }
-
-    return @(
-        $Value.Split(",") |
-        ForEach-Object { $_.Trim() } |
-        Where-Object { $_ -ne "" }
-    )
 }
 
 $requiredPaths = @(
@@ -59,12 +46,7 @@ $requiredPaths = @(
     ".claude\commands",
     ".claude\skills",
     ".claude\rules\constraints.md",
-    ".claude\scripts\validate-workflow.ps1",
-    ".claude\scripts\smoke-test-workflow.ps1",
-    ".claude\contracts\command.schema.json",
-    ".claude\contracts\lesson-entry.schema.json",
-    ".claude\contracts\validation-report.schema.json",
-    ".claude\contracts\review-finding.schema.json"
+    ".claude\scripts\validate-workflow.ps1"
 )
 
 foreach ($relativePath in $requiredPaths) {
@@ -87,14 +69,14 @@ catch {
     Add-Error "Invalid JSON in .claude/settings.json: $($_.Exception.Message)"
 }
 
+$commandFiles = Get-ChildItem -Path (Join-Path $Root ".claude\commands") -Filter *.md -File | Sort-Object Name
 $registeredCommands = @{}
-$registeredSkills = @{}
 
 if ($settings -and $settings.commands) {
     foreach ($prop in $settings.commands.PSObject.Properties) {
         $registeredCommands[$prop.Name] = $prop.Value.file
-        $target = Join-Path $Root $prop.Value.file
-        if (Test-Path $target) {
+        $commandPath = Join-Path $Root $prop.Value.file
+        if (Test-Path $commandPath) {
             Add-Pass "Registered command '$($prop.Name)' points to an existing file"
         }
         else {
@@ -103,68 +85,6 @@ if ($settings -and $settings.commands) {
     }
 }
 
-if ($settings -and $settings.skills) {
-    foreach ($prop in $settings.skills.PSObject.Properties) {
-        $registeredSkills[$prop.Name] = $prop.Value.file
-        $target = Join-Path $Root $prop.Value.file
-        if (Test-Path $target) {
-            Add-Pass "Registered skill '$($prop.Name)' points to an existing file"
-        }
-        else {
-            Add-Error "Registered skill '$($prop.Name)' points to a missing file: $($prop.Value.file)"
-        }
-    }
-}
-
-$internalSkills = @{}
-$skillDirs = Get-ChildItem -Path (Join-Path $Root ".claude\skills") -Directory | Sort-Object Name
-foreach ($dir in $skillDirs) {
-    $skillPath = Join-Path $dir.FullName "SKILL.md"
-    if (-not (Test-Path $skillPath)) {
-        Add-Error "Skill directory '$($dir.Name)' is missing SKILL.md"
-        continue
-    }
-
-    try {
-        $frontmatter = Parse-Frontmatter -Path $skillPath
-        foreach ($requiredField in @("name", "description", "version")) {
-            if ($frontmatter.ContainsKey($requiredField) -and $frontmatter[$requiredField]) {
-                Add-Pass "Skill '$($dir.Name)' includes frontmatter field '$requiredField'"
-            }
-            else {
-                Add-Error "Skill '$($dir.Name)' is missing frontmatter field '$requiredField'"
-            }
-        }
-
-        if ($frontmatter.ContainsKey("internal") -and $frontmatter["internal"].ToLower() -eq "true") {
-            $internalSkills[$dir.Name] = $true
-            if ($frontmatter.ContainsKey("name")) {
-                $internalSkills[$frontmatter["name"]] = $true
-            }
-            Add-Pass "Internal support skill '$($dir.Name)' is explicitly marked internal"
-        }
-        elseif ($registeredSkills.Values -contains ".claude/skills/$($dir.Name)/SKILL.md") {
-            Add-Pass "Skill '$($dir.Name)' is registered in settings.json"
-        }
-        else {
-            Add-Error "Skill '$($dir.Name)' exists on disk but is not registered in settings.json"
-        }
-    }
-    catch {
-        Add-Error $_.Exception.Message
-    }
-}
-
-# Reject .json command files (must be Markdown)
-$jsonCommandFiles = Get-ChildItem -Path (Join-Path $Root ".claude\commands") -Filter *.json -File -ErrorAction SilentlyContinue
-foreach ($jf in $jsonCommandFiles) {
-    Add-Error "Command '$($jf.Name)' uses JSON format; commands MUST be Markdown (.md)"
-}
-if (-not $jsonCommandFiles -or $jsonCommandFiles.Count -eq 0) {
-    Add-Pass "No JSON command files found (all commands use Markdown)"
-}
-
-$commandFiles = Get-ChildItem -Path (Join-Path $Root ".claude\commands") -Filter *.md -File | Sort-Object Name
 foreach ($file in $commandFiles) {
     $relative = ".claude/commands/$($file.Name)"
     $content = Get-Content -Raw -Path $file.FullName
@@ -196,49 +116,52 @@ foreach ($file in $commandFiles) {
     else {
         Add-Error "Command '$($file.Name)' exists on disk but is not registered in settings.json"
     }
+}
 
-    try {
-        $frontmatter = Parse-Frontmatter -Path $file.FullName
-        foreach ($requiredField in @("name", "purpose", "inputs", "outputs", "gates", "depends_on", "writes_to")) {
-            if ($frontmatter.ContainsKey($requiredField) -and $frontmatter[$requiredField]) {
-                Add-Pass "Command '$($file.Name)' includes metadata field '$requiredField'"
-            }
-            else {
-                Add-Error "Command '$($file.Name)' is missing metadata field '$requiredField'"
-            }
-        }
+$skillDirs = Get-ChildItem -Path (Join-Path $Root ".claude\skills") -Directory | Sort-Object Name
+$registeredSkills = @{}
 
-        $expectedName = [System.IO.Path]::GetFileNameWithoutExtension($file.Name)
-        if ($frontmatter["name"] -eq $expectedName) {
-            Add-Pass "Command '$($file.Name)' metadata name matches file name"
+if ($settings -and $settings.skills) {
+    foreach ($prop in $settings.skills.PSObject.Properties) {
+        $registeredSkills[$prop.Name] = $prop.Value.file
+        $skillPath = Join-Path $Root $prop.Value.file
+        if (Test-Path $skillPath) {
+            Add-Pass "Registered skill '$($prop.Name)' points to an existing file"
         }
         else {
-            Add-Error "Command '$($file.Name)' metadata name '$($frontmatter["name"])' does not match file name '$expectedName'"
+            Add-Error "Registered skill '$($prop.Name)' points to a missing file: $($prop.Value.file)"
         }
+    }
+}
 
-        foreach ($dependency in (Split-ListField -Value $frontmatter["depends_on"])) {
-            if ($registeredSkills.ContainsKey($dependency) -or $internalSkills.ContainsKey($dependency)) {
-                Add-Pass "Command '$($file.Name)' dependency '$dependency' resolves to a known skill"
+foreach ($dir in $skillDirs) {
+    $skillPath = Join-Path $dir.FullName "SKILL.md"
+    if (-not (Test-Path $skillPath)) {
+        Add-Error "Skill directory '$($dir.Name)' is missing SKILL.md"
+        continue
+    }
+
+    try {
+        $frontmatter = Parse-Frontmatter -Path $skillPath
+        foreach ($requiredField in @("name", "description", "version")) {
+            if ($frontmatter.ContainsKey($requiredField) -and $frontmatter[$requiredField]) {
+                Add-Pass "Skill '$($dir.Name)' includes frontmatter field '$requiredField'"
             }
             else {
-                Add-Error "Command '$($file.Name)' depends on unknown skill '$dependency'"
+                Add-Error "Skill '$($dir.Name)' is missing frontmatter field '$requiredField'"
             }
         }
 
-        foreach ($target in (Split-ListField -Value $frontmatter["writes_to"])) {
-            # Skip variable-based paths (e.g. $OUTPUT_DIR/...) — resolved at runtime
-            if ($target -match '^\$') {
-                Add-Pass "Command '$($file.Name)' write target '$target' uses runtime variable (skipped)"
-                continue
-            }
-            $fullTarget = Join-Path $Root $target
-            $parent = Split-Path -Parent $fullTarget
-            if ($parent -and (Test-Path $parent)) {
-                Add-Pass "Command '$($file.Name)' write target '$target' has an existing parent path"
-            }
-            else {
-                Add-Error "Command '$($file.Name)' write target '$target' does not have an existing parent path"
-            }
+        $isInternal = $frontmatter.ContainsKey("internal") -and ($frontmatter["internal"].ToLower() -eq "true")
+        $relativeSkill = ".claude/skills/$($dir.Name)/SKILL.md"
+        if ($isInternal) {
+            Add-Pass "Internal support skill '$($dir.Name)' is exempt from settings registration"
+        }
+        elseif ($registeredSkills.Values -contains $relativeSkill) {
+            Add-Pass "Skill '$($dir.Name)' is registered in settings.json"
+        }
+        else {
+            Add-Error "Skill '$($dir.Name)' exists on disk but is not registered in settings.json"
         }
     }
     catch {

@@ -1,14 +1,7 @@
----
-name: preflight
-purpose: Run a parallel readiness check without creating a commit.
-inputs: current branch diff, optional scope
-outputs: preflight report, readiness verdict
-gates: stop-on-empty-scope, stop-on-critical-security, stop-on-validation-failure
-depends_on: review, test, doc, core-review-pipeline, core-validation-pipeline, core-reporting
-writes_to: ./validation-report.md, ./lessons.md
----
+在正式评审或交付前执行一次完整预检查。
 
-在正式交付前执行并行预检查，不会创建提交。
+与 `/ship` 不同，`/preflight` 会优先并行执行检查并汇总结果，
+以更快判断当前变更是否达到“可进入下一步”的状态；它不会创建提交。
 
 ## Usage
 
@@ -16,38 +9,66 @@ writes_to: ./validation-report.md, ./lessons.md
 /preflight [<scope>]
 ```
 
-## Stage 1: 确定范围
+默认目标：当前分支相对 `main` 的变更。
 
-**Goal**: 明确需要检查的 diff。
+## Stage 1: 识别范围
 
-1. 解析 `$ARGUMENTS`。
-2. 默认使用 `main...HEAD`。
+**Goal**: 明确要检查的 diff 范围。
 
-**Verify**: 目标范围非空。
+1. 将 `$ARGUMENTS` 解析为检查目标。
+2. 若未指定范围，则运行 `git diff main...HEAD --stat` 查看受影响文件。
+3. 若没有相关变更，则直接停止。
 
-**On failure**: 输出 `Nothing to check.`。
+**Verify**: 目标范围能解析为非空 diff。
+
+**On failure**：输出 `Nothing to check.` 并停止。
 
 ## Stage 2: 并行检查
 
-**Goal**: 并行运行安全、审查、文档和验证检查。
+**Goal**: 并行运行仓库就绪性检查。
 
-1. 启动安全检查。
-2. 启动代码审查。
-3. 启动文档检查。
-4. 运行校验脚本。
+在一条 Task 消息中同时启动以下检查：
 
-**Verify**: 每一条检查链路都能产出可汇总结果。
+- 安全检查
+- 代码审查（逻辑 + 风格）
+- 测试/校验验证
+- 文档完整性检查
 
-**On failure**: 记录失败原因。
+要求：
 
-## Stage 3: 汇总报告
+- 子代理提示词必须完整内联
+- 总 fan-out 数量不超过 4
+- 测试/校验阶段使用 `CLAUDE.md` 中定义的测试命令
 
-**Goal**: 产出统一的 READY / NOT READY 结论。
+**Verify**: 每条检查链路都返回可被聚合的结果。
 
-1. 按模块汇总发现数量。
-2. 明确 critical、warning 和 doc gap。
-3. 生成总 verdict。
+**On failure**：将并行执行问题记录到 `lessons.md` 并停止。
 
-**Verify**: 报告覆盖全部检查链路。
+## Stage 3: 汇总结果
 
-**On failure**: 指出缺失结果。
+**Goal**: 生成统一的就绪性报告。
+
+将所有结果汇总为：
+
+```text
+## Preflight Report
+
+### Security: PASS / FAIL (N issues)
+### Review: PASS / FAIL (N issues)
+### Tests: PASS / FAIL
+### Docs: PASS / FAIL (N missing items)
+### Overall Verdict: READY / NOT READY
+```
+
+`READY` 的前提：
+
+- 没有 critical 安全问题
+- 校验成功
+
+warning 和文档问题会报告，但不阻塞 READY 判定。
+
+**Verify**: 报告覆盖所有检查链路，并给出最终结论。
+
+**On failure**：解释是哪一部分结果缺失或格式不合法。
+
+Target：`$ARGUMENTS`

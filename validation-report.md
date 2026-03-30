@@ -53,3 +53,12 @@
   - Problem 4: Changed Stage 1 to clone target into ./target-code/ within workspace
   - Problem 5: Configured PostToolUseFailure and Stop hooks for auto error logging and progress tracking
   - 5 new constraints extracted to WorkflowProgram-CN
+
+## 2026-03-28 Claude Code Cleanup
+
+- status: PASS
+- scope: remove Codex mirror layer and contract-only assets, keep Claude Code compatible structure
+- command: `powershell -ExecutionPolicy Bypass -File .claude/scripts/validate-workflow.ps1`
+- result: 70 checks passed, 0 failed
+- notes: removed `.agents/`, `.claude/contracts/`, `smoke-test-workflow.ps1`, `core-*` skills, and downstream transcript artifacts
+

@@ -1,54 +1,30 @@
 # WorkflowProgram Constraints
 
-Source: extracted-workflow hardening and local-Claude validation.
+来源：2026-03-20 仓库基线整理。
 
-## Repository Invariants
+## 仓库不变量
 
-- ALWAYS keep `README.md`, `CLAUDE.md`, `lessons.md`, `validation-report.md`, and `.claude/rules/constraints.md` present.
-- ALWAYS keep `.claude/settings.json` aligned with actual user-facing commands and skills.
-- ALWAYS keep `.claude/contracts/` present once the repository exposes contract-aware validation.
-- NEVER treat `.claude/settings.local.json` as shared workflow logic.
+- ALWAYS 保持 `README.md`、`CLAUDE.md`、`lessons.md` 和 `.claude/rules/constraints.md` 存在。
+- ALWAYS 保持 `.claude/settings.json` 与对外命令、技能的真实状态同步。
+- ALWAYS 在示例路径中优先使用仓库内相对路径，除非工作流明确需要外部目标路径。
+- NEVER 把 `.claude/settings.local.json` 当作共享工作流逻辑的一部分。
 
-## Extracted Workflow Conventions
+## 命令设计
 
-- ALWAYS treat a generated standalone workflow repository as another Claude workflow repository unless the spec explicitly says otherwise.
-- ALWAYS register commands in `.claude/settings.json` as an object map: `commands.<name>.file`.
-- ALWAYS store user-facing command definitions as Markdown files under `.claude/commands/*.md`.
-- ALWAYS store user-facing skills as `SKILL.md` files under `.claude/skills/<skill-name>/`.
-- NEVER generate standalone command JSON files such as `.claude/commands/<name>.json` unless the target runtime contract explicitly requires JSON and the spec calls that out.
-- NEVER switch `settings.json` to an array-based registration format when the target repository is Claude-compatible.
-- ALWAYS declare the extraction target path and the expected write boundary before asking Claude to create files.
-- ALWAYS mention `--add-dir <path>` or an equivalent workspace-expansion mechanism when the target output directory is outside the current Claude workspace.
+- ALWAYS 为用户可见命令保留 `## Usage` 段。
+- ALWAYS 将用户可见命令组织为编号阶段，并为阶段提供 `Goal` 与 `Verify`。
+- ALWAYS 将可复用的失败经验或上下文缺口记录到 `lessons.md`。
+- NEVER 在单个 fan-out 阶段中超过 4 个并行代理。
+- NEVER 让子代理运行时依赖外部 agent 文件，只要可以内联提示词就必须内联。
 
-## Command Design
+## 技能与 Agent 设计
 
-- ALWAYS give each user-facing command a `Usage` section.
-- ALWAYS structure user-facing commands as numbered stages with `Goal` and `Verify`.
-- ALWAYS keep command frontmatter fields in sync with `.claude/contracts/command.schema.json`.
-- ALWAYS declare dependencies and write targets explicitly in command frontmatter.
-- ALWAYS checkpoint long-running workflow stages to disk before waiting for a final summary.
-- ALWAYS consider non-interactive (CI/CD) mode when designing gates: support pre-approval via prompt parameters or environment variables.
-- ALWAYS include toolchain degradation strategy in Stage 3 design when the workflow depends on external tools.
-- ALWAYS provide structured methodology (Step 1/2/3...) for AI agents, not just "focus areas" lists.
-- ALWAYS distinguish "append-only logs" (lessons.md, not read) from "session buffers" (session-findings.md, read/write).
-- ALWAYS clone audit targets into project-internal paths (e.g., ./target-code/) to ensure workspace accessibility.
-- NEVER exceed 4 parallel agents in one fan-out stage.
-- NEVER require runtime subagents to load external agent files when prompts can be inlined or summarized in the command itself.
+- ALWAYS 为每个 `SKILL.md` 提供 `name`、`description`、`version` frontmatter。
+- ALWAYS 为审查类和校验类 Agent 明确输出格式。
+- NEVER 漏掉任何被命令直接引用的支持资产。
 
-## Skill and Agent Design
+## 校验
 
-- ALWAYS give every `SKILL.md` the fields `name`, `description`, and `version`.
-- ALWAYS mark non-user-facing helper skills with `internal: true`.
-- ALWAYS make reviewer and validator outputs structurally explicit.
-- ALWAYS tag each finding with its source (tool name or AI agent) in audit-style workflows, to enable confidence assessment.
-- NEVER leave command-critical support assets outside version control.
-
-## Validation
-
-- ALWAYS update `.claude/scripts/validate-workflow.ps1` when contracts or command metadata change.
-- ALWAYS check external toolchain availability in validation scripts (informational warnings, non-blocking).
-- ALWAYS keep `.claude/scripts/smoke-test-workflow.ps1` passing for registered commands.
-- ALWAYS validate AI-written structured artifacts with a real parser before treating them as final outputs.
-- ALWAYS record structural refactors and local-Claude test findings in `validation-report.md`.
-- ALWAYS configure lightweight hooks (PostToolUseFailure, Stop) for error logging and progress tracking to reduce AI text output.
-- NEVER add heavyweight shared hooks without documenting runtime cost and intent.
+- ALWAYS 在仓库结构或注册规则变更后同步维护 `.claude/scripts/validate-workflow.ps1`。
+- ALWAYS 在交付共享工作流变更前执行仓库校验。
+- NEVER 在未说明原因和运行成本前引入重量级共享 hooks。

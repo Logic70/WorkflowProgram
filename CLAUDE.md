@@ -1,8 +1,8 @@
-# WorkflowProgram
+# WorkflowProgram-CN
 
 ## 项目概述
 
-WorkflowProgram 是一个面向 Claude Code 风格工作区的元工作流仓库。
+WorkflowProgram-CN 是一个面向 Claude Code 风格工作区的元工作流仓库。
 它不提供业务应用源码，而是提供一组可复用的命令、技能、Agent、
 规则和校验脚本，用来设计、交付、审计和迭代其他工作流仓库。
 
@@ -10,7 +10,7 @@ WorkflowProgram 是一个面向 Claude Code 风格工作区的元工作流仓库
 
 - 文档与配置：Markdown、JSON
 - 自动化与校验：PowerShell
-- 运行环境：Claude Code / Codex 工作区命令体系
+- 运行环境：Claude Code 工作区命令体系
 - 数据库：无
 
 ## 架构说明
@@ -58,7 +58,7 @@ WorkflowProgram 是一个面向 Claude Code 风格工作区的元工作流仓库
 ## 项目结构
 
 ```text
-WorkflowProgram/
+WorkflowProgram-CN/
 |-- CLAUDE.md
 |-- README.md
 |-- lessons.md
@@ -107,7 +107,7 @@ WorkflowProgram/
 
 ## Development Commands
 
-- Run：在 Claude Code 或 Codex 中打开本仓库后直接调用上述命令
+- Run：在 Claude Code 中打开本仓库后直接调用上述命令
 - Test：`powershell -ExecutionPolicy Bypass -File .claude/scripts/validate-workflow.ps1`
 - Lint：`powershell -ExecutionPolicy Bypass -File .claude/scripts/validate-workflow.ps1`
 - Build：`N/A`

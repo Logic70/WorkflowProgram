@@ -1,14 +1,6 @@
----
-name: hotfix
-purpose: Fast-track a hotfix with reduced review scope and strict safety gates.
-inputs: current diff, optional hotfix description
-outputs: security result, validation result, approved hotfix commit
-gates: branch-must-not-be-main, stop-on-critical-security, stop-on-validation-failure, approve-before-commit
-depends_on: test, commit, core-validation-pipeline, core-reporting
-writes_to: ./.git, ./lessons.md, ./validation-report.md
----
+以最小但必要的安全门禁快速处理热修复。
 
-用最小但必要的门禁处理热修复。
+这个流程会跳过风格、性能与文档审查，只保留安全检查和校验作为硬门禁。
 
 ## Usage
 
@@ -16,59 +8,69 @@ writes_to: ./.git, ./lessons.md, ./validation-report.md
 /hotfix [<description>]
 ```
 
-## Stage 1: 分支检查
+默认目标：当前所有变更。
 
-**Goal**: 确保当前不是直接在 `main` 上修复。
+## Stage 1: 创建热修复分支
 
-1. 读取当前分支。
-2. 必要时切到 `hotfix/*`。
+**Goal**: 确保修复工作不直接落在 `main` 上。
 
-**Verify**: 当前位于非 `main` 的热修复分支。
+1. 运行 `git branch --show-current`。
+2. 若已经位于 `hotfix/*` 分支，则直接继续。
+3. 若当前在 `main`，则创建并切换到 `hotfix/<description>`。
 
-**On failure**: 请求用户确认热修复描述。
+**Verify**: 当前工作分支不是 `main`，并且符合热修复分支命名。
+
+**On failure**：停止并请求用户确认热修复描述。
 
 ## Stage 2: 安全检查
 
-**Goal**: 快速确认 diff 中没有 critical 安全问题。
+**Goal**: 确认当前 diff 中没有 critical 安全问题。
 
-1. 仅运行安全检查。
-2. 汇总结果。
+1. 启动一个安全审查任务，并内联完整提示词。
+2. 重点检查注入、权限绕过、凭据泄露和内存安全问题。
 
-**Verify**: 返回结构化安全结论。
+**Verify**: 安全任务返回结构化结果或明确的“无问题”结论。
 
-**On failure**: 记录失败并停止。
+**On failure**：把任务失败情况记录到 `lessons.md` 并停止。
 
-**Gate**: 发现 critical 问题时必须停止。
+**Gate**：若出现 critical 安全问题，必须先停下来并要求修复。
 
-## Stage 3: 校验
+## Stage 3: 运行关联校验
 
-**Goal**: 确认热修复不破坏工作流结构。
+**Goal**: 确认热修复不会破坏仓库既有校验。
 
-1. 运行 `validate-workflow.ps1`。
-2. 运行 `smoke-test-workflow.ps1`。
+1. 通过 `git diff` 识别受影响文件。
+2. 如项目具备关联测试，则优先运行相关测试。
+3. 若没有明确的关联测试，则回退到 `CLAUDE.md` 中定义的完整测试命令。
 
-**Verify**: 两个脚本均通过。
+**Verify**: 校验通过后才能继续准备提交。
 
-**On failure**: 展示失败项。
+**On failure**：展示失败信息并停止。
 
 ## Stage 4: 快速提交
 
-**Goal**: 生成并确认热修复提交。
+**Goal**: 生成并创建最小必要提交。
 
-1. 生成 `fix(scope): subject`。
-2. 等待用户批准。
-3. 获批后提交。
+1. 暂存本次修复相关变更。
+2. 生成 `fix(scope): subject` 形式的提交信息。
+3. 向用户展示提交信息并等待批准。
+4. 批准后再执行提交。
 
-**Verify**: 提交信息获批且 commit 成功。
+**Verify**: 提交信息已获批准，且 commit 创建成功。
 
-**On failure**: 在提交前停止。
+**On failure**：在提交前停止，并说明原因。
 
 ## Stage 5: 汇总
 
-**Goal**: 输出热修复状态摘要。
+**Goal**: 向用户汇报热修复当前状态。
 
-1. 输出分支名。
-2. 输出安全和校验结果。
-3. 输出 commit 信息。
+输出：
 
-**Verify**: 摘要与执行结果一致。
+- 当前分支名
+- 安全检查状态
+- 校验状态
+- commit hash 与 subject
+
+**Verify**: 汇总内容与执行结果一致。
+
+Target：`$ARGUMENTS`

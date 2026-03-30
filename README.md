@@ -1,6 +1,6 @@
-# WorkflowProgram
+# WorkflowProgram-CN
 
-WorkflowProgram 是一个可复用的 Claude Code 元工作流仓库。
+WorkflowProgram-CN 是一个可复用的 Claude Code 元工作流仓库。
 它把命令、技能、专家 Agent、约束规则和验证脚本组合在一起，
 用于设计、校验、交付、审计和持续演进其他工作流仓库。
 
@@ -16,7 +16,7 @@ WorkflowProgram 是一个可复用的 Claude Code 元工作流仓库。
 
 ## 快速开始
 
-1. 打开工作区 `D:\Code\WorkflowProgram`
+1. 打开工作区 `D:\Code\WorkflowProgram-CN`
 2. 先阅读 `CLAUDE.md`
 3. 运行仓库校验：
 
@@ -82,7 +82,7 @@ powershell -ExecutionPolicy Bypass -File .claude/scripts/validate-workflow.ps1
 ## 目录结构
 
 ```text
-WorkflowProgram/
+WorkflowProgram-CN/
 |-- CLAUDE.md
 |-- README.md
 |-- lessons.md

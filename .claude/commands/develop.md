@@ -1,79 +1,176 @@
----
-name: develop
-purpose: Design a workflow from requirements and turn it into workflow assets.
-inputs: requirement description, user clarifications, target runtime conventions, output directory (optional)
-outputs: workflow-spec.md, design summary, workflow files, rule updates
-gates: clarify-before-spec, approve-design-before-generation, validate-before-finish
-depends_on: workflow-spec-support, workflow-audit, core-validation-pipeline, core-reporting
-writes_to: $OUTPUT_DIR/workflow-spec.md, $OUTPUT_DIR/.claude/agents, $OUTPUT_DIR/.claude/skills, $OUTPUT_DIR/.claude/commands, $OUTPUT_DIR/.claude/settings.json, $OUTPUT_DIR/.claude/rules/constraints.md, $OUTPUT_DIR/CLAUDE.md, $OUTPUT_DIR/lessons.md
----
-
-根据用户需求设计一个新工作流。产物是工作流资产，而不是业务应用代码。
-
-支持两种运行模式：
-- **本地模式**（默认）：在当前仓库内创建工作流资产。`$OUTPUT_DIR` = `.`
-- **跨路径模式**：通过 `--output-dir` 指定目标路径，在该路径下创建独立工作流仓。当作为用户级 Skill 被调用时，`$OUTPUT_DIR` 由调用方传入。
+根据用户需求设计一个新工作流。这个命令生成的是工作流文件，
+例如 commands、skills、agents、rules 与 settings 更新，而不是应用代码。
 
 ## Usage
 
 ```text
-/develop <requirement> [--output-dir <path>]
+/develop <requirement>
 ```
 
-## Stage 1: 理解需求
-**Goal**: 确定运行模式和输出路径，产出无歧义的 `workflow-spec.md`。
-1. 解析 `$ARGUMENTS`。若指定了 `--output-dir`，设置 `$OUTPUT_DIR` 为该绝对路径；否则 `$OUTPUT_DIR` = 当前工作目录。
-2. 若 `$OUTPUT_DIR` 不存在，创建它。
-3. 围绕输入、输出、触发方式、质量门禁、角色分工和运行环境提出澄清问题。
-4. 明确这是”当前仓内演进”还是”抽取到新目录的独立工作流”。
-5. 基于 `.claude/skills/develop/spec-template.md` 生成 `$OUTPUT_DIR/workflow-spec.md`。
-**Verify**: `workflow-spec.md` 不包含未解释的空白项、`TBD` 或未声明的运行边界。`$OUTPUT_DIR` 路径已确认可写。
-**On failure**: 把缺失信息记录到 `lessons.md`。
+示例：
 
-## Stage 2: 研究上下文
-**Goal**: 识别可复用资产、目标格式和实现边界。
-1. 审阅 WorkflowProgram-CN 的 `.claude/` 结构、`CLAUDE.md`、规则和契约。这些是**设计参考**，不是复制目标。
-2. 若目标是抽取新仓库，确认目标仓是否仍遵循 Claude 命令/技能约定。
-3. 若 `$OUTPUT_DIR` 与 WorkflowProgram-CN 不同（跨路径模式），确认对 `$OUTPUT_DIR` 的写权限已就绪。
-**Verify**: 简报覆盖需求中的关键范围、目标目录与运行约束。
-**On failure**: 记录遗漏的上下文或权限边界。
+```text
+/develop 设计一个用于审计 Markdown 链接有效性的工作流
+```
 
-## Stage 3: 设计工作流
-**Goal**: 产出结构化设计方案。
-1. 结合原子模式给出阶段流、Skill 清单、Agent 维度、验证方式和输出格式。
-2. 明确命令注册格式、文件布局和报告产物。
-3. 若工作流依赖外部工具链（静态分析器、编译器等），明确列出每个工具的用途、安装方式和不可用时的降级策略。
-4. 若抽取独立仓库，默认沿用 Claude 兼容格式：
-   - `.claude/settings.json` 使用对象映射注册。
-   - 用户命令位于 `.claude/commands/*.md`。
-   - 用户技能位于 `.claude/skills/*/SKILL.md`。
-**Verify**: 设计覆盖所有需求，且单阶段并行代理不超过 4 个。
-**On failure**: 记录设计缺口。
-**Gate**: 必须先获得用户批准设计，再进入文件生成。
+整个过程遵循 TDD 风格循环：定义目标 -> 执行 -> 验证 -> 失败则记录到
+`lessons.md` -> 修复 -> 重试。
 
-## Stage 4: 生成工作流资产
-**Goal**: 在 `$OUTPUT_DIR` 下按设计生成完整文件集。
-1. 所有文件写入 `$OUTPUT_DIR`（不是 WorkflowProgram-CN 目录）。
-2. 先生成规则、模板和脚本，再生成 commands、skills、agents、settings。
-3. 对独立工作流仓，优先生成”可运行、可验证”的最小闭环。
-4. 生成 `$OUTPUT_DIR/CLAUDE.md`、`$OUTPUT_DIR/README.md`、`$OUTPUT_DIR/.gitignore` 等仓库基础文件。
-**Verify**: 设计清单中的文件都存在于 `$OUTPUT_DIR`，格式与目标仓约定一致。
-**On failure**: 修复后重新验证，不保留错误格式的占位文件。
+## Stage 1: 理解需求 (Explore)
 
-## Stage 5: 仓库校验
-**Goal**: 确保新工作流通过结构和烟雾测试。
-1. 若 `$OUTPUT_DIR` 内包含 `validate-workflow.ps1`，运行它。
-2. 若 `$OUTPUT_DIR` == WorkflowProgram-CN，同时运行 `smoke-test-workflow.ps1`。
-3. 若产出独立工作流仓且尚无验证脚本，为 `$OUTPUT_DIR` 补一份仓库内验证脚本。
-4. 对 WorkflowProgram-CN 本身运行 `validate-workflow.ps1` 确认元仓未被破坏。
-**Verify**: 所有验证都通过，并且关键命令可被 Claude 识别。
-**On failure**: 停止交付并报告阻塞项。
+**Goal**: 生成一个没有歧义的 `workflow-spec.md`。
 
-## Stage 6: 约束沉淀
-**Goal**: 把可复用经验提炼成规则。
-1. 回看本次设计、生成和本地 Claude 测试的偏差。
-2. 将 recurring issue 写入 WorkflowProgram-CN 的 `.claude/rules/constraints.md`（不是目标仓的）。
-3. 将真实问答与决策沉淀到 WorkflowProgram-CN 的 `lessons.md` 或测试记录中。
-4. 若目标仓有自己的 `constraints.md`，将仅与目标仓相关的规则写入其中。
-**Verify**: 需要沉淀的经验已经转成规则或记录。
-**On failure**: 保留草稿并说明原因。
+1. 将 `$ARGUMENTS` 解析为工作流需求。
+2. 识别歧义点，并围绕以下维度向用户提出 3-5 个澄清问题：
+   - 需要自动化的流程是什么？（触发 -> 步骤 -> 输出）
+   - 输入和输出分别是什么？
+   - 有哪些质量门禁或停止条件？
+   - 涉及多少种角色或专家维度？
+   - 应由手动命令触发，还是由 hook 自动触发？
+3. 用户回答后，使用 `.claude/skills/develop/spec-template.md` 在仓库根目录生成 `workflow-spec.md`。
+4. **Verify**: 规格中的每个字段都有明确值，且不再包含 `TBD`。
+
+**On failure**：把歧义点和所需补充信息记录到 `lessons.md`。
+
+## Stage 2: 领域研究 (Explore)
+
+**Goal**: 生成覆盖规格范围的领域上下文报告。
+
+1. 启动只读 Explore 子代理，分析：
+   - 现有 `.claude/` 资产：agents、skills、commands、settings、rules
+   - `CLAUDE.md` 中的项目约定、校验方式和命名规则
+   - 与目标工作流领域相关的项目结构
+2. 输出结构化报告，列出可复用资产、缺口和命名建议。
+3. **Verify**: 报告覆盖 `workflow-spec.md` 中提到的所有领域范围。
+
+**On failure**：把遗漏的上下文记录到 `lessons.md`。
+
+## Stage 3: 模式选择与工作流设计 (Specialized Agent)
+
+**Goal**: 生成包含模式组合、Agent 编制和文件清单的设计文档。
+
+设计前先阅读 `.claude/rules/constraints.md`。
+
+### 工作流抽取决策框架
+
+在真正生成文件前，先判断这个工作流是否应被抽取成独立仓库。
+
+**ALWAYS extract when：**
+
+- 该工作流强依赖某种语言、框架或工具链
+- 其他团队或项目也可能独立复用它
+- 它需要独立演进和发布节奏
+- 它与当前仓库技术栈明显不同
+
+**NEVER extract when：**
+
+- 它只服务于本仓库
+- 它高度依赖当前仓库约定或本地配置
+- 它还在高频变化期
+- 它本质上是通用能力，应留在当前仓库
+
+**If extracting：**
+
+1. 先在当前仓库中生成草稿
+2. 向用户展示设计
+3. 批准后复制到 `../{name}-workflow/`
+4. 再清理当前仓库中的临时副本
+
+随后，基于六种原子模式分析需求：
+
+- Sequential
+- Fan-out/Fan-in
+- Explore
+- Event-Driven
+- Test-Driven
+- Specialized Agent
+
+设计文档至少包括：
+
+- ASCII 流程图
+- Agent 清单：名称、职责、关注点、输出格式、约束
+- Skill 清单：触发方式与职责
+- Hook 清单：只有确实需要 hooks 时才添加
+- 文件清单：要创建或修改的每个文件
+- 每一阶段的 TDD 目标和验证条件
+
+**Verify**: 设计覆盖全部需求，统一并行输出格式，并且并行代理数不超过 4 个。
+
+**On failure**：把设计失误写入 `lessons.md`。
+
+**Gate**：将设计展示给用户，得到批准后再进入生成阶段。
+
+## Stage 4: 生成工作流文件 (Sequential)
+
+**Goal**: 设计文档中的文件全部生成且格式正确。
+
+生成顺序：
+
+1. `.claude/agents/*.md`
+2. `.claude/skills/*/SKILL.md`
+3. `.claude/commands/*.md`
+4. `.claude/settings.json`
+5. `.claude/rules/constraints.md`
+6. 如有必要，更新 `CLAUDE.md`
+
+逐文件检查：
+
+- Markdown 标题结构稳定、引用不破损
+- JSON 可解析
+- Agent 提示词自包含
+- 会调用子代理的 Skill 内联完整提示词
+
+**Verify**: 设计文档中的每个文件都存在且通过格式检查。
+
+**On failure**：把问题记录到 `lessons.md`，修复后重新验证。
+
+## Stage 5: 工作流校验 (Test-Driven)
+
+**Goal**: 生成后的工作流通过仓库校验。
+
+校验清单：
+
+- [ ] 设计文档中的全部文件存在
+- [ ] `.claude/settings.json` 是合法 JSON
+- [ ] 没有子代理在运行时依赖外部 agent 文件
+- [ ] 命令引用的 agent 名称或内联提示词有效
+- [ ] 单阶段并行代理数不超过 4
+- [ ] 每个阶段都有清晰的 `Goal` 与 `Verify`
+- [ ] Skills 具备合法 YAML frontmatter
+- [ ] 没有引入重复的 command、skill 或 agent 名称
+
+若校验失败：
+
+1. 记录到 `lessons.md`
+2. 修复文件
+3. 重新校验，最多 3 轮
+
+**Verify**: 校验通过，或在 3 轮失败后给出明确阻塞报告。
+
+**On failure**：停止并向用户说明阻塞点。
+
+## Stage 6: 约束演进
+
+**Goal**: 从本次设计会话中提炼可复用规则。
+
+1. 回顾本次 `/develop` 会话写入 `lessons.md` 的内容。
+2. 判断问题是否会重复出现。
+3. 对可复用问题提炼 `ALWAYS` 或 `NEVER` 规则，写入 `.claude/rules/constraints.md`。
+4. 为规则标注来源命令和日期。
+5. 当工作流文件成为正式交付物后，删除临时 `workflow-spec.md`。
+
+**Verify**: 可复用经验已经沉淀为规则，临时草稿已清理。
+
+**On failure**：保留临时文件并向用户解释原因。
+
+## Final Output
+
+输出以下内容：
+
+- 工作流名称与触发命令
+- 创建或修改的文件
+- 使用的模式组合
+- 新增的约束
+- 下一步建议
+
+Target：`$ARGUMENTS`

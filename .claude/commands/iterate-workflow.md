@@ -1,14 +1,7 @@
----
-name: iterate-workflow
-purpose: Draft and apply workflow improvements from lessons with explicit approval.
-inputs: target workflow path, lessons.md, optional dry-run or apply flags
-outputs: draft changes, approval list, applied updates, refreshed validation result
-gates: stop-on-missing-lessons, approve-structural-changes, validate-after-apply
-depends_on: workflow-audit, core-validation-pipeline, core-reporting
-writes_to: ./lessons.md, ./validation-report.md, ./.claude/rules/constraints.md, ./.claude/commands, ./.claude/skills, ./.claude/settings.json
----
+基于累积的 lessons 对工作流进行自我迭代。
 
-基于 lessons 对工作流进行审批式自我迭代。
+这个命令采用“先草拟、后审批、再应用”的 DRAFT MODE，
+避免未经确认就修改结构性工作流资产。
 
 ## Usage
 
@@ -16,58 +9,116 @@ writes_to: ./lessons.md, ./validation-report.md, ./.claude/rules/constraints.md,
 /iterate-workflow [--dry-run] [--apply] [<workflow-path>]
 ```
 
+默认目标：当前工作流仓库。
+
+选项：
+
+- `--dry-run`：仅展示提议，不真正创建或修改文件
+- `--apply`：在获得批准后应用变更
+- `<workflow-path>`：指定目标工作流路径
+
 ## Stage 1: 分析 lessons
 
-**Goal**: 找出高价值、可执行的改进机会。
+**Goal**: 从 `lessons.md` 中识别改进机会。
 
-1. 读取 `lessons.md`。
-2. 将问题归类为格式、结构、模式、代理、规则问题。
+1. 读取目标工作流的 `lessons.md`
+2. 解析：
+   - What Did Not Work
+   - Constraints To Extract
+   - Recommendations
+   - Test Run 或校验结果
+3. 将问题归类为：
+   - 格式问题
+   - 结构问题
+   - 模式问题
+   - Agent 问题
+   - 规则问题
+4. 判断修复方式：
+   - 自动修复：格式、空白、轻量规范
+   - 需要审批：提示词、规则、架构
 
-**Verify**: 问题已完成归类。
+**Verify**: 问题都已被识别并归类。
 
-**On failure**: 提示先积累 lessons。
+**On failure**：若 `lessons.md` 不存在或为空，则提示先运行工作流积累经验。
 
 ## Stage 2: 生成草案
 
-**Goal**: 为每个问题生成带原因和影响说明的提案。
+**Goal**: 在不立即应用的前提下，为每个问题生成清晰提案。
 
-1. 产出 diff 预览。
-2. 标明自动修复项和需审批项。
+对每个问题产出：
 
-**Verify**: 每个提案都包含目标文件、理由和预期效果。
+- 变更名称
+- 目标文件
+- 变更类型（自动修复 / 需审批）
+- 背景原因
+- diff 预览或内容预览
 
-**On failure**: 保留已生成草案并说明缺口。
+草案应优先展示：
 
-## Stage 3: 审批展示
+- 要改什么
+- 为什么要改
+- 不改会有什么影响
 
-**Goal**: 让用户逐项理解并批准结构性变更。
+**Verify**: 所有提议都具备明确原因和预期效果。
 
-1. 展示摘要。
-2. 展示 diff。
-3. 等待用户决定。
+**On failure**：保留已生成草案，并说明哪些问题还需要人工分析。
 
-**Verify**: 用户可以逐项批准或拒绝。
+## Stage 3: 向用户展示
 
-**On failure**: 保留最关键的提案。
+**Goal**: 以适合 CLI 阅读的方式展示所有变更。
 
-## Stage 4: 应用批准项
+展示结构建议：
 
-**Goal**: 只落盘用户明确批准的修改。
+1. 分析摘要
+2. 可自动修复项
+3. 需要审批的结构化变更
+4. 预期收益
+5. 下一步动作
 
-1. 自动应用低风险格式修复。
-2. 对结构性项仅应用批准内容。
+对于需要审批的项，应逐条给出：
 
-**Verify**: 未批准的结构性变更不会被应用。
+- diff 或预览
+- 问题描述
+- 修改理由
+- 等待用户批准
 
-**On failure**: 停止后续落盘。
+**Verify**: 用户能清楚看见每项变更的内容、原因和影响。
+
+**On failure**：缩减输出范围，但保留最关键的问题项。
+
+## Stage 4: 应用批准项（仅在 --apply）
+
+**Goal**: 仅应用用户已经批准的提案。
+
+1. 自动应用低风险格式修复
+2. 对结构性改动逐项确认审批结果
+3. 只对批准项落盘
+4. 在必要时更新 `lessons.md`，标记已提炼或已处理的问题
+
+**Verify**: 只有明确批准的变更被应用。
+
+**On failure**：停止后续应用，并保留审批状态说明。
 
 ## Stage 5: 重新校验
 
-**Goal**: 确认应用后的工作流仍通过全部检查。
+**Goal**: 确认应用后的工作流仍然自洽。
 
-1. 运行 `validate-workflow.ps1`。
-2. 运行 `smoke-test-workflow.ps1`。
+1. 运行仓库定义的验证命令
+2. 检查：
+   - 结构是否仍完整
+   - 注册关系是否仍正确
+   - 新规则是否与现有规则冲突
 
-**Verify**: 变更后依然通过全部脚本。
+**Verify**: 变更后工作流通过校验。
 
-**On failure**: 输出阻塞项并回退到草案说明层。
+**On failure**：展示失败项并回到草案层说明问题。
+
+## Final Output
+
+输出：
+
+- 分析到的问题数量
+- 自动修复项数量
+- 待审批项数量
+- 已应用项数量（若使用 `--apply`）
+- 建议的下一步动作
