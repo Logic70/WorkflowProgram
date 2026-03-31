@@ -1,50 +1,76 @@
-Ship the current changes: review, test, and commit in one sequential pipeline.
+按顺序交付当前变更：先审查，再校验，最后准备提交。
 
-## Step 1: Pre-check
+## Usage
 
-- Run `git status` to confirm there are staged or unstaged changes
-- If no changes found, stop and report "Nothing to ship."
+```text
+/ship [<scope>]
+```
 
-## Step 2: Code Review (Fan-out)
+默认目标：当前所有变更。
 
-Run a comprehensive code review on the current changes:
+## Stage 1: 预检查
 
-1. Get the diff: `git diff` (unstaged) or `git diff --cached` (staged)
-2. Launch 4 parallel review agents using Task tool (all in a SINGLE message):
-   - **Security reviewer** — scan for vulnerabilities (injection, auth, secrets, memory safety)
-   - **Performance reviewer** — scan for bottlenecks (memory, I/O, algorithms, DB queries)
-   - **Style reviewer** — scan for readability issues (naming, types, docs, structure)
-   - **Logic reviewer** — scan for correctness bugs (edge cases, errors, concurrency, state)
+**Goal**: 确认当前存在明确的交付范围。
 
-   Each agent prompt must be FULLY INLINED in the Task call (subagents cannot read files from main context).
-   Each agent outputs one JSON object per line: {"severity":"...","file":"...","line":...,"description":"...","suggestion":"..."}
+1. 运行 `git status`，确认存在已暂存或未暂存变更。
+2. 若提供了 `$ARGUMENTS`，据此缩小范围；否则默认覆盖当前全部变更。
 
-3. Collect all agent outputs. Parse JSON lines, merge into a unified list sorted by severity (critical → warning → info).
+**Verify**: 至少存在一项需要交付的变更。
 
-**Gate**: If any CRITICAL issue is found, STOP here. Show the findings and ask the user whether to fix and retry, or force continue.
+**On failure**：输出 `Nothing to ship.` 并停止。
 
-## Step 3: Run Tests
+## Stage 2: 代码审查 (Fan-out)
 
-1. Run the project's test command (check CLAUDE.md for the test command)
-2. If tests fail, analyze the failure and suggest a fix
-3. Do NOT proceed to commit if tests fail — stop and report
+**Goal**: 收集当前 diff 的多维审查结果。
 
-**Gate**: Tests must pass to continue.
+1. 通过 `git diff` 或 `git diff --cached` 获取差异。
+2. 在单条 Task 消息中并行启动 4 个审查代理：
+   - 安全审查
+   - 性能审查
+   - 风格审查
+   - 逻辑审查
+3. 所有子代理提示词必须完整内联，不能依赖外部 agent 文件。
+4. 收集 JSON Lines 输出，并按 `critical -> warning -> info` 汇总。
 
-## Step 4: Generate Commit
+**Verify**: 四条审查链路都返回了结构化结果或明确的“无问题”结论。
 
-1. Stage changes if not already staged (ask user for confirmation first)
-2. Analyze changes and generate a Conventional Commits message:
-   - `type(scope): subject` (50 char max)
-   - Body explaining WHY (not what — the diff shows what)
-3. Show the commit message and wait for user confirmation
-4. Create the commit
+**On failure**：把审查失败记录到 `lessons.md` 并停止。
 
-## Step 5: Summary
+**Gate**：若出现任何 critical 级问题，必须先停下来让用户决定是修复还是强制继续。
 
-Output a brief summary:
-- Review: X issues found (Y critical, Z warnings, W info)
-- Tests: passed / failed
-- Commit: `<hash> <message>`
+## Stage 3: 运行校验
 
-Ship target: $ARGUMENTS (default: all current changes)
+**Goal**: 确认仓库通过项目定义的测试命令。
+
+1. 运行 `CLAUDE.md` 中定义的测试命令。
+2. 若失败，分析失败原因并给出修复建议。
+3. 在校验未通过前不得继续准备提交。
+
+**Verify**: 测试命令成功退出。
+
+**On failure**：展示失败原因并停止。
+
+## Stage 4: 生成提交
+
+**Goal**: 准备一条能准确说明“为什么改”的提交信息。
+
+1. 如需暂存变更，先征求用户确认。
+2. 分析当前变更范围并撰写 Conventional Commit 信息。
+3. 将提交信息展示给用户审批。
+4. 只有审批通过后才真正创建提交。
+
+**Verify**: 用户已批准提交信息，且 commit 成功。
+
+**On failure**：在提交前停止，并说明阻塞点。
+
+## Stage 5: 汇总
+
+**Goal**: 输出简洁、可信的交付摘要。
+
+输出：
+
+- 按严重级别统计的审查摘要
+- 校验状态
+- 若已提交，则包含 commit hash 与 subject
+
+**Verify**: 摘要内容与前面各阶段的实际结果一致。

@@ -1,62 +1,74 @@
-Run a full preflight check before submitting code for review or deployment.
+在正式评审或交付前执行一次完整预检查。
 
-Unlike /ship which is sequential (review → test → commit), preflight runs all checks IN PARALLEL for speed, then aggregates results into a single report. It does NOT commit.
+与 `/ship` 不同，`/preflight` 会优先并行执行检查并汇总结果，
+以更快判断当前变更是否达到“可进入下一步”的状态；它不会创建提交。
 
-## Step 1: Identify Scope
+## Usage
 
-- Parse $ARGUMENTS as the target (default: changes since branching from main)
-- Run `git diff main...HEAD --stat` to list affected files
-- If no changes, stop and report "Nothing to check."
-
-## Step 2: Parallel Checks (launch ALL at once)
-
-Launch these agents simultaneously using Task tool (all in a SINGLE message):
-
-**Agent 1 — Security Audit:**
-> Scan all changed files for security vulnerabilities.
-> Focus: injection, auth bypass, secrets exposure, memory safety, crypto weakness.
-> Output one JSON per line: {"severity":"...","file":"...","line":...,"cwe":"...","description":"...","suggestion":"..."}
-> If none: "No security issues detected."
-
-**Agent 2 — Code Review (Logic + Style):**
-> Review changed code for logic errors, edge cases, and style issues.
-> Focus: off-by-one, null handling, error propagation, naming, type safety, documentation.
-> Output one JSON per line: {"severity":"...","file":"...","line":...,"description":"...","suggestion":"..."}
-> If none: "No code issues detected."
-
-**Agent 3 — Test Verification:**
-> Run the project's test suite (check CLAUDE.md for the test command).
-> Check test coverage for changed files if coverage tool is available.
-> Report: pass/fail, coverage %, uncovered lines in changed files.
-
-**Agent 4 — Doc Check:**
-> Verify docstrings/comments exist for all new public functions/classes.
-> Check if README needs updating for public API changes.
-> Report: list of missing documentation items.
-
-## Step 3: Aggregate Results
-
-Collect all agent results and produce a single report:
-
+```text
+/preflight [<scope>]
 ```
+
+默认目标：当前分支相对 `main` 的变更。
+
+## Stage 1: 识别范围
+
+**Goal**: 明确要检查的 diff 范围。
+
+1. 将 `$ARGUMENTS` 解析为检查目标。
+2. 若未指定范围，则运行 `git diff main...HEAD --stat` 查看受影响文件。
+3. 若没有相关变更，则直接停止。
+
+**Verify**: 目标范围能解析为非空 diff。
+
+**On failure**：输出 `Nothing to check.` 并停止。
+
+## Stage 2: 并行检查
+
+**Goal**: 并行运行仓库就绪性检查。
+
+在一条 Task 消息中同时启动以下检查：
+
+- 安全检查
+- 代码审查（逻辑 + 风格）
+- 测试/校验验证
+- 文档完整性检查
+
+要求：
+
+- 子代理提示词必须完整内联
+- 总 fan-out 数量不超过 4
+- 测试/校验阶段使用 `CLAUDE.md` 中定义的测试命令
+
+**Verify**: 每条检查链路都返回可被聚合的结果。
+
+**On failure**：将并行执行问题记录到 `lessons.md` 并停止。
+
+## Stage 3: 汇总结果
+
+**Goal**: 生成统一的就绪性报告。
+
+将所有结果汇总为：
+
+```text
 ## Preflight Report
 
 ### Security: PASS / FAIL (N issues)
-[list critical and warning items]
-
-### Review:   PASS / FAIL (N issues)
-[list critical and warning items]
-
-### Tests:    PASS / FAIL (coverage: N%)
-[failure details if any]
-
-### Docs:     PASS / FAIL (N missing)
-[list missing items]
-
+### Review: PASS / FAIL (N issues)
+### Tests: PASS / FAIL
+### Docs: PASS / FAIL (N missing items)
 ### Overall Verdict: READY / NOT READY
 ```
 
-**Overall is READY** only if: zero critical security issues AND tests pass.
-Warnings and doc issues are reported but don't block.
+`READY` 的前提：
 
-Target: $ARGUMENTS (default: main...HEAD)
+- 没有 critical 安全问题
+- 校验成功
+
+warning 和文档问题会报告，但不阻塞 READY 判定。
+
+**Verify**: 报告覆盖所有检查链路，并给出最终结论。
+
+**On failure**：解释是哪一部分结果缺失或格式不合法。
+
+Target：`$ARGUMENTS`

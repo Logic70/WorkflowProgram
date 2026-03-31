@@ -1,45 +1,76 @@
-Fast-track a hotfix: minimal checks, quick commit.
+以最小但必要的安全门禁快速处理热修复。
 
-Skip style review, performance review, and doc check. Only security and tests gate the commit.
+这个流程会跳过风格、性能与文档审查，只保留安全检查和校验作为硬门禁。
 
-## Step 1: Create Hotfix Branch
+## Usage
 
-- Run `git branch --show-current` to check current branch
-- If on main, create and switch to `hotfix/<description>` branch (derive description from $ARGUMENTS or ask user)
-- If already on a hotfix branch, continue on it
+```text
+/hotfix [<description>]
+```
 
-## Step 2: Security Check
+默认目标：当前所有变更。
 
-Launch ONE Task for security review only:
+## Stage 1: 创建热修复分支
 
-> Scan the current diff for critical security issues.
-> Focus: injection, auth bypass, secrets exposure, memory safety.
-> Output one JSON per line: {"severity":"...","file":"...","line":...,"description":"...","suggestion":"..."}
-> If none: "No security issues detected."
+**Goal**: 确保修复工作不直接落在 `main` 上。
 
-**Gate**: If any CRITICAL security issue is found, STOP. Show it and ask the user to fix before continuing.
+1. 运行 `git branch --show-current`。
+2. 若已经位于 `hotfix/*` 分支，则直接继续。
+3. 若当前在 `main`，则创建并切换到 `hotfix/<description>`。
 
-## Step 3: Run Related Tests
+**Verify**: 当前工作分支不是 `main`，并且符合热修复分支命名。
 
-1. Check `git diff` to identify changed files
-2. Find and run ONLY tests related to the changed code (not the full suite)
-3. If no related tests found, run the full test suite as fallback
+**On failure**：停止并请求用户确认热修复描述。
 
-**Gate**: Tests must pass to continue.
+## Stage 2: 安全检查
 
-## Step 4: Quick Commit
+**Goal**: 确认当前 diff 中没有 critical 安全问题。
 
-1. Stage all changes
-2. Generate commit message: `fix(scope): <description>` format
-3. Show the commit message and wait for user confirmation
-4. Create the commit
+1. 启动一个安全审查任务，并内联完整提示词。
+2. 重点检查注入、权限绕过、凭据泄露和内存安全问题。
 
-## Step 5: Summary
+**Verify**: 安全任务返回结构化结果或明确的“无问题”结论。
 
-Output:
-- Branch: `<branch name>`
-- Security: PASS (N issues checked)
-- Tests: passed (N tests run)
-- Commit: `<hash> <message>`
+**On failure**：把任务失败情况记录到 `lessons.md` 并停止。
 
-Hotfix target: $ARGUMENTS (default: all current changes)
+**Gate**：若出现 critical 安全问题，必须先停下来并要求修复。
+
+## Stage 3: 运行关联校验
+
+**Goal**: 确认热修复不会破坏仓库既有校验。
+
+1. 通过 `git diff` 识别受影响文件。
+2. 如项目具备关联测试，则优先运行相关测试。
+3. 若没有明确的关联测试，则回退到 `CLAUDE.md` 中定义的完整测试命令。
+
+**Verify**: 校验通过后才能继续准备提交。
+
+**On failure**：展示失败信息并停止。
+
+## Stage 4: 快速提交
+
+**Goal**: 生成并创建最小必要提交。
+
+1. 暂存本次修复相关变更。
+2. 生成 `fix(scope): subject` 形式的提交信息。
+3. 向用户展示提交信息并等待批准。
+4. 批准后再执行提交。
+
+**Verify**: 提交信息已获批准，且 commit 创建成功。
+
+**On failure**：在提交前停止，并说明原因。
+
+## Stage 5: 汇总
+
+**Goal**: 向用户汇报热修复当前状态。
+
+输出：
+
+- 当前分支名
+- 安全检查状态
+- 校验状态
+- commit hash 与 subject
+
+**Verify**: 汇总内容与执行结果一致。
+
+Target：`$ARGUMENTS`

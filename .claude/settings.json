@@ -1,51 +1,50 @@
 {
-  "PreToolUse": [
-    {
-      "matcher": { "tools": ["BashTool"], "input_contains": "git commit" },
-      "hooks": [
-        {
-          "type": "command",
-          "command": "branch=$(git branch --show-current 2>/dev/null) && [ \"$branch\" != 'main' ] && [ \"$branch\" != 'master' ] || (echo 'BLOCKED: Direct commit to main/master is not allowed. Create a feature branch first.' && exit 1)"
-        }
-      ]
+  "commands": {
+    "develop": {
+      "description": "Design a new workflow from requirements",
+      "file": ".claude/commands/develop.md"
+    },
+    "ship": {
+      "description": "Ship current workflow changes",
+      "file": ".claude/commands/ship.md"
+    },
+    "preflight": {
+      "description": "Run parallel readiness checks before shipping",
+      "file": ".claude/commands/preflight.md"
+    },
+    "hotfix": {
+      "description": "Fast-track a hotfix with reduced scope",
+      "file": ".claude/commands/hotfix.md"
+    },
+    "evolve-workflow": {
+      "description": "Audit and evolve a workflow repository",
+      "file": ".claude/commands/evolve-workflow.md"
+    },
+    "iterate-workflow": {
+      "description": "Iterate a workflow from lessons with approval",
+      "file": ".claude/commands/iterate-workflow.md"
     }
-  ],
-  "PostToolUse": [
-    {
-      "matcher": { "tools": ["WriteTool", "EditTool"], "input_contains": ".py" },
-      "hooks": [
-        {
-          "type": "command",
-          "command": "echo 'REMINDER: Run linter/formatter on changed Python files before committing.'"
-        }
-      ]
+  },
+  "skills": {
+    "review": {
+      "description": "Run parallel multi-agent review on current changes",
+      "file": ".claude/skills/review/SKILL.md"
     },
-    {
-      "matcher": { "tools": ["WriteTool", "EditTool"], "input_contains": ".ts" },
-      "hooks": [
-        {
-          "type": "command",
-          "command": "echo 'REMINDER: Run linter/formatter on changed TypeScript files before committing.'"
-        }
-      ]
+    "test": {
+      "description": "Run validation or tests related to current changes",
+      "file": ".claude/skills/test/SKILL.md"
     },
-    {
-      "matcher": { "tools": ["BashTool"], "input_contains": "git commit" },
-      "hooks": [
-        {
-          "type": "command",
-          "command": "echo \"COMMIT SUMMARY:\" && git log -1 --format='%h %s' 2>/dev/null || true"
-        }
-      ]
+    "commit": {
+      "description": "Generate a conventional commit message",
+      "file": ".claude/skills/commit/SKILL.md"
     },
-    {
-      "matcher": { "tools": ["WriteTool", "EditTool"], "input_contains": ".claude/" },
-      "hooks": [
-        {
-          "type": "command",
-          "command": "echo '[Workflow Validation] File in .claude/ changed. Please ensure structural and format correctness as verified by workflow-validator.'"
-        }
-      ]
+    "doc": {
+      "description": "Update documentation for changed workflow assets",
+      "file": ".claude/skills/doc/SKILL.md"
+    },
+    "workflow-audit": {
+      "description": "Audit workflow structure patterns and quality",
+      "file": ".claude/skills/workflow-audit/SKILL.md"
     }
-  ]
+  }
 }

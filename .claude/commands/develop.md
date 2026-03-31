@@ -1,144 +1,233 @@
-Design a new workflow from a user's requirement. This command produces workflow FILES (commands, agents, skills, hooks, rules), NOT application code.
+根据用户需求设计一个新工作流。这个命令生成的是工作流文件，
+例如 commands、skills、agents、rules 与 settings 更新，而不是应用代码。
 
-Follow each stage exactly. Every stage runs as a TDD loop: define goal → execute → verify → if failed, record to lessons.md, fix, retry.
+## Usage
 
-## Stage 1: Understand the Need (Explore)
+```text
+/develop <requirement>
+```
 
-**Goal**: Produce a `workflow-spec.md` with zero ambiguities.
+示例：
 
-1. Parse $ARGUMENTS as the workflow requirement
-2. Identify ambiguities and ask 3-5 clarifying questions covering:
-   - What process should be automated? (trigger → steps → output)
-   - What are the inputs and expected outputs?
-   - What quality gates / stop conditions are needed?
-   - How many roles / expert dimensions are involved?
-   - Should it be manually triggered (/command) or auto-triggered (Hook)?
-3. After user answers, write `workflow-spec.md` in the project root using the template from `.claude/skills/develop/spec-template.md`
-4. **TDD verify**: Self-check — does every field in the spec have a concrete value (no TBD)? If not, ask follow-up questions and rewrite.
+```text
+/develop 设计一个用于审计 Markdown 链接有效性的工作流
+```
 
-**On failure**: Record to `lessons.md`: what was ambiguous, what clarification was needed.
+整个过程遵循 TDD 风格循环：定义目标 -> 执行 -> 验证 -> 失败则记录到
+`lessons.md` -> 修复 -> 重试。
 
-## Stage 2: Domain Research (Explore)
+## Stage 1: 理解需求 (Explore)
 
-**Goal**: Produce a domain context report covering the spec's scope.
+**Goal**: 生成一个没有歧义的 `workflow-spec.md`。
 
-1. Launch an Explore subagent (read-only) to analyze:
-   - Existing `.claude/` directory: current agents, skills, commands, hooks, rules
-   - `CLAUDE.md`: project conventions, tech stack, commands
-   - Project source code structure relevant to the workflow domain
-2. Output a structured report: existing assets to reuse, gaps to fill, naming conventions
-3. **TDD verify**: Does the report cover every domain mentioned in workflow-spec.md? If not, explore more.
+1. 将 `$ARGUMENTS` 解析为工作流需求。
+2. 识别歧义点，并围绕以下维度向用户提出 3-5 个澄清问题：
+   - 需要自动化的流程是什么？（触发 -> 步骤 -> 输出）
+   - 输入和输出分别是什么？
+   - 有哪些质量门禁或停止条件？
+   - 涉及多少种角色或专家维度？
+   - 应由手动命令触发，还是由 hook 自动触发？
+3. 用户回答后，使用 `.claude/skills/develop/spec-template.md` 在仓库根目录生成 `workflow-spec.md`。
+4. **Verify**: 规格中的每个字段都有明确值，且不再包含 `TBD`。
 
-**On failure**: Record to `lessons.md`: what context was missed.
+**On failure**：把歧义点和所需补充信息记录到 `lessons.md`。
 
-## Stage 3: Pattern Selection & Workflow Design (Specialized Agent)
+## Stage 2: 领域研究 (Explore)
 
-**Goal**: Produce a design document with pattern choices, agent roster, and file list.
+**Goal**: 生成覆盖规格范围的领域上下文报告。
 
-Read `.claude/rules/constraints.md` for learned rules from past designs.
+1. 启动只读 Explore 子代理，分析：
+   - 现有 `.claude/` 资产：agents、skills、commands、settings、rules
+   - `CLAUDE.md` 中的项目约定、校验方式和命名规则
+   - 与目标工作流领域相关的项目结构
+2. 输出结构化报告，列出可复用资产、缺口和命名建议。
+3. **Verify**: 报告覆盖 `workflow-spec.md` 中提到的所有领域范围。
 
-1. Analyze the workflow-spec.md against the six atomic patterns:
-   - Sequential — steps with strict dependencies
-   - Fan-out/Fan-in — independent parallel tasks, aggregate results
-   - Explore — understand before acting
-   - Event-Driven — Hook auto-triggers
-   - Test-Driven — loop until goal met
-   - Specialized Agent — split by expert dimension
+**On failure**：把遗漏的上下文记录到 `lessons.md`。
 
-2. Select which patterns to combine. Output a design document:
-   - Flow diagram (ASCII art)
-   - Agent roster: name, role, focus area, output format
-   - Skill list: name, trigger, what it does
-   - Hook list: trigger timing, matcher, action
-   - File list: every file to create/modify
-   - Each stage's TDD goal and verify condition
+## Stage 3: 模式选择与工作流设计 (Specialized Agent)
 
-3. **TDD verify**: Does the design cover every requirement in workflow-spec.md? Are agent output formats unified? Is parallel agent count ≤ 4?
+**Goal**: 生成包含模式组合、Agent 编制和文件清单的设计文档。
 
-4. **GATE**: Show the design to user and WAIT for confirmation. Do NOT proceed until user approves.
+设计前先阅读 `.claude/rules/constraints.md`。
 
-**On failure**: Record to `lessons.md`: what design mistake was made.
+### 工作流抽取决策框架
 
-## Stage 4: Generate Workflow Files (Sequential)
+在真正生成文件前，先判断这个工作流是否应被抽取成独立仓库。
 
-**Goal**: All files from the design's file list are created with correct format.
+**ALWAYS extract when：**
 
-Generate files in this order (dependencies first):
+- 该工作流强依赖某种语言、框架或工具链
+- 其他团队或项目也可能独立复用它
+- 它需要独立演进和发布节奏
+- 它与当前仓库技术栈明显不同
 
-1. **Agents** (`.claude/agents/*.md`):
-   - Each agent: role + focus areas + output format + rules
-   - Agent prompts must be self-contained (subagent context isolation)
+**NEVER extract when：**
 
-2. **Skills** (`.claude/skills/*/SKILL.md`):
-   - YAML frontmatter (name, description)
-   - Step-by-step instructions with $ARGUMENTS support
-   - If skill invokes agents, INLINE the full agent prompt (do NOT reference agent files)
+- 它只服务于本仓库
+- 它高度依赖当前仓库约定或本地配置
+- 它还在高频变化期
+- 它本质上是通用能力，应留在当前仓库
 
-3. **Commands** (`.claude/commands/*.md`):
-   - Multi-stage workflow orchestration
-   - Reference agents by description (inline prompts for subagent calls)
-   - Define gates between stages
+**If extracting：**
 
-4. **Hooks** (update `.claude/settings.json`):
-   - Merge new hooks with existing ones (don't overwrite)
-   - PreToolUse for gates, PostToolUse for auto-triggers
+1. 先在当前仓库中生成草稿
+2. 向用户展示设计
+3. 批准后复制到 `../{name}-workflow/`
+4. 再清理当前仓库中的临时副本
 
-5. **Rules** (update `.claude/rules/constraints.md`):
-   - Add any domain-specific constraints identified during design
+随后，基于六种原子模式分析需求：
 
-6. **Update CLAUDE.md** if the new workflow introduces new commands or conventions
+- Sequential
+- Fan-out/Fan-in
+- Explore
+- Event-Driven
+- Test-Driven
+- Specialized Agent
 
-7. **TDD verify per file**: After writing each file, verify:
-   - Markdown files: proper structure, no broken references
-   - JSON files: valid JSON, correct schema
-   - Agent prompts: self-contained, no "read file X" instructions
-   - Skills with agents: prompts are fully inlined
+设计文档至少包括：
 
-**On failure**: Record which file had what format issue → fix → re-verify.
+- ASCII 流程图
+- Agent 清单：名称、职责、关注点、输出格式、约束
+- Skill 清单：触发方式与职责
+- Hook 清单：只有确实需要 hooks 时才添加
+- 文件清单：要创建或修改的每个文件
+- 每一阶段的 TDD 目标和验证条件
 
-## Stage 5: Workflow Validation (Test-Driven)
+**Verify**: 设计覆盖全部需求，统一并行输出格式，并且并行代理数不超过 4 个。
 
-**Goal**: The generated workflow passes all validation checks.
+**On failure**：把设计失误写入 `lessons.md`。
 
-Run the validation checklist:
+**Gate**：将设计展示给用户，得到批准后再进入生成阶段。
 
-- [ ] All files from design's file list exist
-- [ ] `.claude/settings.json` is valid JSON
-- [ ] No agent prompt references external files (subagent isolation rule)
-- [ ] Commands reference correct agent names
-- [ ] Parallel agent count per stage ≤ 4
-- [ ] Every stage in commands has a clear TDD goal
-- [ ] Skills have proper YAML frontmatter
-- [ ] No duplicate agent/skill/command names with existing ones
+## Stage 4: 生成工作流文件 (Sequential + 即时校验)
 
-If any check fails:
-1. Record the issue in `lessons.md`
-2. Fix the file
-3. Re-run validation (max 3 rounds)
+**Goal**: 设计文档中的文件全部生成且格式正确。
 
-If 3 rounds still fail, STOP and report to user.
+**复杂度级别**: 从设计文档读取，用于 Stage 5 超时配置
 
-## Stage 6: Constraint Evolution
+生成顺序（每个文件生成后立即校验，最多3次，失败则人工介入）：
 
-**Goal**: Extract reusable rules from this design session.
+1. `.claude/agents/*.md`
+   - 生成后调用 `validate-file` skill 检查
+   - 失败则修复，最多3次，仍失败则停止并人工介入
 
-1. Review `lessons.md` for all entries from this /develop session
-2. For each entry, ask: "Will this problem recur in future workflow designs?"
-3. If yes, extract a rule in `ALWAYS/NEVER` format
-4. Append to `.claude/rules/constraints.md` with source annotation:
-   ```
-   # Source: /develop "[workflow name]" — [date]
-   ALWAYS [rule description]
-   ```
-5. Clean up: delete `workflow-spec.md` (it served its purpose, the workflow files are the deliverable)
+2. `.claude/skills/*/SKILL.md`
+   - 生成后调用 `validate-file` skill 检查
+   - 失败则修复，最多3次，仍失败则停止并人工介入
+
+3. `.claude/commands/*.md`
+   - 生成后调用 `validate-file` skill 检查
+   - 失败则修复，最多3次，仍失败则停止并人工介入
+
+4. `.claude/settings.json`
+   - 生成后调用 `validate-settings` skill 检查
+   - 失败则修复，最多3次，仍失败则停止并人工介入
+
+5. `.claude/rules/constraints.md`（如需要）
+6. 更新 `CLAUDE.md`（如需要）
+
+**Verify**: 设计文档中的每个文件都存在且通过 `validate-file` 检查。
+
+**On failure**：单文件3次尝试失败后，停止并人工介入。
+
+## Stage 5: 运行时验证 (Runtime Validation)
+
+**Goal**: 验证工作流在实际执行时的行为是否符合设计。
+
+**Step 1: 测试场景生成**
+
+启动 `test-scenario-generator` 子代理：
+1. 读取 `workflow-spec.md` 和设计文档
+2. 为每个 Stage 生成标准覆盖测试场景：
+   - Happy Path：正常输入
+   - Edge Case：边界条件
+   - Error Case：错误注入
+3. 包含明确 Validation Points（自动判定命令 + 人工检查项）
+4. 输出 `test-scenarios.md`
+
+**Step 2: 异步执行验证**
+
+启动 `workflow-verifier` 子代理：
+1. 读取复杂度级别（S/M/L/XL）和超时配置
+2. 创建临时 worktree 作为沙盒环境
+3. 在沙盒中启动独立 Claude Code 进程
+4. 按 `test-scenarios.md` 输入命令，模拟用户执行
+5. 轮询 `status.json` 检查进度（5秒间隔）
+6. 超时或完成后终止进程
+
+**超时配置（设计时指定）**：
+- S (≤2 Stages): 3分钟
+- M (3-5 Stages): 5分钟
+- L (>5 Stages): 10分钟
+- XL (复杂编排): 15分钟
+
+**Step 3: 生成验证报告**
+
+输出 `validation-runtime-report.md`：
+- 每个测试场景的详细结果（标准版 + 调试版）
+- CRITICAL/WARNING 问题分类
+- 失败时的日志片段和时间线
+
+**反馈路径**：
+- **PASS** → 进入 Stage 6
+- **FAIL (设计缺陷)** → 回到 Stage 3
+- **FAIL (实现缺陷)** → 回到 Stage 4
+
+**最大循环**：10轮或问题收敛为0
+
+**Verify**: 运行时验证报告无 CRITICAL 问题。
+
+**On failure**：记录问题到 `lessons.md`，按缺陷类型反馈到 Stage 3 或 4，重新验证。
+
+## Stage 6: 约束演进与流程闭环
+
+**Goal**: 从本次设计会话中提炼可复用规则，完成流程闭环。
+
+**前提**: Stage 5 运行时验证通过
+
+1. 回顾本次 `/develop` 会话写入 `lessons.md` 的内容（只读取本次会话新增的记录）。
+2. 判断问题是否会重复出现。
+3. 对可复用问题提炼 `ALWAYS` 或 `NEVER` 规则，写入 `.claude/rules/constraints.md`。
+4. 为规则标注来源命令和日期。
+5. 当工作流文件成为正式交付物后，删除临时 `workflow-spec.md`。
+
+**关于 Lessons 机制**:
+
+- `lessons.md` 是**追加式日志**，用于记录失败经验和待提取的约束
+- 每次新会话**不加载** `lessons.md` 的完整历史（避免上下文膨胀）
+- 只读取本次会话新增的记录，或最新3条记录
+- 长期约束沉淀到 `constraints.md`，新会话自动加载
+- 使用 `/iterate-workflow` 定期将 `lessons.md` 中的约束批量提取到 `constraints.md`
+
+**流程闭环说明**:
+
+```
+Stage 5 (运行时验证)
+       │
+       ├── PASS ──→ Stage 6 ──→ 完成
+       │
+       ├── FAIL (设计缺陷) ──→ Stage 3 (重新设计，需用户批准)
+       │
+       └── FAIL (实现缺陷) ──→ Stage 4 (重新生成)
+              │
+              └── 修复后 ──→ Stage 5 (重新验证)
+
+最大循环: 10轮或问题收敛为0
+```
+
+**Verify**: 可复用经验已经沉淀为规则，临时草稿已清理。
+
+**On failure**：保留临时文件并向用户解释原因。
 
 ## Final Output
 
-Display a summary:
-- Workflow name and trigger command
-- Files created/modified (with paths)
-- Pattern combination used
-- Constraints learned (if any)
-- Suggested next step: "Try running /[new-command] to test your new workflow"
+输出以下内容：
 
-Target: $ARGUMENTS (the workflow requirement description)
+- 工作流名称与触发命令
+- 创建或修改的文件
+- 使用的模式组合
+- 新增的约束
+- 下一步建议
+
+Target：`$ARGUMENTS`
