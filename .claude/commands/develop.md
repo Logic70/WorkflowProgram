@@ -186,11 +186,19 @@
 
 **前提**: Stage 5 运行时验证通过
 
-1. 回顾本次 `/develop` 会话写入 `lessons.md` 的内容。
+1. 回顾本次 `/develop` 会话写入 `lessons.md` 的内容（只读取本次会话新增的记录）。
 2. 判断问题是否会重复出现。
 3. 对可复用问题提炼 `ALWAYS` 或 `NEVER` 规则，写入 `.claude/rules/constraints.md`。
 4. 为规则标注来源命令和日期。
 5. 当工作流文件成为正式交付物后，删除临时 `workflow-spec.md`。
+
+**关于 Lessons 机制**:
+
+- `lessons.md` 是**追加式日志**，用于记录失败经验和待提取的约束
+- 每次新会话**不加载** `lessons.md` 的完整历史（避免上下文膨胀）
+- 只读取本次会话新增的记录，或最新3条记录
+- 长期约束沉淀到 `constraints.md`，新会话自动加载
+- 使用 `/iterate-workflow` 定期将 `lessons.md` 中的约束批量提取到 `constraints.md`
 
 **流程闭环说明**:
 

@@ -62,3 +62,11 @@
 - result: 70 checks passed, 0 failed
 - notes: removed `.agents/`, `.claude/contracts/`, `smoke-test-workflow.ps1`, `core-*` skills, and downstream transcript artifacts
 
+## 2026-03-30 Plugin Packaging
+
+- status: PASS
+- scope: package WorkflowProgram-CN as a Claude Code plugin with root-level commands, skills, agents, rules, and scripts
+- command: `scripts/verify-plugin-load.sh`
+- result: 11 slash entrypoints discovered via `claude --plugin-dir /mnt/d/Code/WorkflowProgram-CN`, 0 discovery failures
+- notes: WSL Claude is currently not logged in, so runtime checks stop at `/login`; discovery and plugin loading are confirmed.
+

@@ -19,25 +19,27 @@
 
 ## Stage 1: 分析 lessons
 
-**Goal**: 从 `lessons.md` 中识别改进机会。
+**Goal**: 从 `lessons.md` 中识别改进机会，并准备提取约束到 `constraints.md`。
 
-1. 读取目标工作流的 `lessons.md`
+1. 读取目标工作流的 `lessons.md`（只读取最近10条记录）
 2. 解析：
    - What Did Not Work
-   - Constraints To Extract
+   - **Constraints To Extract** ← 重点关注
    - Recommendations
    - Test Run 或校验结果
 3. 将问题归类为：
-   - 格式问题
-   - 结构问题
-   - 模式问题
-   - Agent 问题
-   - 规则问题
-4. 判断修复方式：
+   - 格式问题 → 自动修复
+   - 结构问题 → 需审批
+   - 模式问题 → 需审批
+   - Agent 问题 → 需审批
+   - **规则问题 → 提取到 constraints.md**
+4. 提取 `Constraints To Extract` 中的 ALWAYS/NEVER 规则
+5. 判断修复方式：
    - 自动修复：格式、空白、轻量规范
+   - **规则提取**：合并到 `constraints.md`（需去重）
    - 需要审批：提示词、规则、架构
 
-**Verify**: 问题都已被识别并归类。
+**Verify**: 问题都已被识别并归类，待提取的约束已整理。
 
 **On failure**：若 `lessons.md` 不存在或为空，则提示先运行工作流积累经验。
 
@@ -91,11 +93,15 @@
 **Goal**: 仅应用用户已经批准的提案。
 
 1. 自动应用低风险格式修复
-2. 对结构性改动逐项确认审批结果
-3. 只对批准项落盘
-4. 在必要时更新 `lessons.md`，标记已提炼或已处理的问题
+2. **将批准的 `Constraints To Extract` 合并到 `constraints.md`**
+   - 检查是否已存在（避免重复）
+   - 添加来源标注（命令和日期）
+   - 按类别组织（参考现有分类）
+3. 对结构性改动逐项确认审批结果
+4. 只对批准项落盘
+5. 更新 `lessons.md`，标记已提炼或已处理的问题
 
-**Verify**: 只有明确批准的变更被应用。
+**Verify**: 只有明确批准的变更被应用，约束已正确合并到 `constraints.md`。
 
 **On failure**：停止后续应用，并保留审批状态说明。
 

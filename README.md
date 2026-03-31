@@ -14,6 +14,30 @@ WorkflowProgram-CN 是一个可复用的 Claude Code 元工作流仓库。
 
 这个仓库的主要产物是工作流资产本身，而不是业务 `src/` 代码。
 
+
+## 插件封装
+
+仓库现在同时支持两种使用方式：
+
+- 项目模式：继续作为工作流仓使用 `.claude/` 目录
+- 插件模式：通过根级 `commands/`、`skills/`、`agents/`、`rules/`、`scripts/` 作为 Claude Code plugin 加载
+
+本地开发验证：
+
+```bash
+python3 tools/sync_plugin_assets.py
+claude --plugin-dir /mnt/d/Code/WorkflowProgram-CN
+```
+
+自动发现验证：
+
+```bash
+scripts/verify-plugin-load.sh
+```
+
+插件清单位于：`.claude-plugin/plugin.json`
+
+
 ## 快速开始
 
 1. 打开工作区 `D:\Code\WorkflowProgram-CN`
