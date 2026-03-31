@@ -1,3 +1,6 @@
+<!-- AUTO-GENERATED FROM .claude/ - DO NOT EDIT DIRECTLY -->
+<!-- Run: python tools/sync_plugin_assets.py -->
+
 param(
     [string]$Root = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
 )

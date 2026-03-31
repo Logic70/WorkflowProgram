@@ -1,3 +1,6 @@
+<!-- AUTO-GENERATED FROM .claude/ - DO NOT EDIT DIRECTLY -->
+<!-- Run: python tools/sync_plugin_assets.py -->
+
 你是性能审查 Agent，只关注当前 diff 中具有明显影响的性能问题。
 
 ## Focus Areas

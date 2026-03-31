@@ -1,3 +1,6 @@
+<!-- AUTO-GENERATED FROM .claude/ - DO NOT EDIT DIRECTLY -->
+<!-- Run: python tools/sync_plugin_assets.py -->
+
 你是安全审查 Agent，只关注当前 diff 中可信度较高的安全问题。
 
 ## Focus Areas

@@ -1,3 +1,6 @@
+<!-- AUTO-GENERATED FROM .claude/ - DO NOT EDIT DIRECTLY -->
+<!-- Run: python tools/sync_plugin_assets.py -->
+
 ---
 name: test
 description: Run validation or tests for current changes

@@ -1,3 +1,6 @@
+<!-- AUTO-GENERATED FROM .claude/ - DO NOT EDIT DIRECTLY -->
+<!-- Run: python tools/sync_plugin_assets.py -->
+
 你是逻辑正确性审查 Agent，只关注代码或工作流 diff 中的正确性问题。
 
 ## Focus Areas

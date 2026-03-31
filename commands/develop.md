@@ -1,3 +1,11 @@
+<!-- AUTO-GENERATED FROM .claude/ - DO NOT EDIT DIRECTLY -->
+<!-- Run: python tools/sync_plugin_assets.py -->
+
+---
+description: Design a new workflow from requirements
+argument-hint: <requirement>
+---
+
 根据用户需求设计一个新工作流。这个命令生成的是工作流文件，
 例如 commands、skills、agents、rules 与 settings 更新，而不是应用代码。
 
@@ -27,7 +35,7 @@
    - 有哪些质量门禁或停止条件？
    - 涉及多少种角色或专家维度？
    - 应由手动命令触发，还是由 hook 自动触发？
-3. 用户回答后，使用 `.claude/skills/develop/spec-template.md` 在仓库根目录生成 `workflow-spec.md`。
+3. 用户回答后，使用 `${CLAUDE_PLUGIN_ROOT}/skills/develop/spec-template.md` 在仓库根目录生成 `workflow-spec.md`。
 4. **Verify**: 规格中的每个字段都有明确值，且不再包含 `TBD`。
 
 **On failure**：把歧义点和所需补充信息记录到 `lessons.md`。
@@ -49,7 +57,7 @@
 
 **Goal**: 生成包含模式组合、Agent 编制和文件清单的设计文档。
 
-设计前先阅读 `.claude/rules/constraints.md`。
+设计前先阅读 `${CLAUDE_PLUGIN_ROOT}/rules/constraints.md`。
 
 ### 工作流抽取决策框架
 
@@ -124,7 +132,7 @@
    - 生成后调用 `validate-settings` skill 检查
    - 失败则修复，最多3次，仍失败则停止并人工介入
 
-5. `.claude/rules/constraints.md`（如需要）
+5. `${CLAUDE_PLUGIN_ROOT}/rules/constraints.md`（如需要）
 6. 更新 `CLAUDE.md`（如需要）
 
 **Verify**: 设计文档中的每个文件都存在且通过 `validate-file` 检查。
@@ -186,11 +194,19 @@
 
 **前提**: Stage 5 运行时验证通过
 
-1. 回顾本次 `/develop` 会话写入 `lessons.md` 的内容。
+1. 回顾本次 `/develop` 会话写入 `lessons.md` 的内容（只读取本次会话新增的记录）。
 2. 判断问题是否会重复出现。
-3. 对可复用问题提炼 `ALWAYS` 或 `NEVER` 规则，写入 `.claude/rules/constraints.md`。
+3. 对可复用问题提炼 `ALWAYS` 或 `NEVER` 规则，写入 `${CLAUDE_PLUGIN_ROOT}/rules/constraints.md`。
 4. 为规则标注来源命令和日期。
 5. 当工作流文件成为正式交付物后，删除临时 `workflow-spec.md`。
+
+**关于 Lessons 机制**:
+
+- `lessons.md` 是**追加式日志**，用于记录失败经验和待提取的约束
+- 每次新会话**不加载** `lessons.md` 的完整历史（避免上下文膨胀）
+- 只读取本次会话新增的记录，或最新3条记录
+- 长期约束沉淀到 `constraints.md`，新会话自动加载
+- 使用 `/iterate-workflow` 定期将 `lessons.md` 中的约束批量提取到 `constraints.md`
 
 **流程闭环说明**:
 
