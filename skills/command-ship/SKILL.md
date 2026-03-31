@@ -14,10 +14,27 @@ disable-model-invocation: true
 ## Usage
 
 ```text
-/ship [<scope>]
+/ship [<scope>] [--auto-approve]
 ```
 
-默认目标：当前所有变更。
+**参数：**
+- `<scope>`: 可选的变更范围（文件或目录）
+- `--auto-approve`: 自动批准模式，跳过提交信息审批（用于 CI/CD）
+
+**CI/CD 模式：**
+设置环境变量 `CI=true` 或传入 `--auto-approve` 参数，提交门禁将自动放行。
+
+**示例：**
+
+```text
+# 交互模式（默认）
+/ship
+/ship --all
+
+# CI/CD 自动模式
+/ship --auto-approve
+CI=true /ship
+```
 
 ## Stage 1: 预检查
 
@@ -63,14 +80,16 @@ disable-model-invocation: true
 
 ## Stage 4: 生成提交
 
-**Goal**: 准备一条能准确说明“为什么改”的提交信息。
+**Goal**: 准备准确的提交信息并创建提交。
 
 1. 如需暂存变更，先征求用户确认。
 2. 分析当前变更范围并撰写 Conventional Commit 信息。
 3. 将提交信息展示给用户审批。
 4. 只有审批通过后才真正创建提交。
 
-**Verify**: 用户已批准提交信息，且 commit 成功。
+**自动批准模式**：若传入 `--auto-approve` 参数或环境变量 `CI=true` 存在，则跳过人工确认，使用生成的提交信息自动创建提交。
+
+**Verify**: 用户已批准提交信息（或自动模式已启用），且 commit 成功。
 
 **On failure**：在提交前停止，并说明阻塞点。
 

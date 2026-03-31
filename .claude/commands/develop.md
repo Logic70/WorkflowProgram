@@ -4,13 +4,25 @@
 ## Usage
 
 ```text
-/develop <requirement>
+/develop <requirement> [--auto-approve]
 ```
 
-示例：
+**参数：**
+- `<requirement>`: 工作流需求描述（自然语言）
+- `--auto-approve`: 自动批准模式，跳过人工确认门禁（用于 CI/CD）
+
+**CI/CD 模式：**
+设置环境变量 `CI=true` 或传入 `--auto-approve` 参数，所有设计门禁将自动放行。
+
+**示例：**
 
 ```text
+# 交互模式（默认）
 /develop 设计一个用于审计 Markdown 链接有效性的工作流
+
+# CI/CD 自动模式
+/develop "设计一个用于审计 Markdown 链接有效性的工作流" --auto-approve
+CI=true /develop "设计一个用于审计 Markdown 链接有效性的工作流"
 ```
 
 整个过程遵循 TDD 风格循环：定义目标 -> 执行 -> 验证 -> 失败则记录到
@@ -99,6 +111,8 @@
 **On failure**：把设计失误写入 `lessons.md`。
 
 **Gate**：将设计展示给用户，得到批准后再进入生成阶段。
+
+**自动批准模式**：若传入 `--auto-approve` 参数或环境变量 `CI=true` 存在，则跳过人工确认，打印确认信息后自动继续。
 
 ## Stage 4: 生成工作流文件 (Sequential + 即时校验)
 
