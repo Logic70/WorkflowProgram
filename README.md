@@ -14,7 +14,7 @@ WorkflowProgram-CN 是一个用于设计、交付、审计和迭代**可嵌入 C
 
 WorkflowProgram-CN 专为 Claude Code、OpenCode 等 AI 编程助手生态设计，产出物是符合 `.claude/` 结构规范的**工作流仓库**，而非通用的 CI/CD 模板。
 
-**典型产出示例**：[daily-news-workflow](https://github.com/Logic70/-daily-news-workflow) —— 一个可被 Claude Code 识别和调用的自动化新闻收集工作流。
+**典型产出示例**：[daily-news-workflow](https://github.com/Logic70/-daily-news-workflow) —— 一个包含标准 `.claude/` 结构、可被 WorkflowProgram-CN 审计和演进的新闻收集工作流。
 
 ---
 
@@ -168,20 +168,20 @@ powershell -ExecutionPolicy Bypass -File .claude/scripts/validate-workflow.ps1
 **结构**：
 ```
 daily-news-workflow/
-├── .claude/
-│   ├── commands/          # /fetch-news, /preview-news, /deploy-status, /configure
-│   ├── skills/news-collector/
-│   └── settings.json      # Claude Code 注册表
+├── .claude/               # 工作流标记（可被 WorkflowProgram-CN 演进）
+│   ├── commands/          # 命令设计文档（展示阶段结构，非自动加载）
+│   ├── skills/            # 技能定义
+│   └── settings.json      # 工作流元数据
 ├── .github/workflows/     # GitHub Actions 自动化
 ├── scripts/               # Python 收集器
 ├── docs/                  # 输出目录（GitHub Pages）
 └── README.md
 ```
 
-**Code Agent 集成**：
-- 在 Claude Code 中打开该仓库后，可直接调用 `/fetch-news` 等命令
-- 支持 `/evolve-workflow` 审计和持续改进
-- 遵循 `.claude/settings.json` 注册规范
+**演进能力**：
+- 在 WorkflowProgram-CN 中运行 `/evolve-workflow /path/to/daily-news-workflow`
+- 审计结构问题、从 lessons.md 提取约束、生成改进方案
+- `.claude/` 中的命令定义是**设计文档**，用于演进，不会自动加载为 Claude Code 的 `/` 命令
 
 ---
 
