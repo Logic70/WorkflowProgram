@@ -114,7 +114,39 @@ CI=true /develop "设计一个用于审计 Markdown 链接有效性的工作流"
 - 文件清单：要创建或修改的每个文件
 - 每一阶段的 TDD 目标和验证条件
 
-**Verify**: 设计覆盖全部需求，统一并行输出格式，并且并行代理数不超过 4 个。
+**双轨设计输出（Dual-Track Output）**：
+
+设计阶段产出两份互补的设计文档：
+
+1. **`workflow-spec.yaml`** —— 机器可读的编排配置（源文件）
+   - 包含：阶段定义、Agent 引用、转移条件、资源限额
+   - 格式：结构化 YAML，支持 `max_retries`、`max_parallel` 等约束
+   - 用途：Code Agent 执行时解析，强制执行状态转移
+   - 可编辑：✅ 人工可编辑，AI 可生成
+
+2. **`workflow-view.md`** —— 人类可读的只读视图（生成文件）
+   - 包含：ASCII 流程图、设计决策说明、Agent 职责描述
+   - 格式：自然语言 Markdown
+   - 用途：人工审查、快速浏览、设计讨论
+   - 可编辑：❌ 禁止直接编辑，从 YAML 单向生成
+
+**单向瀑布生成原则**：
+```
+workflow-design.md（设计决策，人工审查）
+         ↓
+   提取转换
+         ↓
+workflow-spec.yaml（机器编排，单点真实）
+         ↓
+    生成渲染
+         ↓
+workflow-view.md（只读视图，人类查阅）
+```
+
+**编辑规则**：
+- 如需修改设计 → 编辑 `workflow-spec.yaml`
+- 重新生成视图 → 运行 `python tools/generate-view.py`
+- 禁止直接编辑 `workflow-view.md`（会被覆盖）
 
 **On failure**：把设计失误写入 `lessons.md`。
 
@@ -122,32 +154,45 @@ CI=true /develop "设计一个用于审计 Markdown 链接有效性的工作流"
 
 **自动批准模式**：若传入 `--auto-approve` 参数或环境变量 `CI=true` 存在，则跳过人工确认，打印确认信息后自动继续。
 
-## Stage 4: 生成工作流文件 (Sequential + 即时校验)
+## Stage 4: 从 YAML 生成工作流文件 (Sequential + 即时校验)
 
-**Goal**: 设计文档中的文件全部生成且格式正确。
+**Goal**: 从 `workflow-spec.yaml` 生成所有工作流文件。
 
-**复杂度级别**: 从设计文档读取，用于 Stage 5 超时配置
+**复杂度级别**: 从 YAML 读取 `complexity` 字段，用于 Stage 5 Turn Count 配置
+
+**生成流程**：
+
+1. 解析 `workflow-spec.yaml`
+   - 读取 `meta` 段：target_platform, version
+   - 读取 `stages` 段：阶段定义、Agent 引用、约束
+
+2. 按 YAML 定义生成文件（每个文件生成后立即校验，最多3次）：
 
 生成顺序（每个文件生成后立即校验，最多3次，失败则人工介入）：
 
 1. `.claude/agents/*.md`
+   - 从 YAML `agent_refs` 提取 Agent 定义
    - 生成后调用 `validate-file` skill 检查
    - 失败则修复，最多3次，仍失败则停止并人工介入
 
 2. `.claude/skills/*/SKILL.md`
+   - 从 YAML `skills` 段生成技能定义
    - 生成后调用 `validate-file` skill 检查
    - 失败则修复，最多3次，仍失败则停止并人工介入
 
 3. `.claude/commands/*.md`
+   - 从 YAML `stages` 生成命令 Stage 结构
    - 生成后调用 `validate-file` skill 检查
    - 失败则修复，最多3次，仍失败则停止并人工介入
 
 4. `.claude/settings.json`
+   - 从 YAML 生成命令和技能注册
    - 生成后调用 `validate-settings` skill 检查
    - 失败则修复，最多3次，仍失败则停止并人工介入
 
-5. `${CLAUDE_PLUGIN_ROOT}/rules/constraints.md`（如需要）
-6. 更新 `CLAUDE.md`（如需要）
+5. `${CLAUDE_PLUGIN_ROOT}/rules/constraints.md`（如需要，从 YAML `constraints` 提取）
+6. 生成 `workflow-view.md`（从 YAML 单向渲染，只读）
+7. 更新 `CLAUDE.md`（如需要）
 
 **Verify**: 设计文档中的每个文件都存在且通过 `validate-file` 检查。
 

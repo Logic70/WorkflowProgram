@@ -1,5 +1,9 @@
 # Workflow Specification
 
+> **Note**: 本模板用于自然语言设计文档。
+> 对于机器可读的编排配置，请使用 `yaml-spec-template.md`。
+> 两者关系：`spec-template.md` → 人工审查 → `workflow-spec.yaml` → 生成 `workflow-view.md`
+
 ## Workflow Identity
 
 - 工作流名称：
