@@ -163,18 +163,24 @@ CI=true /develop "设计一个用于审计 Markdown 链接有效性的工作流"
 **Step 2: 异步执行验证**
 
 启动 `workflow-verifier` 子代理：
-1. 读取复杂度级别（S/M/L/XL）和超时配置
+1. 读取复杂度级别（S/M/L/XL）和 **Turn Count 限额**
 2. 创建临时 worktree 作为沙盒环境
 3. 在沙盒中启动独立 Claude Code 进程
 4. 按 `test-scenarios.md` 输入命令，模拟用户执行
-5. 轮询 `status.json` 检查进度（5秒间隔）
-6. 超时或完成后终止进程
+5. 轮询 `status.json` 检查进度，监控：
+   - **Turn Count**: 累计交互轮数，超过限额强制终止
+   - **Circuit Breaker**: 连续 `PostToolUseFailure` 报错计数
+6. 达到限额、熔断条件或完成后终止进程
 
-**超时配置（设计时指定）**：
-- S (≤2 Stages): 3分钟
-- M (3-5 Stages): 5分钟
-- L (>5 Stages): 10分钟
-- XL (复杂编排): 15分钟
+**资源控制配置（设计时指定）**：
+- S (≤2 Stages): 50 turns
+- M (3-5 Stages): 100 turns
+- L (>5 Stages): 200 turns
+- XL (复杂编排): 300 turns
+
+**熔断机制**：
+- 当同一 Agent 连续产生 **3 次 `PostToolUseFailure`** 报错，立即熔断终止
+- 熔断时输出失败上下文和已执行的测试覆盖度
 
 **Step 3: 生成验证报告**
 
