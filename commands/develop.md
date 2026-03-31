@@ -1,0 +1,225 @@
+根据用户需求设计一个新工作流。这个命令生成的是工作流文件，
+例如 commands、skills、agents、rules 与 settings 更新，而不是应用代码。
+
+## Usage
+
+```text
+/develop <requirement>
+```
+
+示例：
+
+```text
+/develop 设计一个用于审计 Markdown 链接有效性的工作流
+```
+
+整个过程遵循 TDD 风格循环：定义目标 -> 执行 -> 验证 -> 失败则记录到
+`lessons.md` -> 修复 -> 重试。
+
+## Stage 1: 理解需求 (Explore)
+
+**Goal**: 生成一个没有歧义的 `workflow-spec.md`。
+
+1. 将 `$ARGUMENTS` 解析为工作流需求。
+2. 识别歧义点，并围绕以下维度向用户提出 3-5 个澄清问题：
+   - 需要自动化的流程是什么？（触发 -> 步骤 -> 输出）
+   - 输入和输出分别是什么？
+   - 有哪些质量门禁或停止条件？
+   - 涉及多少种角色或专家维度？
+   - 应由手动命令触发，还是由 hook 自动触发？
+3. 用户回答后，使用 `.claude/skills/develop/spec-template.md` 在仓库根目录生成 `workflow-spec.md`。
+4. **Verify**: 规格中的每个字段都有明确值，且不再包含 `TBD`。
+
+**On failure**：把歧义点和所需补充信息记录到 `lessons.md`。
+
+## Stage 2: 领域研究 (Explore)
+
+**Goal**: 生成覆盖规格范围的领域上下文报告。
+
+1. 启动只读 Explore 子代理，分析：
+   - 现有 `.claude/` 资产：agents、skills、commands、settings、rules
+   - `CLAUDE.md` 中的项目约定、校验方式和命名规则
+   - 与目标工作流领域相关的项目结构
+2. 输出结构化报告，列出可复用资产、缺口和命名建议。
+3. **Verify**: 报告覆盖 `workflow-spec.md` 中提到的所有领域范围。
+
+**On failure**：把遗漏的上下文记录到 `lessons.md`。
+
+## Stage 3: 模式选择与工作流设计 (Specialized Agent)
+
+**Goal**: 生成包含模式组合、Agent 编制和文件清单的设计文档。
+
+设计前先阅读 `.claude/rules/constraints.md`。
+
+### 工作流抽取决策框架
+
+在真正生成文件前，先判断这个工作流是否应被抽取成独立仓库。
+
+**ALWAYS extract when：**
+
+- 该工作流强依赖某种语言、框架或工具链
+- 其他团队或项目也可能独立复用它
+- 它需要独立演进和发布节奏
+- 它与当前仓库技术栈明显不同
+
+**NEVER extract when：**
+
+- 它只服务于本仓库
+- 它高度依赖当前仓库约定或本地配置
+- 它还在高频变化期
+- 它本质上是通用能力，应留在当前仓库
+
+**If extracting：**
+
+1. 先在当前仓库中生成草稿
+2. 向用户展示设计
+3. 批准后复制到 `../{name}-workflow/`
+4. 再清理当前仓库中的临时副本
+
+随后，基于六种原子模式分析需求：
+
+- Sequential
+- Fan-out/Fan-in
+- Explore
+- Event-Driven
+- Test-Driven
+- Specialized Agent
+
+设计文档至少包括：
+
+- ASCII 流程图
+- Agent 清单：名称、职责、关注点、输出格式、约束
+- Skill 清单：触发方式与职责
+- Hook 清单：只有确实需要 hooks 时才添加
+- 文件清单：要创建或修改的每个文件
+- 每一阶段的 TDD 目标和验证条件
+
+**Verify**: 设计覆盖全部需求，统一并行输出格式，并且并行代理数不超过 4 个。
+
+**On failure**：把设计失误写入 `lessons.md`。
+
+**Gate**：将设计展示给用户，得到批准后再进入生成阶段。
+
+## Stage 4: 生成工作流文件 (Sequential + 即时校验)
+
+**Goal**: 设计文档中的文件全部生成且格式正确。
+
+**复杂度级别**: 从设计文档读取，用于 Stage 5 超时配置
+
+生成顺序（每个文件生成后立即校验，最多3次，失败则人工介入）：
+
+1. `.claude/agents/*.md`
+   - 生成后调用 `validate-file` skill 检查
+   - 失败则修复，最多3次，仍失败则停止并人工介入
+
+2. `.claude/skills/*/SKILL.md`
+   - 生成后调用 `validate-file` skill 检查
+   - 失败则修复，最多3次，仍失败则停止并人工介入
+
+3. `.claude/commands/*.md`
+   - 生成后调用 `validate-file` skill 检查
+   - 失败则修复，最多3次，仍失败则停止并人工介入
+
+4. `.claude/settings.json`
+   - 生成后调用 `validate-settings` skill 检查
+   - 失败则修复，最多3次，仍失败则停止并人工介入
+
+5. `.claude/rules/constraints.md`（如需要）
+6. 更新 `CLAUDE.md`（如需要）
+
+**Verify**: 设计文档中的每个文件都存在且通过 `validate-file` 检查。
+
+**On failure**：单文件3次尝试失败后，停止并人工介入。
+
+## Stage 5: 运行时验证 (Runtime Validation)
+
+**Goal**: 验证工作流在实际执行时的行为是否符合设计。
+
+**Step 1: 测试场景生成**
+
+启动 `test-scenario-generator` 子代理：
+1. 读取 `workflow-spec.md` 和设计文档
+2. 为每个 Stage 生成标准覆盖测试场景：
+   - Happy Path：正常输入
+   - Edge Case：边界条件
+   - Error Case：错误注入
+3. 包含明确 Validation Points（自动判定命令 + 人工检查项）
+4. 输出 `test-scenarios.md`
+
+**Step 2: 异步执行验证**
+
+启动 `workflow-verifier` 子代理：
+1. 读取复杂度级别（S/M/L/XL）和超时配置
+2. 创建临时 worktree 作为沙盒环境
+3. 在沙盒中启动独立 Claude Code 进程
+4. 按 `test-scenarios.md` 输入命令，模拟用户执行
+5. 轮询 `status.json` 检查进度（5秒间隔）
+6. 超时或完成后终止进程
+
+**超时配置（设计时指定）**：
+- S (≤2 Stages): 3分钟
+- M (3-5 Stages): 5分钟
+- L (>5 Stages): 10分钟
+- XL (复杂编排): 15分钟
+
+**Step 3: 生成验证报告**
+
+输出 `validation-runtime-report.md`：
+- 每个测试场景的详细结果（标准版 + 调试版）
+- CRITICAL/WARNING 问题分类
+- 失败时的日志片段和时间线
+
+**反馈路径**：
+- **PASS** → 进入 Stage 6
+- **FAIL (设计缺陷)** → 回到 Stage 3
+- **FAIL (实现缺陷)** → 回到 Stage 4
+
+**最大循环**：10轮或问题收敛为0
+
+**Verify**: 运行时验证报告无 CRITICAL 问题。
+
+**On failure**：记录问题到 `lessons.md`，按缺陷类型反馈到 Stage 3 或 4，重新验证。
+
+## Stage 6: 约束演进与流程闭环
+
+**Goal**: 从本次设计会话中提炼可复用规则，完成流程闭环。
+
+**前提**: Stage 5 运行时验证通过
+
+1. 回顾本次 `/develop` 会话写入 `lessons.md` 的内容。
+2. 判断问题是否会重复出现。
+3. 对可复用问题提炼 `ALWAYS` 或 `NEVER` 规则，写入 `.claude/rules/constraints.md`。
+4. 为规则标注来源命令和日期。
+5. 当工作流文件成为正式交付物后，删除临时 `workflow-spec.md`。
+
+**流程闭环说明**:
+
+```
+Stage 5 (运行时验证)
+       │
+       ├── PASS ──→ Stage 6 ──→ 完成
+       │
+       ├── FAIL (设计缺陷) ──→ Stage 3 (重新设计，需用户批准)
+       │
+       └── FAIL (实现缺陷) ──→ Stage 4 (重新生成)
+              │
+              └── 修复后 ──→ Stage 5 (重新验证)
+
+最大循环: 10轮或问题收敛为0
+```
+
+**Verify**: 可复用经验已经沉淀为规则，临时草稿已清理。
+
+**On failure**：保留临时文件并向用户解释原因。
+
+## Final Output
+
+输出以下内容：
+
+- 工作流名称与触发命令
+- 创建或修改的文件
+- 使用的模式组合
+- 新增的约束
+- 下一步建议
+
+Target：`$ARGUMENTS`
