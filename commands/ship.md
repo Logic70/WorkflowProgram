@@ -36,12 +36,29 @@ CI=true /ship
 
 **Goal**: 确认当前存在明确的交付范围。
 
-1. 运行 `git status`，确认存在已暂存或未暂存变更。
-2. 若提供了 `$ARGUMENTS`，据此缩小范围；否则默认覆盖当前全部变更。
+1. 检查 git 仓库状态：
+   ```bash
+   git rev-parse --git-dir
+   ```
+   - 若返回非 0（非 git 仓库），输出：
+     ```
+     Error: Not a git repository.
+     
+     To fix this, choose one:
+       1. Initialize new repo:  git init && git remote add origin <url>
+       2. Clone existing repo:   git clone <url>
+       3. Change to correct directory
+     ```
+     并停止。
 
-**Verify**: 至少存在一项需要交付的变更。
+2. 运行 `git status`，确认存在已暂存或未暂存变更。
+3. 若提供了 `$ARGUMENTS`，据此缩小范围；否则默认覆盖当前全部变更。
 
-**On failure**：输出 `Nothing to ship.` 并停止。
+**Verify**: 当前是 git 仓库，且至少存在一项需要交付的变更。
+
+**On failure**：
+- 非 git 仓库：输出上述指引并停止。
+- 无变更：输出 `Nothing to ship.` 并停止。
 
 ## Stage 2: 代码审查 (Fan-out)
 
