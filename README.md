@@ -28,7 +28,10 @@ git clone https://github.com/Logic70/WorkflowProgram-CN.git
 cd WorkflowProgram-CN
 
 # 验证仓库结构
+# Windows:
 powershell -ExecutionPolicy Bypass -File .claude/scripts/validate-workflow.ps1
+# macOS/Linux:
+python3 .claude/scripts/validate-workflow.py
 ```
 
 ### 2. 三分钟上手
@@ -228,8 +231,12 @@ WorkflowProgram-CN 使用三层机制管理知识：
 
 所有共享工作流变更交付前必须通过仓库校验：
 
-```powershell
+```bash
+# Windows
 powershell -ExecutionPolicy Bypass -File .claude/scripts/validate-workflow.ps1
+
+# macOS/Linux
+python3 .claude/scripts/validate-workflow.py
 ```
 
 **校验内容**：

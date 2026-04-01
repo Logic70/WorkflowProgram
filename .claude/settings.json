@@ -45,6 +45,11 @@
     "workflow-audit": {
       "description": "Audit workflow structure patterns and quality",
       "file": ".claude/skills/workflow-audit/SKILL.md"
+    },
+    "validate-file": {
+      "description": "Validate workflow file format and constraints",
+      "file": ".claude/skills/validate-file/SKILL.md",
+      "internal": true
     }
   }
 }

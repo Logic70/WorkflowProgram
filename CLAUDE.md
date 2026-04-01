@@ -110,9 +110,11 @@ WorkflowProgram-CN/
 ## Development Commands
 
 - Run：在 Claude Code 中打开本仓库后直接调用上述命令
-- Test：`powershell -ExecutionPolicy Bypass -File .claude/scripts/validate-workflow.ps1`
-- Lint：`powershell -ExecutionPolicy Bypass -File .claude/scripts/validate-workflow.ps1`
-- Build：`N/A`
+- Test：
+  - Windows: `powershell -ExecutionPolicy Bypass -File .claude/scripts/validate-workflow.ps1`
+  - macOS/Linux: `python3 .claude/scripts/validate-workflow.py`
+- Lint：同上
+- Build：`python3 tools/sync_plugin_assets.py`
 
 ## 规则
 
