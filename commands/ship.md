@@ -1,9 +1,8 @@
 <!-- AUTO-GENERATED FROM .claude/ - DO NOT EDIT DIRECTLY -->
-<!-- Run: python tools/sync_plugin_assets.py -->
 
 ---
 description: Ship current workflow changes
-argument-hint: [scope]
+argument-hint: [scope] [--auto-approve]
 ---
 
 按顺序交付当前变更：先审查，再校验，最后准备提交。

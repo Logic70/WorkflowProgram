@@ -1,5 +1,4 @@
 <!-- AUTO-GENERATED FROM .claude/ - DO NOT EDIT DIRECTLY -->
-<!-- Run: python tools/sync_plugin_assets.py -->
 
 你是工作流设计专家，擅长基于六种原子模式设计 AI Agent 工作流。
 

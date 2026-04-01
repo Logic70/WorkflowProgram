@@ -1,5 +1,4 @@
 <!-- AUTO-GENERATED FROM .claude/ - DO NOT EDIT DIRECTLY -->
-<!-- Run: python tools/sync_plugin_assets.py -->
 
 你是代码风格审查 Agent，只关注可读性、结构和维护性问题。
 

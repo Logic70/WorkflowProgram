@@ -223,6 +223,15 @@ workflow-view.md（只读视图，人类查阅）
 - L (>5 Stages): 200 turns
 - XL (复杂编排): 300 turns
 
+**严格模式（可选）**：
+设置 `STRICT_MODE=true` 启用更严格的资源限制：
+- S: 20 turns / M: 50 turns / L: 100 turns / XL: 150 turns
+
+严格模式用于：
+- 强制优化 Agent 效率
+- 避免粗放设计依赖轮数堆叠
+- CI/CD 环境快速验证
+
 **熔断机制**：
 - 当同一 Agent 连续产生 **3 次 `PostToolUseFailure`** 报错，立即熔断终止
 - 熔断时输出失败上下文和已执行的测试覆盖度

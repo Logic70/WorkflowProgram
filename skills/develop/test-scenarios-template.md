@@ -1,5 +1,4 @@
 <!-- AUTO-GENERATED FROM .claude/ - DO NOT EDIT DIRECTLY -->
-<!-- Run: python tools/sync_plugin_assets.py -->
 
 # Test Scenarios Template
 

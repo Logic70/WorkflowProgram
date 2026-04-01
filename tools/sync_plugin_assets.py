@@ -4,15 +4,8 @@ WorkflowProgram Plugin Asset Builder
 
 FIXME: Technical Debt - .claude/ directory is temporary
 To be retired in favor of native root-level plugin structure in Phase X.
-View architecture evolution map for details.
 
-This script is a ONE-WAY BUILD tool (like `npm run build`):
-- Source of Truth: .claude/ directory
-- Build Output: root-level commands/, skills/, etc.
-- Direction: .claude/ → root/ ONLY (never reverse)
-
-DO NOT EDIT files in root-level directories directly.
-All changes should be made in .claude/ and then rebuilt.
+ONE-WAY BUILD: .claude/ → root/ ONLY
 """
 
 from pathlib import Path
@@ -22,8 +15,8 @@ ROOT = Path(__file__).resolve().parents[1]
 CLAUDE = ROOT / '.claude'
 
 COMMAND_DESCRIPTIONS = {
-    'develop': ('Design a new workflow from requirements', '<requirement>'),
-    'ship': ('Ship current workflow changes', '[scope]'),
+    'develop': ('Design a new workflow from requirements', '<requirement> [--auto-approve]'),
+    'ship': ('Ship current workflow changes', '[scope] [--auto-approve]'),
     'preflight': ('Run parallel readiness checks before shipping', '[scope]'),
     'hotfix': ('Fast-track a hotfix with reduced scope', '[description]'),
     'evolve-workflow': ('Audit and evolve a workflow repository', '[options] <workflow-path>'),
@@ -36,76 +29,53 @@ REPLACEMENTS = {
     '.claude/scripts/validate-workflow.ps1': '${CLAUDE_PLUGIN_ROOT}/scripts/validate-workflow.ps1',
 }
 
-AUTO_GENERATED_HEADER = (
-    '<!-- AUTO-GENERATED FROM .claude/ - DO NOT EDIT DIRECTLY -->\n'
-    '<!-- Run: python tools/sync_plugin_assets.py -->\n\n'
-)
+HEADER = '<!-- AUTO-GENERATED FROM .claude/ - DO NOT EDIT DIRECTLY -->\n\n'
 
-ROOT_DIRS = ['commands', 'skills', 'agents', 'rules', 'scripts']
-for dirname in ROOT_DIRS:
+def copy_with_header(src: Path, dst: Path):
+    """Copy file with auto-generated header."""
+    content = HEADER + src.read_text(encoding='utf-8')
+    dst.write_text(content, encoding='utf-8', newline='\n')
+
+# Clean and recreate output directories
+for dirname in ['commands', 'skills', 'agents', 'rules', 'scripts']:
     target = ROOT / dirname
     if target.exists():
         shutil.rmtree(target)
     target.mkdir(parents=True, exist_ok=True)
 
-# Copy agents with auto-generated header
-for source in (CLAUDE / 'agents').glob('*.md'):
-    content = AUTO_GENERATED_HEADER + source.read_text(encoding='utf-8')
-    (ROOT / 'agents' / source.name).write_text(content, encoding='utf-8', newline='\n')
+# Copy agents, rules, scripts with header
+for src in (CLAUDE / 'agents').glob('*.md'):
+    copy_with_header(src, ROOT / 'agents' / src.name)
 
-# Copy skills with auto-generated header
+copy_with_header(CLAUDE / 'rules' / 'constraints.md', ROOT / 'rules' / 'constraints.md')
+copy_with_header(CLAUDE / 'scripts' / 'validate-workflow.ps1', ROOT / 'scripts' / 'validate-workflow.ps1')
+
+# Copy skills with header
 for skill_dir in (CLAUDE / 'skills').iterdir():
     if not skill_dir.is_dir():
         continue
     dest = ROOT / 'skills' / skill_dir.name
     dest.mkdir(parents=True, exist_ok=True)
-    for source in skill_dir.glob('*'):
-        if source.is_file():
-            content = AUTO_GENERATED_HEADER + source.read_text(encoding='utf-8')
-            (dest / source.name).write_text(content, encoding='utf-8', newline='\n')
+    for src in skill_dir.glob('*'):
+        if src.is_file():
+            copy_with_header(src, dest / src.name)
 
-# Copy rules with auto-generated header
-constraints_source = CLAUDE / 'rules' / 'constraints.md'
-content = AUTO_GENERATED_HEADER + constraints_source.read_text(encoding='utf-8')
-(ROOT / 'rules' / 'constraints.md').write_text(content, encoding='utf-8', newline='\n')
-
-# Copy scripts with auto-generated header
-script_source = CLAUDE / 'scripts' / 'validate-workflow.ps1'
-content = AUTO_GENERATED_HEADER + script_source.read_text(encoding='utf-8')
-(ROOT / 'scripts' / 'validate-workflow.ps1').write_text(content, encoding='utf-8', newline='\n')
-
-# Generate commands with frontmatter and auto-generated header
-for source in (CLAUDE / 'commands').glob('*.md'):
-    name = source.stem
-    body = source.read_text(encoding='utf-8')
+# Generate commands with frontmatter and header
+for src in (CLAUDE / 'commands').glob('*.md'):
+    name = src.stem
+    body = src.read_text(encoding='utf-8')
     for old, new in REPLACEMENTS.items():
         body = body.replace(old, new)
-    description, arg_hint = COMMAND_DESCRIPTIONS[name]
-    frontmatter = (
-        '---\n'
-        f'description: {description}\n'
-        f'argument-hint: {arg_hint}\n'
-        '---\n\n'
-    )
-    full_content = AUTO_GENERATED_HEADER + frontmatter + body
-    (ROOT / 'commands' / source.name).write_text(full_content, encoding='utf-8', newline='\n')
+    desc, hint = COMMAND_DESCRIPTIONS[name]
+    frontmatter = f'---\ndescription: {desc}\nargument-hint: {hint}\n---\n\n'
+    (ROOT / 'commands' / src.name).write_text(HEADER + frontmatter + body, encoding='utf-8', newline='\n')
 
-    # Also generate skill wrappers
+    # Generate skill wrapper
     skill_dir = ROOT / 'skills' / f'command-{name}'
     skill_dir.mkdir(parents=True, exist_ok=True)
-    skill_frontmatter = (
-        '---\n'
-        f'name: {name}\n'
-        f'description: {description}\n'
-        'version: 1.0.0\n'
-        f'argument-hint: {arg_hint}\n'
-        'disable-model-invocation: true\n'
-        '---\n\n'
-    )
-    skill_content = AUTO_GENERATED_HEADER + skill_frontmatter + body
-    (skill_dir / 'SKILL.md').write_text(skill_content, encoding='utf-8', newline='\n')
+    skill_meta = f'---\nname: {name}\ndescription: {desc}\nversion: 1.0.0\nargument-hint: {hint}\ndisable-model-invocation: true\n---\n\n'
+    (skill_dir / 'SKILL.md').write_text(HEADER + skill_meta + body, encoding='utf-8', newline='\n')
 
-print("✓ Build complete: .claude/ → root-level directories")
-print("  Source of truth: .claude/")
-print("  Generated: commands/, skills/, agents/, rules/, scripts/")
-print("\nNOTE: Edit files in .claude/ only, then re-run this script.")
+print('✓ Build complete')
+print('  Source: .claude/')
+print('  Output: commands/, skills/, agents/, rules/, scripts/')

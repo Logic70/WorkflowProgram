@@ -1,11 +1,10 @@
 <!-- AUTO-GENERATED FROM .claude/ - DO NOT EDIT DIRECTLY -->
-<!-- Run: python tools/sync_plugin_assets.py -->
 
 ---
 name: ship
 description: Ship current workflow changes
 version: 1.0.0
-argument-hint: [scope]
+argument-hint: [scope] [--auto-approve]
 disable-model-invocation: true
 ---
 

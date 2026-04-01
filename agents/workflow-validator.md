@@ -1,5 +1,4 @@
 <!-- AUTO-GENERATED FROM .claude/ - DO NOT EDIT DIRECTLY -->
-<!-- Run: python tools/sync_plugin_assets.py -->
 
 你是工作流校验专家，负责验证一组生成后的工作流文件是否正确、完整且相互一致。
 

@@ -18,6 +18,35 @@ WorkflowProgram-CN 专为 Claude Code、OpenCode 等 AI 编程助手生态设计
 
 ---
 
+## 快速开始
+
+### 1. 环境准备
+
+```bash
+# 克隆仓库
+git clone https://github.com/Logic70/WorkflowProgram-CN.git
+cd WorkflowProgram-CN
+
+# 验证仓库结构
+powershell -ExecutionPolicy Bypass -File .claude/scripts/validate-workflow.ps1
+```
+
+### 2. 三分钟上手
+
+```text
+# 设计一个新工作流
+/develop "创建一个用于每日收集科技新闻的工作流"
+
+# 审计现有工作流
+/evolve-workflow /path/to/existing-workflow
+
+# 交付当前变更
+/preflight  # 预检查
+/ship        # 正式交付
+```
+
+---
+
 ## 核心能力
 
 ### 1. 工作流设计（/develop）
@@ -85,61 +114,43 @@ WorkflowProgram-CN/
 
 ---
 
-## 快速开始
-
-### 1. 环境准备
-
-```bash
-# 克隆仓库
-git clone https://github.com/Logic70/WorkflowProgram-CN.git
-cd WorkflowProgram-CN
-
-# 验证仓库结构
-powershell -ExecutionPolicy Bypass -File .claude/scripts/validate-workflow.ps1
-```
-
-### 2. 设计新工作流
-
-```text
-# 在 Claude Code 中执行
-/develop "创建一个用于自动化代码审查的工作流"
-```
-
-### 3. 审计现有工作流
-
-```text
-# 审计当前仓库
-/evolve-workflow .
-
-# 审计外部工作流
-/evolve-workflow /path/to/other-workflow
-```
-
-### 4. 交付变更
-
-```text
-# 预检查
-/preflight
-
-# 正式交付
-/ship
-```
-
----
-
 ## 命令清单
 
 ### 工作流设计
-- `/develop <requirement>` —— 根据需求设计新工作流
+- `/develop <requirement> [--auto-approve]` —— 根据需求设计新工作流
 
 ### 交付流水线
-- `/ship [<scope>]` —— 审查、校验、提交
+- `/ship [<scope>] [--auto-approve]` —— 审查、校验、提交
 - `/preflight [<scope>]` —— 并行预检查
 - `/hotfix [<description>]` —— 热修复流程
 
 ### 工作流演进
 - `/evolve-workflow [options] <path>` —— 审计目标工作流
 - `/iterate-workflow [--dry-run] [--apply] [<path>]` —— 从经验迭代改进
+
+---
+
+## 详细使用指南
+
+### CI/CD 自动模式
+
+所有设计门禁支持自动批准：
+
+```text
+# 方式1: 命令行参数
+/develop "需求描述" --auto-approve
+/ship --auto-approve
+
+# 方式2: 环境变量
+CI=true /develop "需求描述"
+```
+
+### 严格资源模式
+
+设置 `STRICT_MODE=true` 启用更严格的 Turn Count 限制：
+- S: 20 turns / M: 50 turns / L: 100 turns / XL: 150 turns
+
+用于强制优化 Agent 效率和 CI/CD 快速验证。
 
 ---
 
