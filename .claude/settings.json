@@ -50,6 +50,26 @@
       "description": "Validate workflow file format and constraints",
       "file": ".claude/skills/validate-file/SKILL.md",
       "internal": true
+    },
+    "workflowprogram-orchestrate": {
+      "description": "Natural-language router for current-project workflow requests; 为当前项目设计、审计、迭代、验证 workflow 时优先使用此入口",
+      "file": ".claude/skills/workflowprogram-orchestrate/SKILL.md"
+    },
+    "workflowprogram-develop": {
+      "description": "Design or update workflow assets for the current target project",
+      "file": ".claude/skills/workflowprogram-develop/SKILL.md"
+    },
+    "workflowprogram-audit": {
+      "description": "Audit workflow assets in the current target project",
+      "file": ".claude/skills/workflowprogram-audit/SKILL.md"
+    },
+    "workflowprogram-iterate": {
+      "description": "Generate workflow improvement proposals from lessons and current state",
+      "file": ".claude/skills/workflowprogram-iterate/SKILL.md"
+    },
+    "workflowprogram-validate": {
+      "description": "Validate workflow assets in the current target project at workflow scope",
+      "file": ".claude/skills/workflowprogram-validate/SKILL.md"
     }
   }
 }

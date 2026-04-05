@@ -1,5 +1,9 @@
 按顺序交付当前变更：先审查，再校验，最后准备提交。
 
+> Compatibility Note
+>
+> `/ship` 保留为当前仓库的交付兼容命令，用于审查、校验和提交准备。它不是 WorkflowProgram 面向 `TARGET_ROOT` 的主入口。
+
 ## Usage
 
 ```text

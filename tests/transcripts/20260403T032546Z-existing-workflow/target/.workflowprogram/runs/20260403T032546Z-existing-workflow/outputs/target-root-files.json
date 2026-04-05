@@ -1,0 +1,17 @@
+{
+  "files": [
+    ".claude/agents/demo-agent.md",
+    ".claude/commands/demo.md",
+    ".claude/rules/constraints.md",
+    ".claude/settings.json",
+    ".claude/skills/demo-skill/SKILL.md",
+    ".workflowprogram/runs/20260403T032546Z-existing-workflow/context.json",
+    ".workflowprogram/runs/20260403T032546Z-existing-workflow/events.jsonl",
+    ".workflowprogram/runs/20260403T032546Z-existing-workflow/outputs/target-claude-files.json",
+    ".workflowprogram/runs/20260403T032546Z-existing-workflow/state.json",
+    "CLAUDE.md",
+    "README.md",
+    "lessons.md",
+    "validation-report.md"
+  ]
+}

@@ -1,0 +1,5 @@
+{"ts": "2026-04-03T03:25:46Z", "type": "RunStarted", "stage": "prepare", "source": "runtime_smoke", "status": "ok", "message": "Preparing fixture broken-workflow"}
+{"ts": "2026-04-03T03:25:46Z", "type": "TaskCreated", "stage": "invoke", "source": "runtime_smoke", "status": "ok", "message": "Invoking /workflowprogram-validate against copied fixture"}
+{"ts": "2026-04-03T03:25:51Z", "type": "EnvironmentSkip", "stage": "invoke", "source": "runtime_smoke", "status": "warn", "message": "Claude CLI is installed but not logged in."}
+{"ts": "2026-04-03T03:25:51Z", "type": "TaskCompleted", "stage": "invoke", "source": "runtime_smoke", "status": "ok", "message": "Claude CLI is installed but not logged in."}
+{"ts": "2026-04-03T03:25:51Z", "type": "RunFinished", "stage": "finished", "source": "runtime_smoke", "status": "warn", "message": "Run finished with result ENVIRONMENT-SKIP"}

@@ -2,6 +2,10 @@
 
 这个流程会跳过风格、性能与文档审查，只保留安全检查和校验作为硬门禁。
 
+> Compatibility Note
+>
+> `/hotfix` 保留为当前仓库的维护兼容命令，用于热修复和快速交付。它不是 WorkflowProgram 面向 `TARGET_ROOT` 的主入口。
+
 ## Usage
 
 ```text

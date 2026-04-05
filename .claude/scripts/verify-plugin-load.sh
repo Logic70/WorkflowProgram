@@ -1,8 +1,31 @@
 #!/usr/bin/env bash
+# Discovery-only plugin check.
+#
+# This script only verifies whether Claude CLI can discover plugin-provided
+# slash entrypoints. It is not a runtime validation harness and must not be
+# used as the sole release gate after Phase 3.
 set -euo pipefail
 
-PLUGIN_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PLUGIN_ROOT="${PLUGIN_ROOT:-}"
 CLAUDE_BIN="${CLAUDE_BIN:-claude}"
+
+if [[ -z "$PLUGIN_ROOT" ]]; then
+  for candidate in \
+    "$SCRIPT_DIR/.." \
+    "$SCRIPT_DIR/../../dist/plugin" \
+    "$SCRIPT_DIR/../dist/plugin"; do
+    if [[ -f "$candidate/.claude-plugin/plugin.json" ]]; then
+      PLUGIN_ROOT="$(cd "$candidate" && pwd)"
+      break
+    fi
+  done
+fi
+
+if [[ -z "$PLUGIN_ROOT" ]]; then
+  echo "Could not resolve plugin root. Set PLUGIN_ROOT explicitly." >&2
+  exit 1
+fi
 
 checks=(
   "/develop smoke-test"

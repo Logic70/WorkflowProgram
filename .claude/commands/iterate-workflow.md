@@ -3,6 +3,10 @@
 这个命令采用“先草拟、后审批、再应用”的 DRAFT MODE，
 避免未经确认就修改结构性工作流资产。
 
+> Compatibility Note
+>
+> `/iterate-workflow` 作为历史兼容入口保留。新的主入口应优先使用 `workflowprogram-iterate`，它面向 `TARGET_ROOT` 基于 lessons 生成 workflow 改进草案。
+
 ## Usage
 
 ```text

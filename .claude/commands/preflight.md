@@ -3,6 +3,10 @@
 与 `/ship` 不同，`/preflight` 会优先并行执行检查并汇总结果，
 以更快判断当前变更是否达到“可进入下一步”的状态；它不会创建提交。
 
+> Compatibility Note
+>
+> `/preflight` 保留为当前仓库的就绪性检查命令，不是 WorkflowProgram 在目标项目中的主产品入口。面向 `TARGET_ROOT` 的 workflow 级验证应优先使用 `workflowprogram-validate`。
+
 ## Usage
 
 ```text

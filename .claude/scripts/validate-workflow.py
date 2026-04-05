@@ -17,7 +17,25 @@ import json
 import re
 import sys
 from pathlib import Path
-from typing import Dict, List, Tuple, Optional
+from typing import Any, Dict, List, Optional
+
+
+REQUIRED_PRIMARY_SKILLS = [
+    'workflowprogram-orchestrate',
+    'workflowprogram-develop',
+    'workflowprogram-audit',
+    'workflowprogram-iterate',
+    'workflowprogram-validate',
+]
+
+FORBIDDEN_LEGACY_PATHS = [
+    'commands',
+    'skills',
+    'agents',
+    'rules',
+    'scripts',
+    'tools/sync_plugin_assets.py',
+]
 
 
 class ValidationResult:
@@ -71,8 +89,16 @@ def validate_required_paths(root: Path, result: ValidationResult) -> None:
         ".claude/commands",
         ".claude/skills",
         ".claude/rules/constraints.md",
+        ".claude/scripts/managed-assets.py",
         ".claude/scripts/validate-workflow.ps1",
         ".claude/scripts/validate-workflow.py",  # Self-check
+        ".claude-plugin/plugin.json",
+        ".claude-plugin/marketplace.json",
+        "tools/build_plugin.py",
+        "tools/runtime_smoke.py",
+        "tests/fixtures",
+        "tests/expectations",
+        "tests/transcripts",
     ]
 
     for relative_path in required_paths:
@@ -81,6 +107,13 @@ def validate_required_paths(root: Path, result: ValidationResult) -> None:
             result.add_pass(f"Found {relative_path}")
         else:
             result.add_error(f"Missing required path: {relative_path}")
+
+    for relative_path in FORBIDDEN_LEGACY_PATHS:
+        full_path = root / relative_path
+        if full_path.exists():
+            result.add_error(f"Legacy compatibility path must not exist: {relative_path}")
+        else:
+            result.add_pass(f"Legacy compatibility path removed: {relative_path}")
 
 
 def validate_settings_json(root: Path, result: ValidationResult) -> Optional[Dict]:
@@ -215,6 +248,20 @@ def validate_skills(root: Path, settings: Dict, result: ValidationResult) -> Non
             result.add_error(f"Cannot validate skill '{skill_dir.name}': {e}")
 
 
+def validate_primary_skill_set(settings: Dict, result: ValidationResult) -> None:
+    """Validate that skills-first primary entry points are registered."""
+    if not settings or 'skills' not in settings:
+        result.add_error('settings.json is missing skills registration')
+        return
+
+    registered = settings['skills']
+    for skill_name in REQUIRED_PRIMARY_SKILLS:
+        if skill_name in registered:
+            result.add_pass(f"Primary skill '{skill_name}' is registered in settings.json")
+        else:
+            result.add_error(f"Missing required primary skill registration: {skill_name}")
+
+
 def validate_constraints(root: Path, result: ValidationResult) -> None:
     """Validate constraints.md contains ALWAYS and NEVER rules."""
     constraints_path = root / ".claude/rules/constraints.md"
@@ -241,6 +288,111 @@ def validate_constraints(root: Path, result: ValidationResult) -> None:
             result.add_error(f"constraints.md must include BOTH ALWAYS and NEVER rules (missing: {', '.join(missing)})")
     except Exception as e:
         result.add_error(f"Cannot validate constraints.md: {e}")
+
+
+def validate_plugin_metadata(root: Path, result: ValidationResult) -> Optional[Dict[str, Any]]:
+    plugin_json_path = root / ".claude-plugin" / "plugin.json"
+    marketplace_json_path = root / ".claude-plugin" / "marketplace.json"
+
+    plugin_meta: Optional[Dict[str, Any]] = None
+    try:
+        plugin_meta = json.loads(plugin_json_path.read_text(encoding="utf-8"))
+        result.add_pass("Parsed .claude-plugin/plugin.json")
+        for field in ["name", "version", "description"]:
+            if plugin_meta.get(field):
+                result.add_pass(f"plugin.json includes field '{field}'")
+            else:
+                result.add_error(f"plugin.json is missing field '{field}'")
+    except Exception as e:
+        result.add_error(f"Cannot parse .claude-plugin/plugin.json: {e}")
+
+    try:
+        marketplace_meta = json.loads(marketplace_json_path.read_text(encoding="utf-8"))
+        result.add_pass("Parsed .claude-plugin/marketplace.json")
+        plugins = marketplace_meta.get("plugins")
+        if isinstance(plugins, list) and plugins:
+            result.add_pass("marketplace.json defines at least one plugin entry")
+        else:
+            result.add_error("marketplace.json must define at least one plugin entry")
+    except Exception as e:
+        result.add_error(f"Cannot parse .claude-plugin/marketplace.json: {e}")
+
+    return plugin_meta
+
+
+def validate_dist_plugin(root: Path, plugin_meta: Optional[Dict[str, Any]], result: ValidationResult) -> None:
+    dist_root = root / "dist" / "plugin"
+    if not dist_root.exists():
+        result.add_pass("dist/plugin not present; build output validation skipped")
+        return
+
+    required_paths = [
+        dist_root / ".claude-plugin" / "plugin.json",
+        dist_root / ".claude-plugin" / "marketplace.json",
+        dist_root / "build-manifest.json",
+        dist_root / "scripts" / "managed-assets.py",
+    ]
+    for path in required_paths:
+        relative = path.relative_to(root)
+        if path.exists():
+            result.add_pass(f"Build output contains {relative}")
+        else:
+            result.add_error(f"Build output is missing {relative}")
+
+    manifest_path = dist_root / "build-manifest.json"
+    if not manifest_path.exists():
+        return
+
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        result.add_pass("Parsed dist/plugin/build-manifest.json")
+    except Exception as e:
+        result.add_error(f"Cannot parse dist/plugin/build-manifest.json: {e}")
+        return
+
+    for field in ["manifest_version", "generated_at", "plugin_name", "plugin_version", "files"]:
+        if field in manifest:
+            result.add_pass(f"build-manifest.json includes field '{field}'")
+        else:
+            result.add_error(f"build-manifest.json is missing field '{field}'")
+
+    if plugin_meta:
+        if manifest.get("plugin_name") == plugin_meta.get("name"):
+            result.add_pass("build-manifest plugin_name matches source plugin.json")
+        else:
+            result.add_error("build-manifest plugin_name does not match source plugin.json")
+        if manifest.get("plugin_version") == plugin_meta.get("version"):
+            result.add_pass("build-manifest plugin_version matches source plugin.json")
+        else:
+            result.add_error("build-manifest plugin_version does not match source plugin.json")
+
+    files = manifest.get("files", [])
+    if not isinstance(files, list):
+        result.add_error("build-manifest files must be a list")
+        return
+
+    has_managed_assets = False
+    for item in files:
+        path = item.get("path")
+        sha256 = item.get("sha256")
+        if not path:
+            result.add_error("build-manifest contains an entry without path")
+            continue
+        if not sha256 or len(sha256) != 64:
+            result.add_error(f"build-manifest entry '{path}' is missing a valid sha256")
+            continue
+        built_file = dist_root / path
+        if built_file.exists():
+            result.add_pass(f"build-manifest file exists: {path}")
+        else:
+            result.add_error(f"build-manifest references a missing file: {path}")
+        if path == "scripts/managed-assets.py":
+            has_managed_assets = True
+
+    if has_managed_assets:
+        result.add_pass("build-manifest tracks scripts/managed-assets.py")
+    else:
+        result.add_error("build-manifest must include scripts/managed-assets.py")
 
 
 def print_report(result: ValidationResult) -> None:
@@ -285,8 +437,11 @@ def main():
     if settings:
         validate_commands(root, settings, result)
         validate_skills(root, settings, result)
+        validate_primary_skill_set(settings, result)
 
     validate_constraints(root, result)
+    plugin_meta = validate_plugin_metadata(root, result)
+    validate_dist_plugin(root, plugin_meta, result)
 
     # Print report
     print_report(result)

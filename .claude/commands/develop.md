@@ -1,6 +1,10 @@
 根据用户需求设计一个新工作流。这个命令生成的是工作流文件，
 例如 commands、skills、agents、rules 与 settings 更新，而不是应用代码。
 
+> Compatibility Note
+>
+> `/develop` 作为历史兼容入口保留。新的主入口应优先使用 `workflowprogram-develop`，它面向 `TARGET_ROOT` 设计或更新 workflow 资产。
+
 ## Usage
 
 ```text
@@ -151,6 +155,15 @@ workflow-view.md（只读视图，人类查阅）
 **Goal**: 从 `workflow-spec.yaml` 生成所有工作流文件。
 
 **复杂度级别**: 从 YAML 读取 `complexity` 字段，用于 Stage 5 Turn Count 配置
+
+**写入约束**：
+
+- 不要直接把新文件静默覆盖到 `TARGET_ROOT/.claude/`。
+- 先把候选文件写入 `RUN_ROOT/outputs/candidate/.claude/`。
+- 候选产物生成完成后，调用 `${CLAUDE_PLUGIN_ROOT}/scripts/managed-assets.py`：
+  - `plan --target-root <TARGET_ROOT> --run-root <RUN_ROOT> --source-root <RUN_ROOT>/outputs/candidate/.claude`
+  - 若无冲突，再执行 `apply-staged`
+- 若返回冲突，必须把候选版本保留在 `RUN_ROOT/outputs/` 并向用户报告，不能静默覆盖用户资产。
 
 **生成流程**：
 

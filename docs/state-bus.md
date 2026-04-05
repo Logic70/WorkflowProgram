@@ -1,136 +1,107 @@
 # Session State Bus
 
-轻量级状态总线，用于工作流执行期间的数据传递、检查点创建和调试。
+`state-bus.py` 是一个开发态辅助工具，用于在长流程中保存阶段状态、创建检查点，并在指定 `RUN_ROOT` 时把关键状态变化追加到 `events.jsonl`。它不是 `Phase 3` 的主 runtime harness；主动态验证入口仍是 `tools/runtime_smoke.py`。
 
-## 用途
+## 定位
 
-- **Agent 间数据共享**: 将前一 Stage 的数据写入总线，后一 Stage 读取
-- **检查点恢复**: 在长流程中创建检查点，支持断点续传
-- **调试追踪**: 查看 Stage 历史、当前状态、性能指标
-- **防丢失**: 结构化存储，避免 LLM 上下文遗忘导致数据丢失
+- 主用途：手工调试、长流程状态持久化、阶段间数据传递
+- 非主用途：替代 runtime smoke 或替代 Claude CLI 运行
+- 对齐原则：优先写入 `TARGET_ROOT/.workflowprogram/runs/<run-id>/`
 
-## 使用方式
+## 路径模型
 
-### 初始化会话
+优先级如下：
+
+1. `--session <path>`
+2. 环境变量 `WORKFLOWPROGRAM_SESSION_FILE`
+3. `--run-root <path>`
+4. 环境变量 `WORKFLOWPROGRAM_RUN_ROOT`
+5. 默认路径 `.workflowprogram/session-state.json`
+
+当提供 `--run-root` 或 `WORKFLOWPROGRAM_RUN_ROOT` 时：
+
+- 会话文件写入：`<RUN_ROOT>/state-bus/session-state.json`
+- 事件日志追加到：`<RUN_ROOT>/events.jsonl`
+
+## 常用命令
+
+### 初始化 RUN_ROOT 对齐的会话
 
 ```bash
-python3 .claude/scripts/state-bus.py init --command "/develop news-workflow" --max-turns 100
+python3 .claude/scripts/state-bus.py init   --run-root "$TARGET_ROOT/.workflowprogram/runs/<run-id>"   --command "/workflowprogram-develop minimal-workflow"   --max-turns 100
 ```
 
 ### Stage 执行流程
 
 ```bash
-# 1. 进入 Stage
-python3 .claude/scripts/state-bus.py transition --stage explore
+python3 .claude/scripts/state-bus.py transition   --run-root "$TARGET_ROOT/.workflowprogram/runs/<run-id>"   --stage explore
 
-# 2. 写入数据到总线
-python3 .claude/scripts/state-bus.py write --stage explore --key requirements --value "创建新闻收集工作流"
-python3 .claude/scripts/state-bus.py write --stage explore --key complexity --value "M"
+python3 .claude/scripts/state-bus.py write   --run-root "$TARGET_ROOT/.workflowprogram/runs/<run-id>"   --stage explore   --key requirements   --value "为当前项目设计最小 workflow"
 
-# 3. 创建检查点（关键节点）
-python3 .claude/scripts/state-bus.py checkpoint --stage explore
-
-# 4. 进入下一 Stage
-python3 .claude/scripts/state-bus.py transition --stage design
-
-# 5. 读取前一 Stage 数据
-python3 .claude/scripts/state-bus.py read --stage explore --key requirements
+python3 .claude/scripts/state-bus.py checkpoint   --run-root "$TARGET_ROOT/.workflowprogram/runs/<run-id>"   --stage explore
 ```
 
-### 调试命令
+### 查看状态
 
 ```bash
-# 查看当前状态
-python3 .claude/scripts/state-bus.py status
-
-# 查看 Stage 历史
-python3 .claude/scripts/state-bus.py history
-
-# 查看所有检查点
-python3 .claude/scripts/state-bus.py checkpoints
-
-# 恢复到检查点
-python3 .claude/scripts/state-bus.py restore explore-20-143022
+python3 .claude/scripts/state-bus.py status --run-root "$TARGET_ROOT/.workflowprogram/runs/<run-id>"
+python3 .claude/scripts/state-bus.py history --run-root "$TARGET_ROOT/.workflowprogram/runs/<run-id>"
+python3 .claude/scripts/state-bus.py checkpoints --run-root "$TARGET_ROOT/.workflowprogram/runs/<run-id>"
 ```
 
 ## 数据结构
+
+### session-state.json
 
 ```json
 {
   "meta": {
     "session_id": "uuid",
-    "command": "/develop xxx",
+    "command": "/workflowprogram-develop minimal-workflow",
     "status": "running",
-    "created_at": "2026-04-01T10:00:00"
+    "created_at": "2026-04-03T12:00:00Z"
   },
   "state": {
     "current_stage": "design",
     "stage_history": ["explore"],
-    "turn_count": 25,
-    "max_turns": 100
+    "turn_count": 2,
+    "max_turns": 100,
+    "run_root": "/abs/path/to/TARGET_ROOT/.workflowprogram/runs/<run-id>"
   },
   "data_bus": {
     "explore": {
-      "requirements": "创建新闻收集工作流",
-      "complexity": "M"
-    },
-    "design": {
-      "patterns": ["Sequential", "Fan-out"]
+      "requirements": "为当前项目设计最小 workflow"
     }
   },
-  "checkpoints": [
-    {
-      "id": "explore-20-143022",
-      "stage": "explore",
-      "turn": 20,
-      "file": ".claude/checkpoints/explore-20-143022.json"
-    }
-  ],
+  "checkpoints": [],
   "debug": {
     "performance": {
-      "tokens_input": 12000,
-      "tokens_output": 8000,
-      "api_calls": 15
+      "tokens_input": 0,
+      "tokens_output": 0,
+      "api_calls": 0
     }
   }
 }
 ```
 
-## 集成到 Commands
+### events.jsonl
 
-在 `develop.md` 中使用：
+当提供 `RUN_ROOT` 时，以下动作会向 `events.jsonl` 追加事件：
 
-```markdown
-## Stage 1: 需求探索
+- `init`
+- `write`
+- `transition`
+- `checkpoint`
+- `restore`
 
-**执行前**:
-```bash
-python3 .claude/scripts/state-bus.py transition --stage explore
+事件示例：
+
+```json
+{"ts":"2026-04-03T12:00:03Z","type":"StateBusTransition","stage":"design","source":"state-bus","status":"ok","message":"Transitioned from explore to design"}
 ```
 
-**执行中**:
-1. 分析需求
-2. 写入总线:
-   ```bash
-   python3 .claude/scripts/state-bus.py write --stage explore --key requirements "$ARGUMENTS"
-   python3 .claude/scripts/state-bus.py write --stage explore --key output_file "workflow-spec.md"
-   ```
-3. 创建检查点:
-   ```bash
-   python3 .claude/scripts/state-bus.py checkpoint --stage explore
-   ```
+## 与 Phase 3 的关系
 
-**执行后**:
-```bash
-python3 .claude/scripts/state-bus.py status
-```
-```
-
-## 优势
-
-| 特性 | 说明 |
-|------|------|
-| 防丢失 | 结构化存储，不依赖 LLM 上下文 |
-| 可调试 | 检查点机制支持断点续传 |
-| 可追踪 | Stage 历史和性能指标 |
-| 轻量级 | 纯 JSON + Python，无外部依赖 |
+- `tools/runtime_smoke.py` 负责创建 `RUN_ROOT`、调用 Claude CLI、写运行报告
+- `state-bus.py` 负责可选的阶段状态持久化和检查点
+- 两者共享 `RUN_ROOT` 和 `events.jsonl` 的基本约定，但 `runtime_smoke.py` 仍是主验证入口

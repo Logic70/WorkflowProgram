@@ -23,8 +23,10 @@
 ## 技能与 Agent 设计
 
 - ALWAYS 为每个 `SKILL.md` 提供 `name`、`description`、`version` frontmatter。
+- ALWAYS 当用户以自然语言表达“为当前项目设计 / 审计 / 迭代 / 验证 workflow”时，优先路由到 `workflowprogram-orchestrate`。
 - ALWAYS 为审查类和校验类 Agent 明确输出格式。
 - ALWAYS 为 AI Agent 提供结构化方法论（Step 1/2/3...），不只给"关注点"列表。
+- NEVER 同时让多个 `workflowprogram-*` 叶子 skill 承担自然语言自动触发职责。
 - NEVER 漏掉任何被命令直接引用的支持资产。
 
 ## 工作流提取

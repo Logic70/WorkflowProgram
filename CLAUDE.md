@@ -9,7 +9,7 @@ WorkflowProgram-CN 是一个面向 Claude Code 风格工作区的元工作流仓
 ## 技术栈
 
 - 文档与配置：Markdown、JSON
-- 自动化与校验：PowerShell
+- 自动化与校验：Python、PowerShell
 - 运行环境：Claude Code 工作区命令体系
 - 数据库：无
 
@@ -34,7 +34,7 @@ WorkflowProgram-CN 是一个面向 Claude Code 风格工作区的元工作流仓
 - `.claude/scripts/`
   可执行校验脚本，使仓库能够被自动验证。
 
-- 根级 `commands/`、`skills/`、`agents/`、`rules/`、`scripts/` 目录用于 Claude Code plugin 封装，由 `tools/sync_plugin_assets.py` 从 `.claude/` 同步生成。
+- `dist/plugin/` 是正式安装产物目录，由 `tools/build_plugin.py` 从 `.claude/` 和 `.claude-plugin/` 构建生成。
 
 经验法则：
 可确定、可复验的检查放到脚本里；
@@ -44,18 +44,18 @@ WorkflowProgram-CN 是一个面向 Claude Code 风格工作区的元工作流仓
 
 ## 核心能力
 
-- `/develop`
-  根据需求设计一个新工作流，产出的是工作流文件，不是应用代码。
-- `/ship`
-  以顺序流水线执行审查、校验和提交准备。
-- `/preflight`
-  在正式交付前运行更快的并行就绪检查，不会提交代码。
-- `/hotfix`
-  以精简流程快速处理热修复，但仍保留关键安全与校验门禁。
-- `/evolve-workflow`
-  审计目标工作流仓库，识别结构和模式问题，并可从 lessons 中抽取约束。
-- `/iterate-workflow`
+- `workflowprogram-orchestrate`
+  作为 skills-first 总控入口，负责将自然语言请求路由到正确主能力；当前只放开它承接自然语言自动触发。
+- `workflowprogram-develop`
+  面向 `TARGET_ROOT` 设计或更新 workflow 资产，产出的是工作流文件，不是应用代码。
+- `workflowprogram-audit`
+  审计目标工作流仓库，识别结构和模式问题。
+- `workflowprogram-iterate`
   从 `lessons.md` 生成改进草案，展示 diff，待批准后再应用。
+- `workflowprogram-validate`
+  对目标项目中的 workflow 资产执行结构化验证。
+- `/ship`、`/preflight`、`/hotfix`
+  保留为当前仓库的维护兼容入口，不作为目标项目的主产品 API。
 
 ## 项目结构
 
@@ -65,17 +65,34 @@ WorkflowProgram-CN/
 |-- README.md
 |-- lessons.md
 |-- validation-report.md
-`-- .claude/
-    |-- settings.json
-    |-- settings.local.json
-    |-- agents/
-    |-- commands/
-    |-- rules/
-    |-- scripts/
-    `-- skills/
+|-- .claude/
+|   |-- settings.json
+|   |-- settings.local.json
+|   |-- agents/
+|   |-- commands/
+|   |-- rules/
+|   |-- scripts/
+|   `-- skills/
+|-- .claude-plugin/
+|-- dist/plugin/
+|-- docs/
+|-- tests/
+`-- tools/
 ```
 
-## Commands
+## Primary Skills
+
+面向目标项目的主入口统一采用 skills-first：
+
+- `workflowprogram-orchestrate`
+- `workflowprogram-develop`
+- `workflowprogram-audit`
+- `workflowprogram-iterate`
+- `workflowprogram-validate`
+
+这些 skill 面向 `TARGET_ROOT` 工作，不应与当前仓库维护命令混用。
+
+## Compatibility Commands
 
 工作流入口命令：
 
@@ -94,7 +111,7 @@ WorkflowProgram-CN/
 
 ## Skills
 
-用户可直接使用的技能：
+辅助/复用技能：
 
 - `/review`
 - `/test`
@@ -107,14 +124,29 @@ WorkflowProgram-CN/
 - `.claude/skills/develop/spec-template.md`
   `/develop` 生成 `workflow-spec.md` 时使用的规格模板。
 
+## Plugin Runtime Model
+
+- 源码真源：`.claude/`
+- 安装产物：`dist/plugin/`
+- trace manifest：`dist/plugin/build-manifest.json`
+- 目标项目交付位置：`TARGET_ROOT/.claude/`
+- managed 资产清单：`TARGET_ROOT/.workflowprogram/managed-files.json`
+- 运行证据位置：`TARGET_ROOT/.workflowprogram/runs/<run-id>/`
+- Agent 双层定义：`.claude/agents/` -> `dist/plugin/agents/`
+- 受支持的发现模型：`claude --plugin-dir <dist/plugin>`
+- 受支持的显式入口：`/workflowprogram-*`
+- `~/.claude` 覆盖式安装不属于正式稳态契约，只能视为实验性开发路径
+
 ## Development Commands
 
 - Run：在 Claude Code 中打开本仓库后直接调用上述命令
 - Test：
   - Windows: `powershell -ExecutionPolicy Bypass -File .claude/scripts/validate-workflow.ps1`
   - macOS/Linux: `python3 .claude/scripts/validate-workflow.py`
+- Runtime Smoke：`python3 tools/runtime_smoke.py --fixture empty-project`
+- Managed Assets：`python3 .claude/scripts/managed-assets.py plan ...`
 - Lint：同上
-- Build：`python3 tools/sync_plugin_assets.py`
+- Build：`python3 tools/build_plugin.py`
 
 ## 规则
 

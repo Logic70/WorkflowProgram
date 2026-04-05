@@ -1,0 +1,14 @@
+{
+  "files": [
+    ".claude/settings.json",
+    ".claude/skills/bad-skill/SKILL.md",
+    ".workflowprogram/runs/20260403T032546Z-broken-workflow/context.json",
+    ".workflowprogram/runs/20260403T032546Z-broken-workflow/events.jsonl",
+    ".workflowprogram/runs/20260403T032546Z-broken-workflow/outputs/target-claude-files.json",
+    ".workflowprogram/runs/20260403T032546Z-broken-workflow/state.json",
+    "CLAUDE.md",
+    "README.md",
+    "lessons.md",
+    "validation-report.md"
+  ]
+}

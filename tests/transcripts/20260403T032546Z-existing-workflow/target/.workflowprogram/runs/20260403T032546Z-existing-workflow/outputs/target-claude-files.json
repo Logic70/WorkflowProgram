@@ -1,0 +1,9 @@
+{
+  "files": [
+    "agents/demo-agent.md",
+    "commands/demo.md",
+    "rules/constraints.md",
+    "settings.json",
+    "skills/demo-skill/SKILL.md"
+  ]
+}

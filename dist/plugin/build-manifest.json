@@ -1,0 +1,231 @@
+{
+  "manifest_version": 1,
+  "generated_at": "2026-04-05T13:38:02Z",
+  "builder": "tools/build_plugin.py",
+  "plugin_name": "workflowprogram-cn",
+  "plugin_version": "0.1.0",
+  "source_commit": "928d1c1f9899c7c70699cf2361d3fd0dfc4d7ee4",
+  "source_dirty": true,
+  "files": [
+    {
+      "path": ".claude-plugin/README.md",
+      "sha256": "e2d406c4ce264dfa8626d1b42e22f3ce0711a23024ddb169829ae4fb6bcc640c",
+      "size": 2163
+    },
+    {
+      "path": ".claude-plugin/marketplace.json",
+      "sha256": "c6a4734f27aa59e6115d0eaac0d6c76907aa8c7bc97bc9102983e765e7c4ad60",
+      "size": 1138
+    },
+    {
+      "path": ".claude-plugin/plugin.json",
+      "sha256": "8c7f3ffbd9f1d05c93b39c28c893af410eb2bdedca32971630c1163ad16da5f9",
+      "size": 606
+    },
+    {
+      "path": "agents/logic-reviewer.md",
+      "sha256": "d7c9dc26cda40e6cc01e3b07eeb676ccdd03e51828c9256ae7dead311ed722f1",
+      "size": 1251
+    },
+    {
+      "path": "agents/performance-reviewer.md",
+      "sha256": "c15910478156540e5e3a35ba30dd9d645e629c973ff70287411f0f907b95fd55",
+      "size": 1041
+    },
+    {
+      "path": "agents/security-reviewer.md",
+      "sha256": "e12fcae92cc933af9aa2f4818f4491f71a1f384be0b3ab77db8ada6ff4377593",
+      "size": 1185
+    },
+    {
+      "path": "agents/style-reviewer.md",
+      "sha256": "bace4c01a70a398181e0ae684788f2901f87c476881c8968ddd55e1e5d31cb1c",
+      "size": 1017
+    },
+    {
+      "path": "agents/test-scenario-generator.md",
+      "sha256": "cf302c6b162216175c107fb428e53dc79011b9c15bb089b6746ac108e039da18",
+      "size": 2867
+    },
+    {
+      "path": "agents/workflow-designer.md",
+      "sha256": "718a5663805600c87fcad36e380618d6f4b2f90477ab908198796e87757857d8",
+      "size": 1899
+    },
+    {
+      "path": "agents/workflow-validator.md",
+      "sha256": "192c8f2a8697d7570bea3f7faccb8c4047d58f54c464fbbd0c0af8ac15ac6ff7",
+      "size": 1624
+    },
+    {
+      "path": "agents/workflow-verifier.md",
+      "sha256": "24b5ff2fd94eecdfba28fcafa57ba9ca5755be1ca2aebfc64b76d0c7ca1f835b",
+      "size": 4521
+    },
+    {
+      "path": "commands/develop.md",
+      "sha256": "1b1085ade9fcee9e1a4d7cd72392f555355e9482829c238b9824eed1abca6e1c",
+      "size": 11731
+    },
+    {
+      "path": "commands/evolve-workflow.md",
+      "sha256": "93e83f742a036474ab9f4ce227027234e0b0641a535aeac2855f57e40281483e",
+      "size": 5035
+    },
+    {
+      "path": "commands/hotfix.md",
+      "sha256": "fbcff7f6375c43083f4fc64567f00fc1bd185e986a7dbab3758053525146c11c",
+      "size": 2476
+    },
+    {
+      "path": "commands/iterate-workflow.md",
+      "sha256": "160aace2548cb54bcea5675affbfa501bc0f4c0028c883f624eb91d0ea917a89",
+      "size": 3992
+    },
+    {
+      "path": "commands/preflight.md",
+      "sha256": "33c651c89412351016e9a8b07067db0afa1fb4f673b5ad4b52a6d76768aecf20",
+      "size": 2213
+    },
+    {
+      "path": "commands/ship.md",
+      "sha256": "d7eb33b87f3f11464ad96672d98837efcfaa5bca51cacb74bae7055a80312c42",
+      "size": 3633
+    },
+    {
+      "path": "rules/constraints.md",
+      "sha256": "f364e49e6ea5480daa7c6187915865ef3e41c97b0789160246b107f3c04c7867",
+      "size": 3252
+    },
+    {
+      "path": "scripts/managed-assets.py",
+      "sha256": "b99637f6635eddfe1a5016cb4eb59f820c4657a0242c8ff255f4c5100237b407",
+      "size": 16089
+    },
+    {
+      "path": "scripts/state-bus.py",
+      "sha256": "d88c27a5ed8c4d6db2638edbb926f3ac4cd3eec2b1eade8f1064d0d893ff4477",
+      "size": 12593
+    },
+    {
+      "path": "scripts/validate-workflow.ps1",
+      "sha256": "4e34308f9424ddb7cd73ff13dc78b7487b6e5d53e0f2f26033b511bad52507b4",
+      "size": 11852
+    },
+    {
+      "path": "scripts/validate-workflow.py",
+      "sha256": "51d4046e846198e3b085204487181c84453827d1a55c861f57fac5010e91a402",
+      "size": 16544
+    },
+    {
+      "path": "scripts/verify-plugin-load.sh",
+      "sha256": "2583be7b09dd0318dbe6e580edb6c2ec9a1908edf50f4d5d6f0cf32f240f3f6c",
+      "size": 1722
+    },
+    {
+      "path": "skills/command-develop/SKILL.md",
+      "sha256": "d502bafa9219b897f6b097347e194da131aa1f27a992c554d7dffcb7c826a417",
+      "size": 11791
+    },
+    {
+      "path": "skills/command-evolve-workflow/SKILL.md",
+      "sha256": "64f344ea58ad5b6eb25f44e0eac7cca2c4a465e0d89ea86d0efc5bd277c619b2",
+      "size": 5103
+    },
+    {
+      "path": "skills/command-hotfix/SKILL.md",
+      "sha256": "070da256e6dcefe12ff3cb9f3cc26658024266f86060be2f7f49760d9fa99b1e",
+      "size": 2535
+    },
+    {
+      "path": "skills/command-iterate-workflow/SKILL.md",
+      "sha256": "464dd04ec5cc0cdb3ae167e06aa7f6b5cc9ce6d5d8e459aa48d0f44e5ccf186e",
+      "size": 4061
+    },
+    {
+      "path": "skills/command-preflight/SKILL.md",
+      "sha256": "cf738e249e5a61b249daf81651622e8a75b5e0a7641e2bcdcfa896a6587b96dc",
+      "size": 2275
+    },
+    {
+      "path": "skills/command-ship/SKILL.md",
+      "sha256": "61898b98f734b9c4bc7b77c690657220bc5db24c64e1a1f11fd77cc92fd401ee",
+      "size": 3690
+    },
+    {
+      "path": "skills/commit/SKILL.md",
+      "sha256": "878eb70ccc7cd101ff483cfe3540e5e82cac49f65a83a4a1c0c55be53b8bc676",
+      "size": 1051
+    },
+    {
+      "path": "skills/develop/SKILL.md",
+      "sha256": "680e0841c1a1dc675034a6b23c460dc40a5543bef0d5da0dda8c446f08bf38cb",
+      "size": 569
+    },
+    {
+      "path": "skills/develop/spec-template.md",
+      "sha256": "f70dcdd3028a41143af9b40de320b8647d63ed66d7c4ee24f77eaaa99401c553",
+      "size": 1392
+    },
+    {
+      "path": "skills/develop/test-scenarios-template.md",
+      "sha256": "2cbb1163a9e58fc9349842e5bb23a91c6be08cb78b3a97a54ab710fb8a79c89b",
+      "size": 9198
+    },
+    {
+      "path": "skills/develop/yaml-spec-template.md",
+      "sha256": "fadd3d7a1b52dcce6caea6377e90e830262ea0e924d3185a4253ae705e8a3cad",
+      "size": 2984
+    },
+    {
+      "path": "skills/doc/SKILL.md",
+      "sha256": "8839681df975557d8cc33679607d772f951b87fd5ebce8ccd4d7a76e9a9425e6",
+      "size": 1214
+    },
+    {
+      "path": "skills/review/SKILL.md",
+      "sha256": "dab1aca9ac59bfde917b874d562c5bfe122f7992854edd08e1f068456bb9a445",
+      "size": 1125
+    },
+    {
+      "path": "skills/test/SKILL.md",
+      "sha256": "5cdf6441993e07d95acb037c9058b0b48b7f2976abbd80e13a7e4dbd6a2236d5",
+      "size": 1047
+    },
+    {
+      "path": "skills/validate-file/SKILL.md",
+      "sha256": "c7bf3973b0b5be7050067f696cf8283e60ca9e1b27b05f17d18c00f5eda5b72b",
+      "size": 2459
+    },
+    {
+      "path": "skills/workflow-audit/SKILL.md",
+      "sha256": "e53877216364b1eab8216459335f6840fc0f224722fea38889c355a49b699e1b",
+      "size": 2351
+    },
+    {
+      "path": "skills/workflowprogram-audit/SKILL.md",
+      "sha256": "011d1a811c17c552c4d7dc2031a1d98a3e0e45c674723c2c9726eabad8e0dad5",
+      "size": 1499
+    },
+    {
+      "path": "skills/workflowprogram-develop/SKILL.md",
+      "sha256": "f13740b9e5678da3e98b31ec433dc96ffaee6ca7ca50953cccf419f1a3b1f0f3",
+      "size": 2679
+    },
+    {
+      "path": "skills/workflowprogram-iterate/SKILL.md",
+      "sha256": "a4e8350e84e3427bdb922ae65c005a167788d2eeb7b6778c7e0ecf091e36830c",
+      "size": 1543
+    },
+    {
+      "path": "skills/workflowprogram-orchestrate/SKILL.md",
+      "sha256": "291c5327677b76cca3452b3b661370b5ede2886a5cfc3156cbe8a5f2deb3c288",
+      "size": 2097
+    },
+    {
+      "path": "skills/workflowprogram-validate/SKILL.md",
+      "sha256": "3651e1086ea5d9b88b419e65498e55cbb472cb883f38ca0c50b6a4434b33f53d",
+      "size": 1652
+    }
+  ]
+}

@@ -37,6 +37,23 @@ function Parse-Frontmatter {
     return $result
 }
 
+$requiredPrimarySkills = @(
+    'workflowprogram-orchestrate',
+    'workflowprogram-develop',
+    'workflowprogram-audit',
+    'workflowprogram-iterate',
+    'workflowprogram-validate'
+)
+
+$forbiddenLegacyPaths = @(
+    'commands',
+    'skills',
+    'agents',
+    'rules',
+    'scripts',
+    'tools\sync_plugin_assets.py'
+)
+
 $requiredPaths = @(
     "CLAUDE.md",
     "README.md",
@@ -46,7 +63,16 @@ $requiredPaths = @(
     ".claude\commands",
     ".claude\skills",
     ".claude\rules\constraints.md",
-    ".claude\scripts\validate-workflow.ps1"
+    ".claude\scripts\managed-assets.py",
+    ".claude\scripts\validate-workflow.ps1",
+    ".claude\scripts\validate-workflow.py",
+    ".claude-plugin\plugin.json",
+    ".claude-plugin\marketplace.json",
+    "tools\build_plugin.py",
+    "tools\runtime_smoke.py",
+    "tests\fixtures",
+    "tests\expectations",
+    "tests\transcripts"
 )
 
 foreach ($relativePath in $requiredPaths) {
@@ -56,6 +82,16 @@ foreach ($relativePath in $requiredPaths) {
     }
     else {
         Add-Error "Missing required path: $relativePath"
+    }
+}
+
+foreach ($relativePath in $forbiddenLegacyPaths) {
+    $fullPath = Join-Path $Root $relativePath
+    if (Test-Path $fullPath) {
+        Add-Error "Legacy compatibility path must not exist: $relativePath"
+    }
+    else {
+        Add-Pass "Legacy compatibility path removed: $relativePath"
     }
 }
 
@@ -169,6 +205,15 @@ foreach ($dir in $skillDirs) {
     }
 }
 
+$requiredPrimarySkills | ForEach-Object {
+    if ($settings -and $settings.skills -and $settings.skills.PSObject.Properties.Name -contains $_) {
+        Add-Pass "Primary skill '$_' is registered in settings.json"
+    }
+    else {
+        Add-Error "Missing required primary skill registration: $_"
+    }
+}
+
 $constraintsPath = Join-Path $Root ".claude\rules\constraints.md"
 if (Test-Path $constraintsPath) {
     $constraintsContent = Get-Content -Raw -Path $constraintsPath
@@ -178,6 +223,124 @@ if (Test-Path $constraintsPath) {
     else {
         Add-Error "constraints.md must include BOTH ALWAYS and NEVER rules"
     }
+}
+
+$pluginMeta = $null
+$pluginJsonPath = Join-Path $Root ".claude-plugin\plugin.json"
+try {
+    $pluginMeta = Get-Content -Raw -Path $pluginJsonPath | ConvertFrom-Json
+    Add-Pass "Parsed .claude-plugin/plugin.json"
+    foreach ($field in @("name", "version", "description")) {
+        if ($pluginMeta.$field) {
+            Add-Pass "plugin.json includes field '$field'"
+        }
+        else {
+            Add-Error "plugin.json is missing field '$field'"
+        }
+    }
+}
+catch {
+    Add-Error "Cannot parse .claude-plugin/plugin.json: $($_.Exception.Message)"
+}
+
+$marketplaceJsonPath = Join-Path $Root ".claude-plugin\marketplace.json"
+try {
+    $marketplaceMeta = Get-Content -Raw -Path $marketplaceJsonPath | ConvertFrom-Json
+    Add-Pass "Parsed .claude-plugin/marketplace.json"
+    if ($marketplaceMeta.plugins -and $marketplaceMeta.plugins.Count -gt 0) {
+        Add-Pass "marketplace.json defines at least one plugin entry"
+    }
+    else {
+        Add-Error "marketplace.json must define at least one plugin entry"
+    }
+}
+catch {
+    Add-Error "Cannot parse .claude-plugin/marketplace.json: $($_.Exception.Message)"
+}
+
+$distRoot = Join-Path $Root "dist\plugin"
+if (Test-Path $distRoot) {
+    foreach ($relativePath in @(
+        "dist\plugin\.claude-plugin\plugin.json",
+        "dist\plugin\.claude-plugin\marketplace.json",
+        "dist\plugin\build-manifest.json",
+        "dist\plugin\scripts\managed-assets.py"
+    )) {
+        $fullPath = Join-Path $Root $relativePath
+        if (Test-Path $fullPath) {
+            Add-Pass "Build output contains $relativePath"
+        }
+        else {
+            Add-Error "Build output is missing $relativePath"
+        }
+    }
+
+    $buildManifestPath = Join-Path $distRoot "build-manifest.json"
+    if (Test-Path $buildManifestPath) {
+        try {
+            $buildManifest = Get-Content -Raw -Path $buildManifestPath | ConvertFrom-Json
+            Add-Pass "Parsed dist/plugin/build-manifest.json"
+            foreach ($field in @("manifest_version", "generated_at", "plugin_name", "plugin_version", "files")) {
+                if ($null -ne $buildManifest.$field) {
+                    Add-Pass "build-manifest.json includes field '$field'"
+                }
+                else {
+                    Add-Error "build-manifest.json is missing field '$field'"
+                }
+            }
+
+            if ($pluginMeta) {
+                if ($buildManifest.plugin_name -eq $pluginMeta.name) {
+                    Add-Pass "build-manifest plugin_name matches source plugin.json"
+                }
+                else {
+                    Add-Error "build-manifest plugin_name does not match source plugin.json"
+                }
+
+                if ($buildManifest.plugin_version -eq $pluginMeta.version) {
+                    Add-Pass "build-manifest plugin_version matches source plugin.json"
+                }
+                else {
+                    Add-Error "build-manifest plugin_version does not match source plugin.json"
+                }
+            }
+
+            $hasManagedAssets = $false
+            foreach ($fileEntry in @($buildManifest.files)) {
+                if (-not $fileEntry.path) {
+                    Add-Error "build-manifest contains an entry without path"
+                    continue
+                }
+                if (-not $fileEntry.sha256 -or $fileEntry.sha256.Length -ne 64) {
+                    Add-Error "build-manifest entry '$($fileEntry.path)' is missing a valid sha256"
+                    continue
+                }
+                $builtFilePath = Join-Path $distRoot ($fileEntry.path -replace '/', '\')
+                if (Test-Path $builtFilePath) {
+                    Add-Pass "build-manifest file exists: $($fileEntry.path)"
+                }
+                else {
+                    Add-Error "build-manifest references a missing file: $($fileEntry.path)"
+                }
+                if ($fileEntry.path -eq "scripts/managed-assets.py") {
+                    $hasManagedAssets = $true
+                }
+            }
+
+            if ($hasManagedAssets) {
+                Add-Pass "build-manifest tracks scripts/managed-assets.py"
+            }
+            else {
+                Add-Error "build-manifest must include scripts/managed-assets.py"
+            }
+        }
+        catch {
+            Add-Error "Cannot parse dist/plugin/build-manifest.json: $($_.Exception.Message)"
+        }
+    }
+}
+else {
+    Add-Pass "dist/plugin not present; build output validation skipped"
 }
 
 Write-Host "Workflow validation summary"

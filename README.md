@@ -36,47 +36,58 @@ python3 .claude/scripts/validate-workflow.py
 
 ### 2. 三分钟上手
 
+```bash
+# 构建并以 plugin-dir 方式加载
+python3 tools/build_plugin.py
+claude --plugin-dir /mnt/d/Code/WorkflowProgram-CN/dist/plugin
+```
+
 ```text
-# 设计一个新工作流
-/develop "创建一个用于每日收集科技新闻的工作流"
+# 推荐：先让总控 skill 识别目标
+/workflowprogram-orchestrate "为当前项目设计一个 Claude Code 工作流"
 
-# 审计现有工作流
-/evolve-workflow /path/to/existing-workflow
-
-# 交付当前变更
-/preflight  # 预检查
-/ship        # 正式交付
+# 显式主入口
+/workflowprogram-develop "创建一个用于每日收集科技新闻的工作流"
+/workflowprogram-audit /path/to/existing-workflow
+/workflowprogram-validate /path/to/existing-workflow
 ```
 
 ---
 
 ## 核心能力
 
-### 1. 工作流设计（/develop）
+### 1. 工作流设计（workflowprogram-develop）
 
-从需求到完整工作流仓库的端到端设计：
+面向 `TARGET_ROOT` 的主入口，用于为目标项目设计或更新 `.claude/` workflow 资产：
 
 ```text
-/develop "创建一个用于每日收集科技新闻并生成摘要的工作流"
+/workflowprogram-develop "创建一个用于每日收集科技新闻并生成摘要的工作流"
 ```
 
 **阶段**：
-1. 需求分析 → 2. 规格定义 → 3. 架构设计 → 4. 代码生成 → 5. 验证交付
+1. 需求分析 → 2. 规格定义 → 3. 架构设计 → 4. 资产生成 → 5. workflow 验证建议
 
-### 2. 交付流水线（/ship, /preflight, /hotfix）
+### 2. 工作流编排与验证（workflowprogram-orchestrate, workflowprogram-validate）
+
+| 入口 | 用途 |
+|------|------|
+| `workflowprogram-orchestrate` | 识别自然语言需求并路由到正确主 skill |
+| `workflowprogram-validate` | 对目标项目中的 workflow 资产执行结构化验证 |
+
+### 3. 工作流演进（workflowprogram-audit, workflowprogram-iterate）
+
+| 入口 | 用途 |
+|------|------|
+| `workflowprogram-audit` | 审计目标工作流，识别结构问题和模式偏离 |
+| `workflowprogram-iterate` | 从 lessons.md 生成改进草案 |
+
+### 4. 仓库维护兼容命令（/ship, /preflight, /hotfix）
 
 | 命令 | 用途 |
 |------|------|
 | `/ship [<scope>]` | 顺序执行审查、校验和提交准备 |
 | `/preflight [<scope>]` | 并行预检查，不创建提交 |
 | `/hotfix [<description>]` | 热修复精简流程 |
-
-### 3. 工作流演进（/evolve-workflow, /iterate-workflow）
-
-| 命令 | 用途 |
-|------|------|
-| `/evolve-workflow <path>` | 审计目标工作流，识别结构问题 |
-| `/iterate-workflow [--apply] <path>` | 从 lessons.md 生成改进方案 |
 
 ---
 
@@ -87,20 +98,18 @@ WorkflowProgram-CN 采用分层结构，将不同类型的资产分离：
 ```
 WorkflowProgram-CN/
 ├── .claude/
-│   ├── commands/          # 用户可见命令（/develop, /ship 等）
-│   ├── skills/            # 可复用技能模板
-│   ├── agents/            # 专家角色定义
-│   ├── rules/             # 长期约束与规范
-│   ├── scripts/           # 可执行校验脚本
-│   └── settings.json      # 命令/技能注册中心
-│
-├── commands/              # 根级命令（Plugin 模式兼容）
-├── skills/                # 根级技能（Plugin 模式兼容）
-├── agents/                # 根级 Agent（Plugin 模式兼容）
-├── rules/                 # 根级规则（Plugin 模式兼容）
-├── scripts/               # 根级脚本（Plugin 模式兼容）
-│
-├── CLAUDE.md              # 项目说明（Claude Code 优先读取）
+│   ├── commands/          # 源码层命令定义
+│   ├── skills/            # 源码层技能定义
+│   ├── agents/            # 源码层 agent 定义
+│   ├── rules/             # 源码层规则
+│   ├── scripts/           # 源码层脚本
+│   └── settings.json      # 源码层注册表
+├── .claude-plugin/        # 插件清单元数据
+├── dist/plugin/           # 仓库内 canonical 运行时载荷目录
+├── tests/                 # fixture、expectation、transcript 与 runtime 证据
+├── tools/                 # 构建与 runtime smoke 工具
+├── docs/                  # 设计、phase 计划与归档文档
+├── CLAUDE.md              # 开发者说明
 ├── README.md              # 本文件
 ├── lessons.md             # 经验日志（失败记录、待提取约束）
 └── validation-report.md   # 校验报告
@@ -110,14 +119,28 @@ WorkflowProgram-CN/
 
 | 位置 | 用途 | 经验法则 |
 |------|------|----------|
-| `scripts/` | 可确定、可复验的检查 | 能自动化的校验放脚本 |
-| `commands/`, `skills/` | 流程编排 | 用户交互和流程控制 |
-| `agents/` | 角色职责 | AI 子代理的提示词定义 |
-| `rules/` | 长期约束 | 沉淀为 ALWAYS/NEVER 规则 |
+| `.claude/` | 源码真源 | 只在这里维护命令、技能、agent、规则和脚本 |
+| `dist/plugin/` | canonical 运行时载荷 | Claude Code 插件运行时消费的载荷目录（仓库内） |
+| `TARGET_ROOT/.claude/` | 目标项目最终交付 | 插件执行后写入目标项目的工作流资产 |
+| `TARGET_ROOT/.workflowprogram/managed-files.json` | managed 资产清单 | 记录哪些目标文件可由 WorkflowProgram 安全更新 |
+| `TARGET_ROOT/.workflowprogram/runs/<run-id>/` | 运行证据 | 记录 context、state、events、transcript 和 runtime report |
 
 ---
 
-## 命令清单
+## 推荐入口（Skills-First）
+
+当前推荐直接使用 `workflowprogram-*` skills 作为主入口：
+
+- `/workflowprogram-orchestrate`：总控入口，负责将自然语言请求路由到正确主能力
+- `/workflowprogram-develop`：为 `TARGET_ROOT` 设计或更新 workflow 资产
+- `/workflowprogram-audit`：审计目标项目中的 workflow 资产
+- `/workflowprogram-iterate`：基于 lessons 生成 workflow 改进草案
+- `/workflowprogram-validate`：对目标项目中的 workflow 资产执行结构化验证
+
+旧 `/develop`、`/evolve-workflow`、`/iterate-workflow` 继续保留为兼容 slash 入口；用户级主入口统一采用 `workflowprogram-*` skills。
+当前方案下，只有 `workflowprogram-orchestrate` 允许承接自然语言自动触发；其余 4 个叶子 skill 仍以显式 slash 调用为主。
+
+## 兼容命令清单
 
 ### 工作流设计
 - `/develop <requirement> [--auto-approve]` —— 根据需求设计新工作流
@@ -132,6 +155,114 @@ WorkflowProgram-CN/
 - `/iterate-workflow [--dry-run] [--apply] [<path>]` —— 从经验迭代改进
 
 ---
+
+## Plugin 运行时模型
+
+当前设计明确区分三层：
+
+- 源码层：`.claude/*`
+  - 仓库内部开发真源
+- 安装产物层：`dist/plugin/*`
+  - 插件运行时实际消费的目录
+- 目标项目层：`TARGET_ROOT/.claude/`
+  - WorkflowProgram 执行后写入目标项目的最终工作流资产
+
+其中 agent 采用双层模型：
+
+- 源码定义：`.claude/agents/`
+- 运行时暴露：`dist/plugin/agents/`
+
+## 插件发现与调用契约
+
+Claude Code 识别 WorkflowProgram 的前提，不是用户 `~/.claude` 下存在这些文件，而是 **WorkflowProgram 先被作为 plugin 加载**。
+
+当前受支持的发现模型是：
+
+1. 使用 `python3 tools/build_plugin.py` 生成 `dist/plugin/`
+2. 使用 `claude --plugin-dir /abs/path/to/dist/plugin` 启动 Claude Code
+3. Claude Code 从 `dist/plugin/skills/`、`dist/plugin/agents/`、`dist/plugin/commands/` 发现运行时资产
+
+因此：
+
+- `.claude/` 是源码真源
+- `dist/plugin/` 是 Claude Code 真正消费的运行时目录
+- `TARGET_ROOT/.claude/` 才是 WorkflowProgram 写给目标项目的最终工作流
+
+当前唯一受支持的显式调用语法是 slash 入口：
+
+- `/workflowprogram-orchestrate`
+- `/workflowprogram-develop`
+- `/workflowprogram-audit`
+- `/workflowprogram-iterate`
+- `/workflowprogram-validate`
+
+纯自然语言触发可以作为易用性增强，但不是发布验证的唯一契约。
+当前自然语言优化策略是：**只让 `workflowprogram-orchestrate` 承接自然语言自动触发**，再由它路由到叶子 skill，避免多个叶子 skill 互相竞争。
+
+## 目标项目资产更新契约
+
+WorkflowProgram 不应把新资产直接静默覆盖到 `TARGET_ROOT/.claude/`。
+
+当前受支持的最小流程是：
+
+1. 先在 `RUN_ROOT/outputs/candidate/.claude/` 生成候选文件
+2. 调用 `${CLAUDE_PLUGIN_ROOT}/scripts/managed-assets.py plan`
+3. 若无冲突，再调用 `apply-staged`
+4. 若有冲突，把候选版本保留在 `RUN_ROOT/outputs/conflicts/`
+
+应用成功后，工具会维护：
+
+- `TARGET_ROOT/.workflowprogram/managed-files.json`
+- `RUN_ROOT/outputs/managed-change-plan.json`
+- `RUN_ROOT/outputs/managed-change-result.json`
+
+## 构建产物可追溯性
+
+每次执行 `python3 tools/build_plugin.py` 后，`dist/plugin/` 下都应生成：
+
+- `build-manifest.json`
+
+它至少记录：
+
+- `plugin_name`
+- `plugin_version`
+- `generated_at`
+- `source_commit`
+- `source_dirty`
+- 每个构建文件的 `path` 与 `sha256`
+
+---
+
+## 动态验证
+
+Phase 3 已引入最小运行时 smoke harness：
+
+- 开发期结构验证：`python3 .claude/scripts/validate-workflow.py`
+- 插件构建：`python3 tools/build_plugin.py`
+- 运行时 smoke：`python3 tools/runtime_smoke.py --fixture empty-project`
+
+当前环境下，如果 Claude CLI 未登录，运行时 smoke 会返回 `ENVIRONMENT-SKIP`，同时仍会创建 `RUN_ROOT` 和完整证据文件。
+
+## 安装与验证路径
+
+当前文档定义两条受支持安装通道，它们共享同一运行时载荷结构：
+
+- Source Build 通道：
+  - 使用 `python3 tools/build_plugin.py` 生成 `dist/plugin/`
+  - 使用 `claude --plugin-dir /mnt/d/Code/WorkflowProgram-CN/dist/plugin` 做发现与运行验证
+
+- GitHub Release Package 通道：
+  - 下载并解压 release 附件 `workflowprogram-plugin-<version>.tar.gz`（或 zip）
+  - 确认解压目录包含 `plugin/build-manifest.json`
+  - 使用 `claude --plugin-dir /abs/path/to/<extracted>/plugin` 启动
+
+以下路径当前**不属于受支持稳态模型**：
+
+- 将 `dist/plugin/` 复制到用户 `~/.claude`
+- 在未完成实测前，直接把 marketplace 或 `/plugin install` 视为正式安装契约
+
+仓库中的 `tools/install_dev.sh` 和 `tools/quick_install.sh` 仅保留为实验性开发辅助脚本，不作为发布路径。
+
 
 ## 详细使用指南
 
@@ -159,7 +290,7 @@ CI=true /develop "需求描述"
 
 ## 技能清单
 
-### 用户可用技能
+### 辅助/复用技能
 - `/review` —— 代码审查
 - `/test` —— 测试执行
 - `/commit` —— 提交准备
@@ -240,7 +371,7 @@ python3 .claude/scripts/validate-workflow.py
 ```
 
 **校验内容**：
-- 根目录必需文件（README.md, CLAUDE.md, lessons.md, constraints.md）
+- 根目录与源码层必需文件（README.md, CLAUDE.md, lessons.md, .claude/rules/constraints.md）
 - `.claude/settings.json` JSON 合法性
 - 命令/技能注册一致性
 - 命令文件规范性（Usage、阶段、Goal/Verify）
@@ -248,19 +379,16 @@ python3 .claude/scripts/validate-workflow.py
 
 ---
 
-## Plugin 模式（可选）
+## Plugin 构建与本地验证
 
-WorkflowProgram-CN 同时支持作为 Claude Code Plugin 加载：
+WorkflowProgram-CN 通过 `tools/build_plugin.py` 生成正式插件产物：
 
 ```bash
-# 同步根级资产
-python3 tools/sync_plugin_assets.py
-
-# 以 Plugin 模式启动
-claude --plugin-dir /mnt/d/Code/WorkflowProgram-CN
+python3 tools/build_plugin.py
+claude --plugin-dir /mnt/d/Code/WorkflowProgram-CN/dist/plugin
 ```
 
-Plugin 清单位于 `.claude-plugin/plugin.json`
+Plugin 清单位于 `.claude-plugin/plugin.json`，运行时实际消费目录为 `dist/plugin/`。
 
 ---
 
