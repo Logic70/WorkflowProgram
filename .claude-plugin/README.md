@@ -62,6 +62,7 @@ marketplace 或 `/plugin install` 通道仍属于后续定案事项。
 - 插件运行时 agent：`dist/plugin/agents/`
 - 插件运行时 skill：`dist/plugin/skills/`
 - 插件 trace manifest：`dist/plugin/build-manifest.json`
+- 进展脚本：`dist/plugin/scripts/stage-progress.py`
 - 目标项目最终工作流：`TARGET_ROOT/.claude/`
 
 ## 发现契约

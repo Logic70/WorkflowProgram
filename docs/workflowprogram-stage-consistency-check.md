@@ -22,6 +22,7 @@
 | artifact 字段约束完整性 | PASS | `kind/root/producer/status` 均已枚举化 |
 | Stage 间 I/O 依赖闭合 | PASS | `S1->S2->S3->S4->S5->S6` 无未定义依赖 |
 | Stage 准出可验证性 | PASS | 每个 Stage 已补充证据路径和可验证检查条目 |
+| 进展与关键节点可视化契约 | PASS | 增加 `current-progress/milestones/user-progress` 三类进展资产 |
 | 与现有实现贴合度 | PASS | 未引入强依赖的新外部运行时 |
 | 设计与实现差距可见性 | WARN | spec 控制面是目标架构，仍需后续脚本级强化 |
 

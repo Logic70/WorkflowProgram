@@ -117,3 +117,15 @@
   - `workflowprogram-orchestrate` description is now bilingual and includes current-project workflow design / audit / iterate / validate cues
   - `.claude/settings.json` and `.claude/rules/constraints.md` now explicitly state that only `workflowprogram-orchestrate` should accept natural-language auto-trigger
   - leaf skills `workflowprogram-develop/audit/iterate/validate` remain slash-first to avoid multi-skill competition
+
+## 2026-04-06 Phase 6 Stage Progress Instrumentation
+
+- status: PASS
+- scope: add stage progress instrumentation, stage-node encapsulation plan, and validator enforcement
+- command: `python3 .claude/scripts/stage-progress.py update --run-root /tmp/wf-run ... --json`, `python3 tools/build_plugin.py`, `python3 .claude/scripts/validate-workflow.py`, `powershell.exe -ExecutionPolicy Bypass -File .claude/scripts/validate-workflow.ps1`
+- result: stage-progress smoke generated `current-progress.json` / `milestones.jsonl` / `user-progress.md`; build succeeded; Python validator `PASS: 187 / FAIL: 0`; PowerShell validator `PASS: 187 / FAIL: 0`
+- notes:
+  - added `.claude/scripts/stage-progress.py` for `StageStarted/StageCheckpoint/StageCompleted` event logging
+  - `/develop` and `workflowprogram-develop` now include explicit progress hook requirements
+  - validators now require both source and build outputs to include `stage-progress.py`
+  - added `docs/phase-06-implementation-plan.md` and expanded lowlevel design to provide stage-level node encapsulation and runtime progress contracts

@@ -243,6 +243,20 @@ Phase 3 已引入最小运行时 smoke harness：
 
 当前环境下，如果 Claude CLI 未登录，运行时 smoke 会返回 `ENVIRONMENT-SKIP`，同时仍会创建 `RUN_ROOT` 和完整证据文件。
 
+## 运行进展可视化
+
+Phase 6 起，建议在 Stage 执行中统一写入进展资产：
+
+- `RUN_ROOT/outputs/progress/current-progress.json`
+- `RUN_ROOT/outputs/progress/milestones.jsonl`
+- `RUN_ROOT/outputs/progress/user-progress.md`
+
+统一脚本入口：
+
+```bash
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/stage-progress.py update ...
+```
+
 ## 安装与验证路径
 
 当前文档定义两条受支持安装通道，它们共享同一运行时载荷结构：

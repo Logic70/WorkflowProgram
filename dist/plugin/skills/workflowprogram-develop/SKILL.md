@@ -24,18 +24,21 @@ disable-model-invocation: true
 - 不要把仓库维护命令包装进目标项目 workflow 设计。
 - 若出现目标文件冲突，应把候选版本保留在 `RUN_ROOT/outputs/`，而不是覆盖用户资产。
 - 对已应用文件，应维护 `TARGET_ROOT/.workflowprogram/managed-files.json`。
+- 执行过程中必须通过 `${CLAUDE_PLUGIN_ROOT}/scripts/stage-progress.py` 写入进展与关键节点结果。
 
 ## Step 1: Resolve Target
 
 1. 确认 `TARGET_ROOT`。
 2. 检查 `TARGET_ROOT/.claude/` 是否已经存在。
 3. 识别用户需求中的触发方式、输入、输出、角色与质量门禁。
+4. 写入进展事件：`S1 StageStarted`。
 
 ## Step 2: Produce Workflow Spec
 
 1. 用统一规格模板整理需求。
 2. 若关键信息缺失，只提出最小必要问题。
 3. 形成工作流规格、模式选择和文件清单。
+4. 写入进展事件：`S1 StageCheckpoint` 与 `S1 StageCompleted`。
 
 ## Step 3: Design Assets
 
@@ -52,6 +55,7 @@ disable-model-invocation: true
 1. 调用 `${CLAUDE_PLUGIN_ROOT}/scripts/managed-assets.py plan --target-root <TARGET_ROOT> --run-root <RUN_ROOT> --source-root <RUN_ROOT>/outputs/candidate/.claude`
 2. 若无冲突，再调用 `apply-staged`
 3. 若存在冲突，只输出候选版本与冲突摘要，不静默覆盖目标项目
+4. 写入进展事件：`S4 StageStarted`、`S4 StageCheckpoint`、`S4 StageCompleted`
 
 ## Step 4: Verify Readiness
 
@@ -59,6 +63,7 @@ disable-model-invocation: true
 2. 检查新增资产是否可被后续 `workflowprogram-validate` 验证。
 3. 检查 `managed-files.json` 与本次应用结果是否一致。
 4. 输出建议的下一步动作。
+5. 更新 `RUN_ROOT/outputs/progress/user-progress.md`，向用户展示当前进展和历史关键节点结果。
 
 ## Output
 
@@ -68,4 +73,5 @@ disable-model-invocation: true
 - 设计摘要
 - 计划新增或修改的 workflow 资产
 - managed asset 计划或冲突摘要
+- 当前阶段进展与关键节点历史结果摘要
 - 建议执行的后续验证步骤

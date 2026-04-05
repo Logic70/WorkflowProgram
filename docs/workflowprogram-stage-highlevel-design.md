@@ -94,6 +94,7 @@ TARGET_ROOT/
 - `TARGET_ROOT/.claude/` 资产（`settings.json`、`skills/`、`agents/`、`rules/`、可选 `commands/`）
 - `TARGET_ROOT/.workflowprogram/managed-files.json`
 - `RUN_ROOT` 证据（`context.json`、`state.json`、`events.jsonl`、`transcript.md`、`validation-runtime-report.md`、`outputs/`）
+- 进展可视化资产（`outputs/progress/current-progress.json`、`outputs/progress/milestones.jsonl`、`outputs/progress/user-progress.md`）
 
 ## 5. Stage 运行逻辑（High-Level）
 
@@ -163,6 +164,7 @@ TARGET_ROOT/
 - 目标项目资产写入必须先 candidate 后 apply。
 - unmanaged 或 drifted 文件不得静默覆盖。
 - 每次执行必须产生可追踪证据，且可定位失败阶段。
+- 每个 Stage 必须输出进展事件并可回溯关键节点结果。
 
 ### 6.3 可维护性要求
 

@@ -32,9 +32,41 @@ CI=true /develop "设计一个用于审计 Markdown 链接有效性的工作流"
 整个过程遵循 TDD 风格循环：定义目标 -> 执行 -> 验证 -> 失败则记录到
 `lessons.md` -> 修复 -> 重试。
 
+## Stage 进展播报契约
+
+每个 Stage 都必须使用：
+
+```bash
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/stage-progress.py update ...
+```
+
+维护以下进展资产：
+
+- `RUN_ROOT/outputs/progress/current-progress.json`
+- `RUN_ROOT/outputs/progress/milestones.jsonl`
+- `RUN_ROOT/outputs/progress/user-progress.md`
+
+每个 Stage 至少记录三个事件：
+
+- `StageStarted`
+- `StageCheckpoint`
+- `StageCompleted`
+
+并向用户同步：
+
+- 当前 Stage / Node
+- 当前完成度（percent）
+- 最近关键节点结果（milestones）
+- 下一步动作
+
 ## Stage 1: 理解需求 (Explore)
 
 **Goal**: 生成一个没有歧义的 `workflow-spec.md`。
+
+**Progress hooks**：
+- Stage 开始：`S1 StageStarted`
+- 规格草案写入后：`S1 StageCheckpoint`
+- Stage 完成：`S1 StageCompleted`
 
 1. 将 `$ARGUMENTS` 解析为工作流需求。
 2. 识别歧义点，并围绕以下维度向用户提出 3-5 个澄清问题：
@@ -52,6 +84,11 @@ CI=true /develop "设计一个用于审计 Markdown 链接有效性的工作流"
 
 **Goal**: 生成覆盖规格范围的领域上下文报告。
 
+**Progress hooks**：
+- Stage 开始：`S2 StageStarted`
+- 上下文报告写入后：`S2 StageCheckpoint`
+- Stage 完成：`S2 StageCompleted`
+
 1. 启动只读 Explore 子代理，分析：
    - 现有 `.claude/` 资产：agents、skills、commands、settings、rules
    - `CLAUDE.md` 中的项目约定、校验方式和命名规则
@@ -64,6 +101,11 @@ CI=true /develop "设计一个用于审计 Markdown 链接有效性的工作流"
 ## Stage 3: 模式选择与工作流设计 (Specialized Agent)
 
 **Goal**: 生成包含模式组合、Agent 编制和文件清单的设计文档。
+
+**Progress hooks**：
+- Stage 开始：`S3 StageStarted`
+- YAML/View 生成后：`S3 StageCheckpoint`
+- gate 通过后：`S3 StageCompleted`
 
 设计前先阅读 `.claude/rules/constraints.md`。
 
@@ -154,6 +196,11 @@ workflow-view.md（只读视图，人类查阅）
 
 **Goal**: 从 `workflow-spec.yaml` 生成所有工作流文件。
 
+**Progress hooks**：
+- Stage 开始：`S4 StageStarted`
+- candidate 与 managed plan 完成后：`S4 StageCheckpoint`
+- apply 成功或冲突归档后：`S4 StageCompleted`
+
 **复杂度级别**: 从 YAML 读取 `complexity` 字段，用于 Stage 5 Turn Count 配置
 
 **写入约束**：
@@ -206,6 +253,11 @@ workflow-view.md（只读视图，人类查阅）
 ## Stage 5: 运行时验证 (Runtime Validation)
 
 **Goal**: 验证工作流在实际执行时的行为是否符合设计。
+
+**Progress hooks**：
+- Stage 开始：`S5 StageStarted`
+- 关键验证节点后：`S5 StageCheckpoint`
+- 结论写入后：`S5 StageCompleted`
 
 **Step 1: 测试场景生成**
 
@@ -272,6 +324,11 @@ workflow-view.md（只读视图，人类查阅）
 **Goal**: 从本次设计会话中提炼可复用规则，完成流程闭环。
 
 **前提**: Stage 5 运行时验证通过
+
+**Progress hooks**：
+- Stage 开始：`S6 StageStarted`
+- lessons 增量生成后：`S6 StageCheckpoint`
+- 闭环总结后：`S6 StageCompleted`
 
 1. 回顾本次 `/develop` 会话写入 `lessons.md` 的内容（只读取本次会话新增的记录）。
 2. 判断问题是否会重复出现。

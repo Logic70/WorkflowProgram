@@ -1,16 +1,16 @@
 {
   "manifest_version": 1,
-  "generated_at": "2026-04-05T13:38:02Z",
+  "generated_at": "2026-04-05T17:48:52Z",
   "builder": "tools/build_plugin.py",
   "plugin_name": "workflowprogram-cn",
   "plugin_version": "0.1.0",
-  "source_commit": "928d1c1f9899c7c70699cf2361d3fd0dfc4d7ee4",
+  "source_commit": "f274018764c37af414ce4bcf18fb626f2c91a0ea",
   "source_dirty": true,
   "files": [
     {
       "path": ".claude-plugin/README.md",
-      "sha256": "e2d406c4ce264dfa8626d1b42e22f3ce0711a23024ddb169829ae4fb6bcc640c",
-      "size": 2163
+      "sha256": "7a4e5f9bb626ed3b10ed2f5f6c9950784b5fff55b063ee8362933c521cac7e87",
+      "size": 2723
     },
     {
       "path": ".claude-plugin/marketplace.json",
@@ -64,8 +64,8 @@
     },
     {
       "path": "commands/develop.md",
-      "sha256": "1b1085ade9fcee9e1a4d7cd72392f555355e9482829c238b9824eed1abca6e1c",
-      "size": 11731
+      "sha256": "173dc40f2fe9b75890bb4820aa003851375c60585cd92a2cbe713387a79744b2",
+      "size": 13182
     },
     {
       "path": "commands/evolve-workflow.md",
@@ -103,19 +103,24 @@
       "size": 16089
     },
     {
+      "path": "scripts/stage-progress.py",
+      "sha256": "14850fe04b04f3c49caa94fc4a161f02b2c516a954322da267e996bc3d8638f6",
+      "size": 7031
+    },
+    {
       "path": "scripts/state-bus.py",
       "sha256": "d88c27a5ed8c4d6db2638edbb926f3ac4cd3eec2b1eade8f1064d0d893ff4477",
       "size": 12593
     },
     {
       "path": "scripts/validate-workflow.ps1",
-      "sha256": "4e34308f9424ddb7cd73ff13dc78b7487b6e5d53e0f2f26033b511bad52507b4",
-      "size": 11852
+      "sha256": "419e9dbd1408066797da1228265d90d1423d55dd9e7a29f62dcdc270937ce876",
+      "size": 12358
     },
     {
       "path": "scripts/validate-workflow.py",
-      "sha256": "51d4046e846198e3b085204487181c84453827d1a55c861f57fac5010e91a402",
-      "size": 16544
+      "sha256": "3671729893520c7252fa4faf43c38f90d9a3bed0462de0e41eadae571512898d",
+      "size": 16954
     },
     {
       "path": "scripts/verify-plugin-load.sh",
@@ -124,8 +129,8 @@
     },
     {
       "path": "skills/command-develop/SKILL.md",
-      "sha256": "d502bafa9219b897f6b097347e194da131aa1f27a992c554d7dffcb7c826a417",
-      "size": 11791
+      "sha256": "de69e8d59f3720f54f31c818afd0dbe9df7faa120164c578ddedb7d03ce1d741",
+      "size": 13242
     },
     {
       "path": "skills/command-evolve-workflow/SKILL.md",
@@ -209,8 +214,8 @@
     },
     {
       "path": "skills/workflowprogram-develop/SKILL.md",
-      "sha256": "f13740b9e5678da3e98b31ec433dc96ffaee6ca7ca50953cccf419f1a3b1f0f3",
-      "size": 2679
+      "sha256": "34f1c86a0ee5d5e2817b3ae4143c168488bdca759c505ac29bb18aebc6713917",
+      "size": 3169
     },
     {
       "path": "skills/workflowprogram-iterate/SKILL.md",

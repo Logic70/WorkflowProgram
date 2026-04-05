@@ -6,9 +6,9 @@
 
 - `.claude/`：源码真源
 - `.claude-plugin/`：插件清单元数据
-- `dist/plugin/`：正式安装产物
+- `dist/plugin/`：仓库内 canonical 运行时载荷目录
 
-## 受支持的安装 / 本地验证模型
+## 受支持的加载与安装模型
 
 ```bash
 python3 tools/build_plugin.py
@@ -17,11 +17,24 @@ claude --plugin-dir /mnt/d/Code/WorkflowProgram-CN/dist/plugin
 
 说明：
 
-- 当前唯一受支持的安装 / 验证路径是 `plugin-dir`
-- 本地开发与验证统一以 `dist/plugin/` 为对象
+- 当前受支持的加载方式是 `--plugin-dir`
+- `dist/plugin/` 是仓库内 canonical 载荷目录
 - `.claude/` 只作为源码真源，不直接作为插件运行目录
 - Claude Code 运行时从 `dist/plugin/skills/`、`dist/plugin/agents/`、`dist/plugin/commands/` 发现插件能力
 - `dist/plugin/build-manifest.json` 记录本次构建的版本、commit 和文件摘要
+
+支持的分发通道：
+
+- Source Build：从源码仓构建 `dist/plugin/` 并加载
+- GitHub Release Package：下载发布包中的 `plugin/` 并加载
+- Marketplace：仍待定案
+
+### GitHub Release Package 安装步骤
+
+1. 下载发布附件 `workflowprogram-plugin-<version>.tar.gz`（或 zip）。
+2. 解压并确认存在 `plugin/build-manifest.json` 与 `plugin/skills`。
+3. 在目标项目目录执行：
+   `claude --plugin-dir /abs/path/to/<extracted>/plugin`
 
 ## 推荐主入口
 
@@ -35,9 +48,9 @@ claude --plugin-dir /mnt/d/Code/WorkflowProgram-CN/dist/plugin
 
 旧 commands 仅作为兼容入口保留。
 
-## 正式安装
+## Marketplace 通道
 
-正式发布安装仍属于后续待定事项。
+marketplace 或 `/plugin install` 通道仍属于后续定案事项。
 
 在 marketplace 或 `/plugin install` 的行为完成实测定案前，本文档不把它们视为受支持稳态契约。
 
@@ -49,6 +62,7 @@ claude --plugin-dir /mnt/d/Code/WorkflowProgram-CN/dist/plugin
 - 插件运行时 agent：`dist/plugin/agents/`
 - 插件运行时 skill：`dist/plugin/skills/`
 - 插件 trace manifest：`dist/plugin/build-manifest.json`
+- 进展脚本：`dist/plugin/scripts/stage-progress.py`
 - 目标项目最终工作流：`TARGET_ROOT/.claude/`
 
 ## 发现契约

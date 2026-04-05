@@ -91,6 +91,7 @@ def validate_required_paths(root: Path, result: ValidationResult) -> None:
         ".claude/skills",
         "${CLAUDE_PLUGIN_ROOT}/rules/constraints.md",
         "${CLAUDE_PLUGIN_ROOT}/scripts/managed-assets.py",
+        ".claude/scripts/stage-progress.py",
         "${CLAUDE_PLUGIN_ROOT}/scripts/validate-workflow.ps1",
         ".claude/scripts/validate-workflow.py",  # Self-check
         ".claude-plugin/plugin.json",
@@ -332,6 +333,7 @@ def validate_dist_plugin(root: Path, plugin_meta: Optional[Dict[str, Any]], resu
         dist_root / ".claude-plugin" / "marketplace.json",
         dist_root / "build-manifest.json",
         dist_root / "scripts" / "managed-assets.py",
+        dist_root / "scripts" / "stage-progress.py",
     ]
     for path in required_paths:
         relative = path.relative_to(root)
@@ -373,6 +375,7 @@ def validate_dist_plugin(root: Path, plugin_meta: Optional[Dict[str, Any]], resu
         return
 
     has_managed_assets = False
+    has_stage_progress = False
     for item in files:
         path = item.get("path")
         sha256 = item.get("sha256")
@@ -389,11 +392,18 @@ def validate_dist_plugin(root: Path, plugin_meta: Optional[Dict[str, Any]], resu
             result.add_error(f"build-manifest references a missing file: {path}")
         if path == "scripts/managed-assets.py":
             has_managed_assets = True
+        if path == "scripts/stage-progress.py":
+            has_stage_progress = True
 
     if has_managed_assets:
         result.add_pass("build-manifest tracks scripts/managed-assets.py")
     else:
         result.add_error("build-manifest must include scripts/managed-assets.py")
+
+    if has_stage_progress:
+        result.add_pass("build-manifest tracks scripts/stage-progress.py")
+    else:
+        result.add_error("build-manifest must include scripts/stage-progress.py")
 
 
 def print_report(result: ValidationResult) -> None:

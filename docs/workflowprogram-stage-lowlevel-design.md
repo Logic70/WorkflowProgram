@@ -216,6 +216,12 @@ WorkflowProgram 自身必须按原子能力组织，每个 Stage 必须可拆分
 - `RUN_ROOT/outputs/progress/milestones.jsonl`
 - `RUN_ROOT/outputs/progress/user-progress.md`
 
+建议统一调用：
+
+```bash
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/stage-progress.py update ...
+```
+
 `current-progress.json` 最小字段：
 
 - `run_id`
@@ -258,7 +264,7 @@ WorkflowProgram 自身必须按原子能力组织，每个 Stage 必须可拆分
 | Stage | 原子 Node | 承载类型 | 默认承载对象 |
 |---|---|---|---|
 | S0 | `route_intent` | `skill_node` | `workflowprogram-orchestrate` |
-| S0 | `emit_route_milestone` | `script_node` | 进展记录脚本（progress writer） |
+| S0 | `emit_route_milestone` | `script_node` | `${CLAUDE_PLUGIN_ROOT}/scripts/stage-progress.py` |
 | S1 | `clarify_requirement` | `skill_node` | `workflowprogram-develop` |
 | S1 | `draft_spec` | `agent_node` | `requirement_analyst`（或等效子代理） |
 | S1 | `persist_spec` | `script_node` | 模板渲染与写盘逻辑 |

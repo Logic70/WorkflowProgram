@@ -65,6 +65,7 @@ $requiredPaths = @(
     ".claude\skills",
     ".claude\rules\constraints.md",
     ".claude\scripts\managed-assets.py",
+    ".claude\scripts\stage-progress.py",
     ".claude\scripts\validate-workflow.ps1",
     ".claude\scripts\validate-workflow.py",
     ".claude-plugin\plugin.json",
@@ -265,7 +266,8 @@ if (Test-Path $distRoot) {
         "dist\plugin\.claude-plugin\plugin.json",
         "dist\plugin\.claude-plugin\marketplace.json",
         "dist\plugin\build-manifest.json",
-        "dist\plugin\scripts\managed-assets.py"
+        "dist\plugin\scripts\managed-assets.py",
+        "dist\plugin\scripts\stage-progress.py"
     )) {
         $fullPath = Join-Path $Root $relativePath
         if (Test-Path $fullPath) {
@@ -307,6 +309,7 @@ if (Test-Path $distRoot) {
             }
 
             $hasManagedAssets = $false
+            $hasStageProgress = $false
             foreach ($fileEntry in @($buildManifest.files)) {
                 if (-not $fileEntry.path) {
                     Add-Error "build-manifest contains an entry without path"
@@ -326,6 +329,9 @@ if (Test-Path $distRoot) {
                 if ($fileEntry.path -eq "scripts/managed-assets.py") {
                     $hasManagedAssets = $true
                 }
+                if ($fileEntry.path -eq "scripts/stage-progress.py") {
+                    $hasStageProgress = $true
+                }
             }
 
             if ($hasManagedAssets) {
@@ -333,6 +339,13 @@ if (Test-Path $distRoot) {
             }
             else {
                 Add-Error "build-manifest must include scripts/managed-assets.py"
+            }
+
+            if ($hasStageProgress) {
+                Add-Pass "build-manifest tracks scripts/stage-progress.py"
+            }
+            else {
+                Add-Error "build-manifest must include scripts/stage-progress.py"
             }
         }
         catch {

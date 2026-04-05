@@ -356,6 +356,11 @@ Claude Code 识别 WorkflowProgram 能力的前提，不是用户目录里存在
 - 生成阶段：`RUN_ROOT/outputs/candidate/.claude/` + managed plan/result
 - 验证阶段：`validation-runtime-report.md` + `RUN_ROOT/outputs/stages/s5-validation-summary.json`
 - 闭环阶段：`RUN_ROOT/outputs/stages/s6-lessons-delta.md`
+- 进展播报：`RUN_ROOT/outputs/progress/current-progress.json`、`milestones.jsonl`、`user-progress.md`
+
+进展播报应统一通过：
+
+- `${CLAUDE_PLUGIN_ROOT}/scripts/stage-progress.py`
 
 判定原则：
 
