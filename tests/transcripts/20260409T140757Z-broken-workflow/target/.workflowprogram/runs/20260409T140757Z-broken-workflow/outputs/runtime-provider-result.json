@@ -1,0 +1,66 @@
+{
+  "provider": "command_adapter",
+  "result": "PASS",
+  "failure_code": "",
+  "message": "Mock host completed workflow execution successfully.",
+  "is_error": false,
+  "command": [
+    "python3",
+    "/mnt/d/Code/WorkflowProgram-CN/tools/mock_runtime_host.py",
+    "invoke",
+    "--plugin-root",
+    "/mnt/d/Code/WorkflowProgram-CN/dist/plugin",
+    "--target-root",
+    "/mnt/d/Code/WorkflowProgram-CN/tests/transcripts/20260409T140757Z-broken-workflow/target",
+    "--run-root",
+    "/mnt/d/Code/WorkflowProgram-CN/tests/transcripts/20260409T140757Z-broken-workflow/target/.workflowprogram/runs/20260409T140757Z-broken-workflow",
+    "--entry-skill",
+    "workflowprogram-validate",
+    "--request",
+    "验证当前项目中的 workflow 资产，并输出失败项、影响范围和修复优先级",
+    "--fixture",
+    "broken-workflow",
+    "--timeout",
+    "90",
+    "--json"
+  ],
+  "returncode": 0,
+  "stdout": "{\n  \"result\": \"PASS\",\n  \"failure_code\": \"\",\n  \"message\": \"Mock host completed workflow execution successfully.\",\n  \"is_error\": false,\n  \"stage_history\": [\n    \"requirement\",\n    \"context\",\n    \"design\",\n    \"generate\",\n    \"validate\",\n    \"lessons\"\n  ],\n  \"stage_status\": \"done\",\n  \"current_stage\": \"lessons\",\n  \"next_action\": \"complete\",\n  \"generated_files\": [\n    \".claude/settings.json\",\n    \".claude/rules/constraints.md\",\n    \".claude/commands/example.md\"\n  ]\n}\n",
+  "stderr": "",
+  "parsed": {
+    "result": "PASS",
+    "failure_code": "",
+    "message": "Mock host completed workflow execution successfully.",
+    "is_error": false,
+    "stage_history": [
+      "requirement",
+      "context",
+      "design",
+      "generate",
+      "validate",
+      "lessons"
+    ],
+    "stage_status": "done",
+    "current_stage": "lessons",
+    "next_action": "complete",
+    "generated_files": [
+      ".claude/settings.json",
+      ".claude/rules/constraints.md",
+      ".claude/commands/example.md"
+    ]
+  },
+  "subagent_evidence": false,
+  "stage_history": [
+    "requirement",
+    "context",
+    "design",
+    "generate",
+    "validate",
+    "lessons"
+  ],
+  "current_stage": "lessons",
+  "stage_status": "",
+  "next_action": "complete",
+  "next_stage_on_failure": "",
+  "metadata": {}
+}

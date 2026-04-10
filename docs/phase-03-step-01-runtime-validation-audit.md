@@ -1,5 +1,10 @@
 # Phase 3 Step 1 运行验证现状审计
 
+> Historical Note
+>
+> 本文档保留为 Phase 3 的运行验证审计记录，不再单独定义当前 S5/S6 或 runtime evidence 契约。
+> 当前真源和已关闭决策见 [workflowprogram-design-status.md](/mnt/d/Code/WorkflowProgram-CN/docs/workflowprogram-design-status.md)。
+
 ## 1. 目的
 
 本审计用于确认当前仓库在“动态验证”方面已经有什么、缺什么，以及哪些现有资产可以复用到 Phase 3。

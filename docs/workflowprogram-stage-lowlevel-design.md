@@ -76,6 +76,24 @@
 | `environment` | 环境问题导致失败或跳过 |
 | `conflict` | 目标文件冲突导致失败 |
 
+### 2.1.2 职责边界与阶段模型
+
+为消除阶段模型与实现边界的漂移，统一约定三层职责：
+
+| 层级 | 责任 | 典型产物 |
+|---|---|---|
+| runner | 控制面状态转移、边界校验、状态落盘与最小运行证据校验 | `context.json`、`state.json`、`events.jsonl`、`outputs/stages/runner-summary.json` |
+| workflowprogram-validate | S5 主 judge，消费 `test_contract`，形成 workflow 级 verdict | `validation-runtime-report.md`、`outputs/stages/s5-validation-summary.json` |
+| runtime_smoke | 动态 harness，补充真实执行和环境相关证据 | `transcript.md`、`validation-runtime-report.md`、`outputs/stages/s5-validation-summary.json` |
+
+逻辑阶段与执行阶段的关系如下：
+
+- 逻辑模型仍按 `S0..S6` 统一描述职责归属。
+- runner 只负责控制面：状态转移、边界校验、状态落盘与最小运行证据校验。
+- `workflow-spec.yaml.stages` 可保持为执行链列表，runner 只按执行链推进，不承担 S5 judge 语义。
+- `workflow-spec.yaml.intent_flows` 负责把 `develop/audit/iterate/validate` 映射到逻辑阶段流；runner 至少必须执行当前意图的 `required_stage_slots`。
+- `learn` 阶段负责 S6 闭环，不负责替代 S5 判定。
+
 ### 2.2 State.artifacts 字段
 
 Artifact 使用固定结构：
@@ -177,7 +195,7 @@ Artifact 使用固定结构：
 
 ### 2.5 Stage 证据路径约定
 
-为保证每个 Stage 可验证，约定以下最小证据路径：
+为保证每个 Stage 可验证，约定以下设计态证据路径（按场景可裁剪）：
 
 - `RUN_ROOT/outputs/stages/s0-route.json`
 - `RUN_ROOT/workflow-spec.md`
@@ -190,6 +208,134 @@ Artifact 使用固定结构：
 - `RUN_ROOT/outputs/managed-change-result.json`
 - `RUN_ROOT/outputs/stages/s5-validation-summary.json`
 - `RUN_ROOT/outputs/stages/s6-lessons-delta.md`
+
+#### 2.5.1 `runtime_contract.required_evidence`（运行态硬约束）
+
+为支撑完整运行测试，`workflow-spec.yaml.runtime_contract.required_evidence` 必须至少包含：
+
+- `context.json`
+- `state.json`
+- `events.jsonl`
+- `outputs/progress/current-progress.json`
+- `outputs/progress/milestones.jsonl`
+- `outputs/progress/user-progress.md`
+- `outputs/stages/s0-route.json`
+- `outputs/stages/runner-summary.json`
+
+`workflow-runner.py` 在结束前必须逐项检查上述文件是否存在，缺失即失败。
+
+#### 2.5.2 `runtime_contract.write_boundaries`（写入边界硬约束）
+
+`workflow-spec.yaml.runtime_contract.write_boundaries` 必须声明：
+
+- `target_root_allow`
+- `run_root_allow`
+- `temp_root_allow`
+- `deny`
+
+Runner 在生成每个 artifact 前必须先做边界匹配；命中 `deny` 或不在 allow 列表即失败。
+
+#### 2.5.3 `runtime_contract.failure_kinds` 与 `environment_skip`
+
+- `failure_kinds`：运行结论中的 `failure_kind` 必须来自此枚举。
+- `environment_skip`：每个条目必须具备 `code/check/message`，命中后 runner 输出 `ENVIRONMENT-SKIP`，并写入 `skip_reasons` 证据。
+
+#### 2.5.4 `test_contract`（基础运行测试判定契约）
+
+`workflow-spec.yaml.test_contract` 不参与 runner 的执行期状态转移；它的职责是为基础运行测试提供稳定的判定输入。
+
+固定分段：
+
+- `entry`
+- `boundary`
+- `flow`
+- `artifacts`
+- `failure`
+
+##### 2.5.4.1 `test_contract.entry`
+
+必须声明：
+
+- `main_entry`
+  - 必须能解析到 `registry.commands` 或 `registry.skills` 中的真实入口
+- `entry_type`
+  - 枚举：`slash_command | natural_language | hybrid`
+- `required_args`
+  - 必需输入参数列表
+- `missing_arg_verdict`
+  - 缺参时预期 verdict，必须来自 `PASS/WARN/FAIL/ENVIRONMENT-SKIP`
+- `invalid_entry_verdict`
+  - 非法入口时预期 verdict，必须来自 `PASS/WARN/FAIL/ENVIRONMENT-SKIP`
+
+##### 2.5.4.2 `test_contract.boundary` 与 `artifacts`
+
+为避免配置漂移，`test_contract` 对执行期硬约束必须采用固定引用语法：
+
+```yaml
+ref: runtime_contract.<field>
+```
+
+当前允许的固定写法：
+
+- `test_contract.boundary.write_boundaries_ref: runtime_contract.write_boundaries`
+- `test_contract.artifacts.evidence_ref: runtime_contract.required_evidence`
+- `test_contract.failure.failure_kinds_ref: runtime_contract.failure_kinds`
+- `test_contract.failure.environment_skip_ref: runtime_contract.environment_skip`
+
+校验器必须同时检查：
+
+1. 引用语法可解析
+2. 引用目标真实存在
+3. `test_contract` 中不存在同名复制声明（例如再次声明 `write_boundaries`、`required_evidence`、`failure_kinds`、`environment_skip`）
+
+此外：
+
+- `boundary` 必须补充 `managed_overwrite_policy`、`conflict_expectation`、`external_write_policy`
+- `artifacts.deliverables` 必须声明关键交付物
+- develop 主链若包含 `S4`，`artifacts.deliverables` 必须包含 `.workflowprogram/managed-files.json`
+- `artifacts.optional_outputs` 可声明允许缺失的非关键输出
+
+##### 2.5.4.3 `test_contract.flow`
+
+必须声明：
+
+- `required_stages`
+  - 必须发生的阶段，必须是已声明 `stage.id` 的子集
+- `skippable_stages`
+  - 允许跳过的阶段，必须是已声明 `stage.id` 的子集
+- `failure_recovery`
+  - 失败类别到回流阶段的映射；键必须来自 `runtime_contract.failure_kinds`，值必须是已声明 `stage.id`
+- `terminal_conditions`
+  - `PASS/WARN/FAIL/ENVIRONMENT-SKIP -> stage_status` 的终止状态映射
+
+##### 2.5.4.4 `test_contract.failure`
+
+必须声明：
+
+- `failure_kinds_ref`
+- `environment_skip_ref`
+- `implemented_now`
+
+其中：
+
+- `implemented_now` 必须是 `runtime_contract.failure_kinds` 的子集
+- `implemented_now` 只表达“当前实现覆盖度”，不得反向改变 runner 的 `verdict` 或 `failure_kind`
+- 当 `runtime_contract.failure_kinds` 已声明但 `implemented_now` 尚未覆盖全部枚举时，视为测试覆盖度缺口，而不是执行契约缺口
+
+#### 2.5.5 验证证据归属
+
+S5 相关证据不归 runner 独占，应由主 judge 与 smoke harness 共同写入：
+
+- `validation-runtime-report.md`
+- `outputs/stages/s5-validation-summary.json`
+- `transcript.md`
+
+其中：
+
+- `workflowprogram-validate` 负责生成判定结论与 summary。
+- `runtime_smoke.py` 负责在 Claude 可用时补充真实执行证据。
+- runner 仅负责保留控制面证据，不负责 S5 结果解释。
+- `state.json` 与 `events.jsonl` 的字段定义以 [phase-03-step-02-runtime-evidence-spec.md](/mnt/d/Code/WorkflowProgram-CN/docs/phase-03-step-02-runtime-evidence-spec.md) 为准；本节只定义其在 Stage 契约中的归属与引用方式。
 
 ### 2.6 原子能力规划与质量要求
 
@@ -264,6 +410,7 @@ python3 ${CLAUDE_PLUGIN_ROOT}/scripts/stage-progress.py update ...
 | Stage | 原子 Node | 承载类型 | 默认承载对象 |
 |---|---|---|---|
 | S0 | `route_intent` | `skill_node` | `workflowprogram-orchestrate` |
+| S0 | `route_intent_hard_check` | `script_node` | `${CLAUDE_PLUGIN_ROOT}/scripts/route-intent.py` |
 | S0 | `emit_route_milestone` | `script_node` | `${CLAUDE_PLUGIN_ROOT}/scripts/stage-progress.py` |
 | S1 | `clarify_requirement` | `skill_node` | `workflowprogram-develop` |
 | S1 | `draft_spec` | `agent_node` | `requirement_analyst`（或等效子代理） |
@@ -272,10 +419,14 @@ python3 ${CLAUDE_PLUGIN_ROOT}/scripts/stage-progress.py update ...
 | S2 | `build_context_report` | `agent_node` | `workflow_designer` / explore 子代理 |
 | S3 | `design_workflow` | `agent_node` | `workflow-designer` |
 | S3 | `render_yaml_and_view` | `script_node` | spec/view 生成脚本 |
+| S3 | `validate_yaml_contract` | `script_node` | `${CLAUDE_PLUGIN_ROOT}/scripts/validate-workflow-spec.py` |
 | S3 | `approval_gate` | `gate_node` | 用户审批或 CI 自动审批 |
 | S4 | `generate_candidates` | `script_node` | 生成器链（agents/skills/commands/settings） |
 | S4 | `validate_generated_files` | `skill_node` | `validate-file` |
 | S4 | `plan_apply_managed_assets` | `script_node` | `managed-assets.py` |
+| S4 | `product_entry_finalize` | `script_node` | `${CLAUDE_PLUGIN_ROOT}/scripts/workflow-entry.py` |
+| S4 | `run_transition_control_plane` | `script_node` | `${CLAUDE_PLUGIN_ROOT}/scripts/workflow-runner.py` |
+| S4 | `validate_state_artifacts` | `script_node` | `${CLAUDE_PLUGIN_ROOT}/scripts/validate-run-state.py` |
 | S5 | `workflow_validation` | `skill_node` | `workflowprogram-validate` |
 | S5 | `runtime_smoke_optional` | `script_node` | `tools/runtime_smoke.py` |
 | S5 | `publish_validation_summary` | `script_node` | 汇总写盘逻辑 |
@@ -301,19 +452,22 @@ python3 ${CLAUDE_PLUGIN_ROOT}/scripts/stage-progress.py update ...
 
 - 明确单一意图（`develop/audit/iterate/validate`）
 - 明确 `target_root`
+- 若 `target_root` 不存在则先创建目录
 - 生成路由证据文件
 
 ### 执行过程（封装级）
 
 1. `route_intent`（skill_node）
    - 调用 `workflowprogram-orchestrate` 解析请求语义、路径上下文与意图。
-2. `normalize_target`（script_node）
-   - 规范化并校验 `target_root` 绝对路径。
-3. `persist_route_result`（script_node）
+2. `route_intent_hard_check`（script_node）
+   - 调用 `${CLAUDE_PLUGIN_ROOT}/scripts/route-intent.py` 进行确定性路由校验；strict 模式下歧义必须阻断。
+3. `normalize_target`（script_node）
+   - 规范化 `target_root` 绝对路径；若目录不存在则创建，并记录“已存在/本阶段创建”的结果。
+4. `persist_route_result`（script_node）
    - 写入 `RUN_ROOT/outputs/stages/s0-route.json`。
-4. `emit_route_milestone`（script_node）
+5. `emit_route_milestone`（script_node）
    - 追加 `milestones.jsonl`，更新 `current-progress.json`。
-5. `notify_user`（script_node）
+6. `notify_user`（script_node）
    - 写入/更新 `user-progress.md`，输出“已路由到哪个主流程”。
 
 ### 可验证检查
@@ -321,17 +475,20 @@ python3 ${CLAUDE_PLUGIN_ROOT}/scripts/stage-progress.py update ...
 1. `intent` 必须属于 `develop|audit|iterate|validate`。
 2. `target_root` 必须是绝对路径，且目录存在。
 3. `s0-route.json` 必须包含 `intent`、`target_root`、`entry_skill` 字段。
-4. 进展资产 `current-progress.json` 与 `milestones.jsonl` 必须包含 S0 记录。
+4. `s0-route.json` 必须包含 `target_root_preexisting` 与 `target_root_created` 字段。
+5. 进展资产 `current-progress.json` 与 `milestones.jsonl` 必须包含 S0 记录。
 
 ### 实现方案
 
 - 主承载：`workflowprogram-orchestrate`
 - 自然语言入口只开放此 skill，叶子 skill 使用显式 slash。
+- 通过 `route-intent.py` 提供确定性路由能力；strict 模式下启用硬性阻断。
 
 ### 承载文件
 
 - [workflowprogram-orchestrate/SKILL.md](/mnt/d/Code/WorkflowProgram-CN/.claude/skills/workflowprogram-orchestrate/SKILL.md)
 - [.claude/settings.json](/mnt/d/Code/WorkflowProgram-CN/.claude/settings.json)
+- [route-intent.py](/mnt/d/Code/WorkflowProgram-CN/.claude/scripts/route-intent.py)
 
 ## S1 需求澄清（Explore Requirement）
 
@@ -375,12 +532,14 @@ python3 ${CLAUDE_PLUGIN_ROOT}/scripts/stage-progress.py update ...
 
 - 主承载：`/develop` Stage 1、`workflowprogram-develop` Step 2
 - 模板来源：`skills/develop/spec-template.md`
+- 校验承载：`validate-workflow-draft.py`
 
 ### 承载文件
 
 - [develop.md](/mnt/d/Code/WorkflowProgram-CN/.claude/commands/develop.md)
 - [workflowprogram-develop/SKILL.md](/mnt/d/Code/WorkflowProgram-CN/.claude/skills/workflowprogram-develop/SKILL.md)
 - [spec-template.md](/mnt/d/Code/WorkflowProgram-CN/.claude/skills/develop/spec-template.md)
+- [validate-workflow-draft.py](/mnt/d/Code/WorkflowProgram-CN/.claude/scripts/validate-workflow-draft.py)
 
 ## S2 领域研究（Explore Context）
 
@@ -448,6 +607,7 @@ python3 ${CLAUDE_PLUGIN_ROOT}/scripts/stage-progress.py update ...
 ### 准出目标
 
 - 覆盖阶段定义、节点职责、转移路径、资源约束
+- 覆盖执行契约（`runtime_contract`）与基础运行测试契约（`test_contract`）
 - 用户 gate 通过（或自动批准）
 - YAML 可解析且关键字段齐全
 
@@ -456,31 +616,44 @@ python3 ${CLAUDE_PLUGIN_ROOT}/scripts/stage-progress.py update ...
 1. `design_workflow`（agent_node）
    - `workflow-designer` 生成阶段结构、节点职责、约束策略。
 2. `render_yaml_and_view`（script_node）
-   - 产出 `RUN_ROOT/workflow-spec.yaml` 和 `RUN_ROOT/workflow-view.md`。
-3. `persist_design_summary`（script_node）
+   - 先产出 `RUN_ROOT/workflow-spec.yaml`。
+   - 再调用 `python ${CLAUDE_PLUGIN_ROOT}/scripts/generate-workflow-view.py --spec <RUN_ROOT>/workflow-spec.yaml --out <RUN_ROOT>/workflow-view.md` 生成只读视图。
+3. `validate_yaml_contract`（script_node）
+   - 调用 `${CLAUDE_PLUGIN_ROOT}/scripts/validate-workflow-spec.py --spec <RUN_ROOT>/workflow-spec.yaml`，同时校验 `runtime_contract` 与 `test_contract`；失败则回退到设计步骤。
+4. `persist_design_summary`（script_node）
    - 写入 `RUN_ROOT/outputs/stages/s3-design-summary.json`。
-4. `approval_gate`（gate_node）
-   - 用户审批或 CI 自动批准。
-5. `emit_stage_progress`（script_node）
+5. `approval_gate`（gate_node）
+   - 用户审批或 CI 自动批准；人工批准与自动批准必须分别记录为 `approved` 和 `auto-approved`。
+6. `emit_stage_progress`（script_node）
    - 记录 S3 关键节点和审批结果，更新用户进展。
 
 ### 可验证检查
 
 1. `workflow-spec.yaml` 可被 YAML 解析。
-2. 顶层必须包含：`meta`、`stages`、`agent_refs`、`skills`、`registry`、`constraints`、`resource_limits`。
-3. `s3-design-summary.json` 必须记录 `approval_status` 与 `complexity`。
-4. `workflow-view.md` 必须存在且标注来源 `workflow-spec.yaml`。
-5. `approval_status` 必须写入 `current-progress.json`。
+2. 顶层必须包含：`meta`、`stages`、`agent_refs`、`skills`、`registry`、`constraints`、`resource_limits`、`runtime_contract`、`test_contract`。
+3. `runtime_contract` 必须包含：`write_boundaries`、`required_evidence`、`failure_kinds`、`environment_skip`。
+4. `test_contract` 必须包含：`entry`、`boundary`、`flow`、`artifacts`、`failure`。
+5. `test_contract` 中所有 `*_ref` 字段必须采用 `runtime_contract.<field>` 固定语法，且目标字段存在。
+6. `test_contract.failure.implemented_now` 必须是 `runtime_contract.failure_kinds` 的子集。
+7. `s3-design-summary.json` 必须记录 `approval_status` 与 `complexity`。
+8. `workflow-view.md` 必须存在且标注来源 `workflow-spec.yaml`。
+9. `approval_status` 必须写入 `current-progress.json`。
+10. `validate-workflow-spec.py` 必须返回 `PASS`。
+11. 若存在 `user_approval` gate，则未经批准不得进入 S4。
 
 ### 实现方案
 
 - 主承载：`/develop` Stage 3
 - YAML 模板来源：`yaml-spec-template.md`
+- 视图渲染脚本：`generate-workflow-view.py`（确定性渲染，不依赖自由文本）
+- 规格校验脚本：`${CLAUDE_PLUGIN_ROOT}/scripts/validate-workflow-spec.py`
 
 ### 承载文件
 
 - [develop.md](/mnt/d/Code/WorkflowProgram-CN/.claude/commands/develop.md)
 - [yaml-spec-template.md](/mnt/d/Code/WorkflowProgram-CN/.claude/skills/develop/yaml-spec-template.md)
+- [generate-workflow-view.py](/mnt/d/Code/WorkflowProgram-CN/.claude/scripts/generate-workflow-view.py)
+- [validate-workflow-spec.py](/mnt/d/Code/WorkflowProgram-CN/.claude/scripts/validate-workflow-spec.py)
 
 ## S4 生成与受控写入（Generate + Managed Apply）
 
@@ -515,9 +688,16 @@ python3 ${CLAUDE_PLUGIN_ROOT}/scripts/stage-progress.py update ...
    - 调 `managed-assets.py plan` 生成变更计划。
 4. `apply_or_conflict`（script_node）
    - 无冲突执行 `apply-staged`；有冲突写入 `outputs/conflicts/` 并标记失败分类。
-5. `persist_apply_summary`（script_node）
+5. `product_entry_finalize`（script_node）
+   - develop 主链必须通过 `${CLAUDE_PLUGIN_ROOT}/scripts/workflow-entry.py run --spec <RUN_ROOT>/workflow-spec.yaml --run-root <RUN_ROOT> --target-root <TARGET_ROOT> --entry-skill workflowprogram-develop --request "<原始需求>"` 驱动，而不是只在 skill 中罗列口头顺序。
+   - 该脚本必须顺序调用 `validate-workflow-spec.py`、`generate-workflow-view.py`、`managed-assets.py`、`workflow-runner.py`、`validate-run-state.py`，并写入 `outputs/stages/entry-orchestration-summary.json`。
+6. `run_transition_control_plane`（script_node）
+   - 调 `${CLAUDE_PLUGIN_ROOT}/scripts/workflow-runner.py run --spec <RUN_ROOT>/workflow-spec.yaml --run-root <RUN_ROOT> --target-root <TARGET_ROOT>`，由程序执行状态转移并产出 `state.json` / `events.jsonl`。
+7. `validate_state_artifacts`（script_node）
+   - 调 `${CLAUDE_PLUGIN_ROOT}/scripts/validate-run-state.py --state <RUN_ROOT>/state.json`，强制检查 `kind/producer/status` 枚举。
+8. `persist_apply_summary`（script_node）
    - 写入 managed plan/result/summary 与更新 `managed-files.json`。
-6. `emit_stage_progress`（script_node）
+9. `emit_stage_progress`（script_node）
    - 记录 S4 关键节点结果并更新用户进展。
 
 ### 可验证检查
@@ -527,17 +707,22 @@ python3 ${CLAUDE_PLUGIN_ROOT}/scripts/stage-progress.py update ...
 3. 若存在冲突，`RUN_ROOT/outputs/conflicts/` 必须存在且包含冲突文件副本。
 4. `TARGET_ROOT/.workflowprogram/managed-files.json` 必须更新 `updated_at`。
 5. `user-progress.md` 必须包含“已应用/冲突”摘要。
+6. `RUN_ROOT/state.json` 必须存在且通过 `validate-run-state.py`。
+7. `RUN_ROOT/outputs/stages/runner-summary.json` 必须存在。
 
 ### 实现方案
 
 - 主承载：`/develop` Stage 4、`workflowprogram-develop` Step 3
-- 关键脚本：`managed-assets.py`
+- 关键脚本：`workflow-entry.py`、`managed-assets.py`、`workflow-runner.py`、`validate-run-state.py`
 
 ### 承载文件
 
 - [develop.md](/mnt/d/Code/WorkflowProgram-CN/.claude/commands/develop.md)
 - [workflowprogram-develop/SKILL.md](/mnt/d/Code/WorkflowProgram-CN/.claude/skills/workflowprogram-develop/SKILL.md)
+- [workflow-entry.py](/mnt/d/Code/WorkflowProgram-CN/.claude/scripts/workflow-entry.py)
 - [managed-assets.py](/mnt/d/Code/WorkflowProgram-CN/.claude/scripts/managed-assets.py)
+- [workflow-runner.py](/mnt/d/Code/WorkflowProgram-CN/.claude/scripts/workflow-runner.py)
+- [validate-run-state.py](/mnt/d/Code/WorkflowProgram-CN/.claude/scripts/validate-run-state.py)
 
 ## S5 验证（Validate）
 
@@ -545,12 +730,15 @@ python3 ${CLAUDE_PLUGIN_ROOT}/scripts/stage-progress.py update ...
 
 - 目标项目 `.claude/` 资产
 - S4 产出证据
+- `workflow-spec.yaml.test_contract`
 
 ### 输出
 
 - workflow 级结论：`PASS/WARN/FAIL/ENVIRONMENT-SKIP`
 - 运行态报告或结构化验证报告
 - `RUN_ROOT/outputs/stages/s5-validation-summary.json`
+- `RUN_ROOT/transcript.md`
+- `RUN_ROOT/validation-runtime-report.md`
 
 ### 准出目标
 
@@ -558,15 +746,18 @@ python3 ${CLAUDE_PLUGIN_ROOT}/scripts/stage-progress.py update ...
 - 注册、命名、结构、格式无阻断性问题
 - 证据链完整可追溯
 - 验证结论和失败分类可机读
+- 基础运行测试的入口/边界/流程/产物/失败五类判定均有对应检查来源
 
 ### 执行过程（封装级）
 
 1. `workflow_validation`（skill_node）
-   - 调 `workflowprogram-validate` 形成 workflow 级校验结论。
+   - 调 `workflowprogram-validate` 形成 workflow 级校验结论；它是 S5 主 judge。
 2. `critical_file_checks`（skill_node）
    - 调 `validate-file` 检查关键文件与注册一致性。
 3. `runtime_smoke_optional`（script_node）
-   - 按需执行 `tools/runtime_smoke.py` 采集动态证据。
+   - 按需执行 `tools/runtime_smoke.py` 或等效 harness 采集动态证据。
+   - 动态验证目标应优先从 `test_contract` 派生；其中执行期边界、skip 与失败枚举仍以 `runtime_contract` 为准。
+   - `runtime_smoke.py` 是动态 harness，不是 S5 主 judge。
 4. `publish_validation_summary`（script_node）
    - 写入 `RUN_ROOT/outputs/stages/s5-validation-summary.json`。
 5. `emit_stage_progress`（script_node）
@@ -578,6 +769,8 @@ python3 ${CLAUDE_PLUGIN_ROOT}/scripts/stage-progress.py update ...
 2. 若 verdict=`ENVIRONMENT-SKIP`，必须包含 `environment_reason`。
 3. `RUN_ROOT/state.json` 与 `validation-runtime-report.md` 结论必须一致。
 4. `milestones.jsonl` 必须记录至少一个关键检查节点结果。
+5. 当存在 `test_contract` 时，验证总结必须能够解释其判定目标来源于哪一类契约（入口/边界/流程/产物/失败），即使当前执行器尚未覆盖全部枚举。
+6. `validation-runtime-report.md`、`transcript.md` 和 `s5-validation-summary.json` 的责任归属必须清晰区分。
 
 ### 实现方案
 
@@ -636,6 +829,7 @@ python3 ${CLAUDE_PLUGIN_ROOT}/scripts/stage-progress.py update ...
 
 - 主承载：`/develop` Stage 6
 - 辅助承载：`workflowprogram-iterate`
+- 校验承载：`validate-lessons-delta.py`
 
 ### 承载文件
 
@@ -643,6 +837,7 @@ python3 ${CLAUDE_PLUGIN_ROOT}/scripts/stage-progress.py update ...
 - [workflowprogram-iterate/SKILL.md](/mnt/d/Code/WorkflowProgram-CN/.claude/skills/workflowprogram-iterate/SKILL.md)
 - [lessons.md](/mnt/d/Code/WorkflowProgram-CN/lessons.md)
 - [constraints.md](/mnt/d/Code/WorkflowProgram-CN/.claude/rules/constraints.md)
+- [validate-lessons-delta.py](/mnt/d/Code/WorkflowProgram-CN/.claude/scripts/validate-lessons-delta.py)
 
 ## 4. 意图到 Stage 的映射
 
@@ -656,8 +851,10 @@ python3 ${CLAUDE_PLUGIN_ROOT}/scripts/stage-progress.py update ...
 ## 5. 实施约束
 
 - 不新增脱离 Claude Code 的独立运行时依赖。
-- 先用现有 skill/agent/script 实现 Stage 执行，再渐进增强自动调度。
+- 使用 `workflow-runner.py` 作为统一控制面，执行程序化 Stage 转移与证据落盘。
 - 所有新字段必须先写入规范文档，再进入模板与脚本实现。
+- Runner 采用“程序控制面 + AI 节点执行”分层：程序负责状态转移、I/O 约束与证据落盘；AI 负责节点语义生成。
+- 对 `kind/producer/status` 的枚举约束必须通过 `validate-run-state.py` 强制校验，不得仅依赖提示词约定。
 
 ## 6. 安装与分发 Low-Level 契约
 

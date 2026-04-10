@@ -1,0 +1,287 @@
+{
+  "verdict": "FAIL",
+  "failure_kind": "design",
+  "failure_code": "S5_ENTRY_REQUIRED_ARGUMENTS_PRESENT",
+  "observed_verdict": "FAIL",
+  "observed_failure_kind": "design",
+  "observed_failure_code": "MISSING_ARGUMENT",
+  "environment_reason": null,
+  "contract_source": "workflow-spec.yaml.test_contract",
+  "contract_categories": [
+    "entry",
+    "boundary",
+    "flow",
+    "artifacts",
+    "failure"
+  ],
+  "implemented_failure_kinds": [
+    "none",
+    "environment"
+  ],
+  "environment_skip_codes": [
+    "RUNTIME_HOST_MISSING",
+    "TARGET_NOT_WRITABLE",
+    "RUNTIME_HOST_NOT_READY"
+  ],
+  "provider": "command_adapter",
+  "checked_files": [
+    "context.json",
+    "events.jsonl",
+    "outputs/mock-runtime-host.log",
+    "outputs/plugin-build-manifest.json",
+    "outputs/runtime-provider-result.json",
+    "outputs/stages/s5-validation-summary.json",
+    "outputs/stderr.log",
+    "outputs/stdout.log",
+    "outputs/target-claude-before.json",
+    "outputs/target-claude-files.json",
+    "outputs/target-root-before.json",
+    "outputs/target-root-files.json",
+    "state.json",
+    "transcript.md",
+    "validation-runtime-report.md"
+  ],
+  "checks_by_category": {
+    "entry": [
+      {
+        "name": "smoke_entry_invoked",
+        "status": "PASS",
+        "detail": "Observed smoke entry skill: workflowprogram-develop",
+        "source": "smoke.invocation"
+      },
+      {
+        "name": "declared_main_entry",
+        "status": "INFO",
+        "detail": "Declared main_entry=example; smoke entry=workflowprogram-develop",
+        "source": "test_contract.entry.main_entry"
+      },
+      {
+        "name": "required_arguments_present",
+        "status": "FAIL",
+        "detail": "Request payload is empty while $ARGUMENTS is required.",
+        "source": "test_contract.entry.required_args"
+      },
+      {
+        "name": "missing_argument_behavior",
+        "status": "PASS",
+        "detail": "Observed verdict=FAIL; expected missing_arg_verdict=FAIL; raw failure_code=MISSING_ARGUMENT",
+        "source": "test_contract.entry.missing_arg_verdict"
+      }
+    ],
+    "boundary": [
+      {
+        "name": "write_boundaries_reference",
+        "status": "PASS",
+        "detail": "Boundary contract must reference runtime_contract.write_boundaries.",
+        "source": "test_contract.boundary.write_boundaries_ref"
+      },
+      {
+        "name": "run_root_spec_boundary",
+        "status": "PASS",
+        "detail": "workflow-spec.yaml should be allowed in RUN_ROOT for control-plane execution.",
+        "source": "runtime_contract.write_boundaries.run_root_allow"
+      },
+      {
+        "name": "target_root_boundary_changes",
+        "status": "PASS",
+        "detail": "Changed target-root paths=['.workflowprogram/runs/20260409T140609Z-missing-args/events.jsonl', '.workflowprogram/runs/20260409T140609Z-missing-args/outputs/mock-runtime-host.log', '.workflowprogram/runs/20260409T140609Z-missing-args/outputs/target-claude-before.json', '.workflowprogram/runs/20260409T140609Z-missing-args/outputs/target-root-before.json', '.workflowprogram/runs/20260409T140609Z-missing-args/state.json', '.workflowprogram/runs/20260409T140609Z-missing-args/workflow-spec.yaml']; disallowed=['<none>']",
+        "source": "runtime_contract.write_boundaries.target_root_allow"
+      },
+      {
+        "name": "external_write_policy",
+        "status": "PASS",
+        "detail": "external_write_policy=deny; disallowed_changes=['<none>']",
+        "source": "test_contract.boundary.external_write_policy"
+      },
+      {
+        "name": "managed_overwrite_policy_observed",
+        "status": "INFO",
+        "detail": "managed_overwrite_policy=reject-unmanaged-overwrite; no managed conflicts were observed.",
+        "source": "test_contract.boundary.managed_overwrite_policy"
+      },
+      {
+        "name": "conflict_artifacts_preserved",
+        "status": "INFO",
+        "detail": "conflict_expectation=keep-candidate-and-report; no conflicts were observed.",
+        "source": "test_contract.boundary.conflict_expectation"
+      }
+    ],
+    "flow": [
+      {
+        "name": "required_stages_executed",
+        "status": "FAIL",
+        "detail": "Observed stage_history=['requirement']; missing=['context', 'design', 'generate', 'validate']",
+        "source": "test_contract.flow.required_stages"
+      },
+      {
+        "name": "terminal_condition_observed",
+        "status": "PASS",
+        "detail": "Observed stage_status=failed; expected=failed",
+        "source": "test_contract.flow.terminal_conditions"
+      },
+      {
+        "name": "skippable_stages_observed",
+        "status": "PASS",
+        "detail": "Present skippable stages=['<none>']; absent skippable stages=['lessons']",
+        "source": "test_contract.flow.skippable_stages"
+      },
+      {
+        "name": "failure_recovery_target",
+        "status": "FAIL",
+        "detail": "Observed next_stage_on_failure=provide the required request arguments; expected=design",
+        "source": "test_contract.flow.failure_recovery"
+      }
+    ],
+    "artifacts": [
+      {
+        "name": "evidence:context.json",
+        "status": "PASS",
+        "detail": "context.json exists in RUN_ROOT.",
+        "source": "runtime_smoke.evidence"
+      },
+      {
+        "name": "evidence:state.json",
+        "status": "PASS",
+        "detail": "state.json exists in RUN_ROOT.",
+        "source": "runtime_smoke.evidence"
+      },
+      {
+        "name": "evidence:events.jsonl",
+        "status": "PASS",
+        "detail": "events.jsonl exists in RUN_ROOT.",
+        "source": "runtime_smoke.evidence"
+      },
+      {
+        "name": "evidence:transcript.md",
+        "status": "PASS",
+        "detail": "transcript.md exists in RUN_ROOT.",
+        "source": "runtime_smoke.evidence"
+      },
+      {
+        "name": "evidence:validation-runtime-report.md",
+        "status": "PASS",
+        "detail": "validation-runtime-report.md is generated by the S5 judge.",
+        "source": "runtime_smoke.evidence"
+      },
+      {
+        "name": "evidence:outputs/stdout.log",
+        "status": "PASS",
+        "detail": "outputs/stdout.log exists in RUN_ROOT.",
+        "source": "runtime_smoke.evidence"
+      },
+      {
+        "name": "evidence:outputs/stderr.log",
+        "status": "PASS",
+        "detail": "outputs/stderr.log exists in RUN_ROOT.",
+        "source": "runtime_smoke.evidence"
+      },
+      {
+        "name": "evidence:outputs/runtime-provider-result.json",
+        "status": "PASS",
+        "detail": "outputs/runtime-provider-result.json exists in RUN_ROOT.",
+        "source": "runtime_smoke.evidence"
+      },
+      {
+        "name": "evidence:outputs/target-claude-before.json",
+        "status": "PASS",
+        "detail": "outputs/target-claude-before.json exists in RUN_ROOT.",
+        "source": "runtime_smoke.evidence"
+      },
+      {
+        "name": "evidence:outputs/target-claude-files.json",
+        "status": "PASS",
+        "detail": "outputs/target-claude-files.json exists in RUN_ROOT.",
+        "source": "runtime_smoke.evidence"
+      },
+      {
+        "name": "evidence:outputs/target-root-before.json",
+        "status": "PASS",
+        "detail": "outputs/target-root-before.json exists in RUN_ROOT.",
+        "source": "runtime_smoke.evidence"
+      },
+      {
+        "name": "evidence:outputs/target-root-files.json",
+        "status": "PASS",
+        "detail": "outputs/target-root-files.json exists in RUN_ROOT.",
+        "source": "runtime_smoke.evidence"
+      },
+      {
+        "name": "evidence:outputs/mock-runtime-host.log",
+        "status": "PASS",
+        "detail": "outputs/mock-runtime-host.log exists in RUN_ROOT.",
+        "source": "runtime_smoke.evidence"
+      },
+      {
+        "name": "evidence:outputs/plugin-build-manifest.json",
+        "status": "PASS",
+        "detail": "outputs/plugin-build-manifest.json exists in RUN_ROOT.",
+        "source": "runtime_smoke.evidence"
+      },
+      {
+        "name": "evidence:outputs/stages/s5-validation-summary.json",
+        "status": "PASS",
+        "detail": "outputs/stages/s5-validation-summary.json is generated by the S5 judge.",
+        "source": "runtime_smoke.evidence"
+      },
+      {
+        "name": "evidence_reference",
+        "status": "PASS",
+        "detail": "evidence_ref=runtime_contract.required_evidence",
+        "source": "test_contract.artifacts.evidence_ref"
+      },
+      {
+        "name": "required_runtime_evidence",
+        "status": "FAIL",
+        "detail": "Missing required_evidence=['outputs/progress/current-progress.json', 'outputs/progress/milestones.jsonl', 'outputs/progress/user-progress.md', 'outputs/stages/s0-route.json', 'outputs/stages/runner-summary.json']",
+        "source": "runtime_contract.required_evidence"
+      },
+      {
+        "name": "deliverable:.claude/settings.json",
+        "status": "WARN",
+        "detail": "Deliverable pattern .claude/settings.json did not match files under TARGET_ROOT.",
+        "source": "test_contract.artifacts.deliverables"
+      },
+      {
+        "name": "deliverable:.claude/rules/constraints.md",
+        "status": "WARN",
+        "detail": "Deliverable pattern .claude/rules/constraints.md did not match files under TARGET_ROOT.",
+        "source": "test_contract.artifacts.deliverables"
+      }
+    ],
+    "failure": [
+      {
+        "name": "derived_failure_kind",
+        "status": "PASS",
+        "detail": "Derived failure_kind=design; raw failure_code=MISSING_ARGUMENT",
+        "source": "judge.mapping"
+      },
+      {
+        "name": "implemented_now_coverage",
+        "status": "WARN",
+        "detail": "implemented_now=['none', 'environment']; observed=design",
+        "source": "test_contract.failure.implemented_now"
+      },
+      {
+        "name": "failure_kinds_reference",
+        "status": "PASS",
+        "detail": "failure_kinds_ref=runtime_contract.failure_kinds",
+        "source": "test_contract.failure.failure_kinds_ref"
+      },
+      {
+        "name": "environment_skip_reference",
+        "status": "PASS",
+        "detail": "environment_skip_ref=runtime_contract.environment_skip",
+        "source": "test_contract.failure.environment_skip_ref"
+      }
+    ]
+  },
+  "judge_basis": {
+    "category": "entry",
+    "name": "required_arguments_present",
+    "status": "FAIL",
+    "detail": "Request payload is empty while $ARGUMENTS is required.",
+    "source": "test_contract.entry.required_args"
+  },
+  "summary": "Mock host rejected an empty request payload.",
+  "report_path": "/mnt/d/Code/WorkflowProgram-CN/tests/transcripts/20260409T140609Z-missing-args/target/.workflowprogram/runs/20260409T140609Z-missing-args/validation-runtime-report.md"
+}

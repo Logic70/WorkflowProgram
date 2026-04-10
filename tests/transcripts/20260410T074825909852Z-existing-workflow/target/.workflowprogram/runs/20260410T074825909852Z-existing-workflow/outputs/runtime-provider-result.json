@@ -1,0 +1,56 @@
+{
+  "provider": "command_adapter",
+  "result": "PASS",
+  "failure_code": "",
+  "message": "Mock host completed workflow audit successfully.",
+  "is_error": false,
+  "command": [
+    "python3",
+    "/mnt/d/Code/WorkflowProgram-CN/tools/mock_runtime_host.py",
+    "invoke",
+    "--plugin-root",
+    "/mnt/d/Code/WorkflowProgram-CN/dist/plugin",
+    "--target-root",
+    "/mnt/d/Code/WorkflowProgram-CN/tests/transcripts/20260410T074825909852Z-existing-workflow/target",
+    "--run-root",
+    "/mnt/d/Code/WorkflowProgram-CN/tests/transcripts/20260410T074825909852Z-existing-workflow/target/.workflowprogram/runs/20260410T074825909852Z-existing-workflow",
+    "--entry-skill",
+    "workflowprogram-audit",
+    "--request",
+    "审计当前项目中的 workflow 结构，并输出结构问题、模式偏离和下一步建议",
+    "--fixture",
+    "existing-workflow",
+    "--timeout",
+    "90",
+    "--json"
+  ],
+  "returncode": 0,
+  "stdout": "{\n  \"result\": \"PASS\",\n  \"failure_code\": \"\",\n  \"message\": \"Mock host completed workflow audit successfully.\",\n  \"is_error\": false,\n  \"stage_history\": [\n    \"validate\",\n    \"lessons\"\n  ],\n  \"stage_status\": \"done\",\n  \"current_stage\": \"lessons\",\n  \"next_action\": \"complete\",\n  \"generated_files\": [\n    \"validation-report.md\"\n  ]\n}\n",
+  "stderr": "",
+  "parsed": {
+    "result": "PASS",
+    "failure_code": "",
+    "message": "Mock host completed workflow audit successfully.",
+    "is_error": false,
+    "stage_history": [
+      "validate",
+      "lessons"
+    ],
+    "stage_status": "done",
+    "current_stage": "lessons",
+    "next_action": "complete",
+    "generated_files": [
+      "validation-report.md"
+    ]
+  },
+  "subagent_evidence": false,
+  "stage_history": [
+    "validate",
+    "lessons"
+  ],
+  "current_stage": "lessons",
+  "stage_status": "",
+  "next_action": "complete",
+  "next_stage_on_failure": "",
+  "metadata": {}
+}

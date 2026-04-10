@@ -1,0 +1,6 @@
+{
+  "intent": "audit",
+  "entry_skill": "workflowprogram-audit",
+  "target_root": "/mnt/d/Code/WorkflowProgram-CN/tests/transcripts/20260410T032323Z-existing-workflow/target",
+  "routed_at": "2026-04-10T03:23:24Z"
+}

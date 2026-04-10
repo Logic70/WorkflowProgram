@@ -1,0 +1,9 @@
+{"ts": "2026-04-09T14:00:56Z", "type": "RunStarted", "stage": "prepare", "source": "runtime_smoke", "status": "ok", "message": "Preparing fixture empty-project"}
+{"ts": "2026-04-09T14:00:57Z", "type": "TaskCreated", "stage": "invoke", "source": "runtime_smoke", "status": "ok", "message": "Invoking provider=fixture_host for /workflowprogram-develop"}
+{"ts": "2026-04-09T14:01:00Z", "type": "ManagedAssetApplied", "stage": "managed-assets", "source": "managed-assets", "status": "ok", "message": "Applied .claude/commands/generated-smoke.md", "action": "create"}
+{"ts": "2026-04-09T14:01:00Z", "type": "ManagedAssetApplied", "stage": "managed-assets", "source": "managed-assets", "status": "ok", "message": "Applied .claude/rules/constraints.md", "action": "create"}
+{"ts": "2026-04-09T14:01:00Z", "type": "ManagedAssetApplied", "stage": "managed-assets", "source": "managed-assets", "status": "ok", "message": "Applied .claude/settings.json", "action": "create"}
+{"ts": "2026-04-09T14:01:00Z", "type": "ManagedAssetApplied", "stage": "managed-assets", "source": "managed-assets", "status": "ok", "message": "Applied .claude/skills/generated-smoke/SKILL.md", "action": "create"}
+{"ts": "2026-04-09T14:01:01Z", "type": "TaskCompleted", "stage": "invoke", "source": "runtime_smoke", "status": "ok", "message": "fixture_host applied 4 managed workflow assets."}
+{"ts": "2026-04-09T14:01:04Z", "type": "OutputWritten", "stage": "invoke", "source": "runtime_smoke", "status": "ok", "message": "Captured plugin build manifest into RUN_ROOT outputs"}
+{"ts": "2026-04-09T14:01:07Z", "type": "RunFinished", "stage": "finished", "source": "runtime_smoke", "status": "ok", "message": "Run finished with result PASS"}

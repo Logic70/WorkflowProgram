@@ -1,5 +1,10 @@
 # WorkflowProgram-CN 技能优先插件化重构设计
 
+> Historical Note
+>
+> 本文档保留为历史设计与问题追溯材料，不再作为当前运行时真源。
+> 当前真源和已关闭决策见 [workflowprogram-design-status.md](/mnt/d/Code/WorkflowProgram-CN/docs/workflowprogram-design-status.md)。
+
 ## 1. 文档目的
 
 本文档用于固定 `WorkflowProgram-CN` 的插件化稳态架构，避免后续边实现边改架构。

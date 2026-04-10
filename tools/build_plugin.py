@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """
-WorkflowProgram dist/plugin builder
+WorkflowProgram 的 dist/plugin 构建器。
 
-Source of truth:
+真源目录：
     .claude/
     .claude-plugin/
 
-Build output:
+构建输出：
     dist/plugin/
 """
 
@@ -44,19 +44,23 @@ SCRIPT_BANNER = "AUTO-GENERATED FROM .claude/ - DO NOT EDIT DIRECTLY"
 
 
 def ensure_parent(path: Path) -> None:
+    """在写入生成文件前确保父目录存在。"""
     path.parent.mkdir(parents=True, exist_ok=True)
 
 
 def write_text(path: Path, content: str) -> None:
+    """以统一换行格式写入 UTF-8 文本。"""
     ensure_parent(path)
     path.write_text(content, encoding="utf-8", newline="\n")
 
 
 def iso_now() -> str:
+    """返回稳定的 UTC 时间戳，供 trace manifest 使用。"""
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 
 def decorate_generated_text(src: Path, content: str) -> str:
+    """按输出文件类型添加合适的“自动生成”头部标记。"""
     suffix = src.suffix.lower()
     if suffix == ".md":
         return MARKDOWN_HEADER + content
@@ -70,6 +74,7 @@ def decorate_generated_text(src: Path, content: str) -> str:
 
 
 def copy_generated_text(src: Path, dst: Path, *, replace_paths: bool = False) -> None:
+    """把文本资产复制到 dist，并可选做路径替换和头部标记注入。"""
     content = src.read_text(encoding="utf-8")
     if replace_paths:
         content = apply_replacements(content)
@@ -77,6 +82,7 @@ def copy_generated_text(src: Path, dst: Path, *, replace_paths: bool = False) ->
 
 
 def copy_tree_generated(src_dir: Path, dst_dir: Path, *, replace_paths: bool = False) -> None:
+    """把整棵生成型文本目录树复制到 dist。"""
     for src in sorted(src_dir.rglob("*")):
         if src.is_file():
             dst = dst_dir / src.relative_to(src_dir)
@@ -84,6 +90,7 @@ def copy_tree_generated(src_dir: Path, dst_dir: Path, *, replace_paths: bool = F
 
 
 def copy_plugin_manifest(src_dir: Path, dst_dir: Path) -> None:
+    """把插件元数据文件原样复制到 dist 载荷。"""
     for src in sorted(src_dir.rglob("*")):
         if src.is_file():
             dst = dst_dir / src.relative_to(src_dir)
@@ -92,18 +99,21 @@ def copy_plugin_manifest(src_dir: Path, dst_dir: Path) -> None:
 
 
 def apply_replacements(content: str) -> str:
+    """把仓库内路径改写成 dist/plugin 运行时占位路径。"""
     for old, new in REPLACEMENTS.items():
         content = content.replace(old, new)
     return content
 
 
 def render_command(src: Path, dst: Path, desc: str, hint: str) -> None:
+    """为命令 Markdown 生成带 frontmatter 的分发版本。"""
     body = apply_replacements(src.read_text(encoding="utf-8"))
     frontmatter = f"---\ndescription: {desc}\nargument-hint: {hint}\n---\n\n"
     write_text(dst, MARKDOWN_HEADER + frontmatter + body)
 
 
 def render_command_wrapper(src: Path, dst: Path, name: str, desc: str, hint: str) -> None:
+    """生成插件分发用的 command-as-skill wrapper。"""
     body = apply_replacements(src.read_text(encoding="utf-8"))
     meta = (
         f"---\nname: {name}\ndescription: {desc}\nversion: 1.0.0\n"
@@ -113,6 +123,7 @@ def render_command_wrapper(src: Path, dst: Path, name: str, desc: str, hint: str
 
 
 def prepare_output_dirs(root: Path) -> None:
+    """从零重建 dist/plugin 目录。"""
     if root.exists():
         shutil.rmtree(root)
     for dirname in [".claude-plugin", "agents", "commands", "skills", "rules", "scripts"]:
@@ -120,14 +131,17 @@ def prepare_output_dirs(root: Path) -> None:
 
 
 def build_agents() -> None:
+    """把 agent 定义复制到 dist 载荷。"""
     copy_tree_generated(CLAUDE / "agents", DIST / "agents")
 
 
 def build_rules() -> None:
+    """把当前生效的规则集复制到 dist 载荷。"""
     copy_generated_text(CLAUDE / "rules" / "constraints.md", DIST / "rules" / "constraints.md")
 
 
 def build_scripts() -> None:
+    """复制必须随插件一起分发的运行时脚本。"""
     allowed_suffixes = {".py", ".ps1", ".sh"}
     for src in sorted((CLAUDE / "scripts").rglob("*")):
         if not src.is_file():
@@ -139,10 +153,12 @@ def build_scripts() -> None:
 
 
 def build_skills() -> None:
+    """把 skill 目录复制到 dist/plugin。"""
     copy_tree_generated(CLAUDE / "skills", DIST / "skills")
 
 
 def build_commands() -> None:
+    """根据源命令生成命令 Markdown 和对应 wrapper skill。"""
     for src in sorted((CLAUDE / "commands").glob("*.md")):
         name = src.stem
         desc, hint = COMMAND_DESCRIPTIONS[name]
@@ -157,10 +173,12 @@ def build_commands() -> None:
 
 
 def build_plugin_manifest_dir() -> None:
+    """把插件市场元数据复制到 dist/plugin。"""
     copy_plugin_manifest(PLUGIN_META, DIST / ".claude-plugin")
 
 
 def sha256_file(path: Path) -> str:
+    """返回文件 SHA-256，用于 build trace manifest。"""
     digest = hashlib.sha256()
     with path.open("rb") as handle:
         for chunk in iter(lambda: handle.read(65536), b""):
@@ -169,10 +187,12 @@ def sha256_file(path: Path) -> str:
 
 
 def load_plugin_metadata() -> dict:
+    """从源 manifest 加载插件元数据。"""
     return json.loads((PLUGIN_META / "plugin.json").read_text(encoding="utf-8"))
 
 
 def git_output(*args: str) -> str | None:
+    """执行 git 命令，并在可用时返回 stdout。"""
     try:
         completed = subprocess.run(
             ["git", *args],
@@ -189,10 +209,12 @@ def git_output(*args: str) -> str | None:
 
 
 def source_commit() -> str | None:
+    """在 git 元数据可用时返回源码 commit hash。"""
     return git_output("rev-parse", "HEAD")
 
 
 def source_dirty() -> bool | None:
+    """返回源码工作区是否存在未提交修改。"""
     output = git_output("status", "--short")
     if output is None:
         return None
@@ -200,6 +222,7 @@ def source_dirty() -> bool | None:
 
 
 def collect_output_files(root: Path) -> list[dict]:
+    """枚举构建输出文件，供 build trace manifest 记录。"""
     files = []
     for path in sorted(root.rglob("*")):
         if not path.is_file():
@@ -218,6 +241,7 @@ def collect_output_files(root: Path) -> list[dict]:
 
 
 def build_trace_manifest(commit: str | None, dirty: bool | None) -> None:
+    """写出把 dist 载荷与源码树关联起来的 trace manifest。"""
     plugin_meta = load_plugin_metadata()
     payload = {
         "manifest_version": 1,
@@ -233,6 +257,7 @@ def build_trace_manifest(commit: str | None, dirty: bool | None) -> None:
 
 
 def main() -> None:
+    """根据真源目录构建 dist/plugin 载荷。"""
     commit = source_commit()
     dirty = source_dirty()
     prepare_output_dirs(DIST)

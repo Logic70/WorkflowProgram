@@ -1,0 +1,22 @@
+{
+  "result": "PASS",
+  "failure_code": "",
+  "message": "Mock host completed workflow execution successfully.",
+  "is_error": false,
+  "stage_history": [
+    "requirement",
+    "context",
+    "design",
+    "generate",
+    "validate",
+    "lessons"
+  ],
+  "stage_status": "done",
+  "current_stage": "lessons",
+  "next_action": "complete",
+  "generated_files": [
+    ".claude/settings.json",
+    ".claude/rules/constraints.md",
+    ".claude/commands/example.md"
+  ]
+}

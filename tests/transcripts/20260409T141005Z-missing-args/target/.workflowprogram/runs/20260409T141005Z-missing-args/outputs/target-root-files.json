@@ -1,0 +1,84 @@
+{
+  "files": [
+    ".workflowprogram/runs/20260409T141005Z-missing-args/context.json",
+    ".workflowprogram/runs/20260409T141005Z-missing-args/events.jsonl",
+    ".workflowprogram/runs/20260409T141005Z-missing-args/outputs/mock-runtime-host.log",
+    ".workflowprogram/runs/20260409T141005Z-missing-args/outputs/progress/current-progress.json",
+    ".workflowprogram/runs/20260409T141005Z-missing-args/outputs/progress/milestones.jsonl",
+    ".workflowprogram/runs/20260409T141005Z-missing-args/outputs/progress/user-progress.md",
+    ".workflowprogram/runs/20260409T141005Z-missing-args/outputs/stages/runner-summary.json",
+    ".workflowprogram/runs/20260409T141005Z-missing-args/outputs/stages/s0-route.json",
+    ".workflowprogram/runs/20260409T141005Z-missing-args/outputs/target-claude-before.json",
+    ".workflowprogram/runs/20260409T141005Z-missing-args/outputs/target-root-before.json",
+    ".workflowprogram/runs/20260409T141005Z-missing-args/state.json",
+    ".workflowprogram/runs/20260409T141005Z-missing-args/workflow-spec.yaml",
+    "README.md"
+  ],
+  "entries": [
+    {
+      "path": ".workflowprogram/runs/20260409T141005Z-missing-args/context.json",
+      "sha256": "e8b7adc390a9c1ccf71c18b6b96422f2c427d93da7c1296b2f6311b6b8b3d4f9",
+      "size": 855
+    },
+    {
+      "path": ".workflowprogram/runs/20260409T141005Z-missing-args/events.jsonl",
+      "sha256": "6537a73138c66dda65928ed764270ded235b6218c6ff76bb103a27168daa2c79",
+      "size": 713
+    },
+    {
+      "path": ".workflowprogram/runs/20260409T141005Z-missing-args/outputs/mock-runtime-host.log",
+      "sha256": "ba6ccdd1c4d13f9e663ffd89f653dd70e2267730fbbee16d52d8889caf1ec704",
+      "size": 60
+    },
+    {
+      "path": ".workflowprogram/runs/20260409T141005Z-missing-args/outputs/progress/current-progress.json",
+      "sha256": "390ac3b4a7c1ca0e26cacdc8264c531c5f384391ef26aee3d13cc13afa972e1f",
+      "size": 141
+    },
+    {
+      "path": ".workflowprogram/runs/20260409T141005Z-missing-args/outputs/progress/milestones.jsonl",
+      "sha256": "70f3804592df621a674adb963016a082701240836ccc9d347a9f908f550ed120",
+      "size": 83
+    },
+    {
+      "path": ".workflowprogram/runs/20260409T141005Z-missing-args/outputs/progress/user-progress.md",
+      "sha256": "f717c475ae834a55bafc2ee315d6100cab39b24201163c89aef54a92882482bb",
+      "size": 65
+    },
+    {
+      "path": ".workflowprogram/runs/20260409T141005Z-missing-args/outputs/stages/runner-summary.json",
+      "sha256": "623dc9f38fdc7e4ab4a41ec90c23af1bcafe8124daa7c4a15cd3e2574df8fae2",
+      "size": 175
+    },
+    {
+      "path": ".workflowprogram/runs/20260409T141005Z-missing-args/outputs/stages/s0-route.json",
+      "sha256": "7db99c7893ef8cd71d6082d9eded3c954a1d3a7b9413990c752ed9d07c7a57fa",
+      "size": 215
+    },
+    {
+      "path": ".workflowprogram/runs/20260409T141005Z-missing-args/outputs/target-claude-before.json",
+      "sha256": "7c945ff589fa3bd7fb359be79fd57d389823e42527de5d1f2ca7cab44f192f4f",
+      "size": 35
+    },
+    {
+      "path": ".workflowprogram/runs/20260409T141005Z-missing-args/outputs/target-root-before.json",
+      "sha256": "fa630dc60abe4df6ef9d21d98483bca12613de7316d17e9e6a3a3c007f7b42df",
+      "size": 1000
+    },
+    {
+      "path": ".workflowprogram/runs/20260409T141005Z-missing-args/state.json",
+      "sha256": "c9e275bdc8d8a0416b2dacf2d74de50da7d97c2d0d53294b251bc52de1088c8d",
+      "size": 263
+    },
+    {
+      "path": ".workflowprogram/runs/20260409T141005Z-missing-args/workflow-spec.yaml",
+      "sha256": "8a8c6852570ad4337ed3fe0ca5b6b5d7567089496297bbd0fdfac7ec0dc9923d",
+      "size": 6432
+    },
+    {
+      "path": "README.md",
+      "sha256": "b3a389139b841c66ea3ee695ea55256b8bd4de4e4b80bf52e47551f650e25be0",
+      "size": 77
+    }
+  ]
+}

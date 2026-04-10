@@ -1,0 +1,25 @@
+{
+  "run_id": "20260410T034711082170Z-external-write",
+  "started_at": "2026-04-10T03:47:11Z",
+  "plugin_root": "/mnt/d/Code/WorkflowProgram-CN/dist/plugin",
+  "target_root": "/mnt/d/Code/WorkflowProgram-CN/tests/transcripts/20260410T034711082170Z-external-write/target",
+  "fixture": "external-write",
+  "entry_skill": "workflowprogram-develop",
+  "request": "触发 external-write 验证路径",
+  "claude_bin": "claude",
+  "runtime_provider": "command_adapter",
+  "provider_command": "python3 tools/mock_runtime_host.py",
+  "mode": "runtime-smoke",
+  "plugin_build_manifest": "/mnt/d/Code/WorkflowProgram-CN/dist/plugin/build-manifest.json",
+  "contract_summary": {
+    "contract_source": "fixture_preset",
+    "contract_categories": [
+      "boundary",
+      "artifacts",
+      "failure"
+    ],
+    "implemented_failure_kinds": [],
+    "environment_skip_codes": [],
+    "spec_path": null
+  }
+}

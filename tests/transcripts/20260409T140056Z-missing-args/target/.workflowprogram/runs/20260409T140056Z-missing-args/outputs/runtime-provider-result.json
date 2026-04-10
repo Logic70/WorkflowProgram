@@ -1,0 +1,17 @@
+{
+  "provider": "fixture_host",
+  "result": "FAIL",
+  "failure_code": "INPUT_FAILURE",
+  "message": "Required request arguments were not provided.",
+  "is_error": true,
+  "command": [],
+  "returncode": 0,
+  "stdout": "",
+  "stderr": "",
+  "parsed": null,
+  "subagent_evidence": false,
+  "stage_history": [],
+  "current_stage": "",
+  "next_action": "",
+  "metadata": {}
+}

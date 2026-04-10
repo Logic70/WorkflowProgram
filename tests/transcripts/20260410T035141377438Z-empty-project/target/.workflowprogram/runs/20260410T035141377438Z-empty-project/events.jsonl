@@ -1,0 +1,6 @@
+{"ts": "2026-04-10T03:51:41Z", "type": "RunStarted", "stage": "prepare", "source": "runtime_smoke", "status": "ok", "message": "Preparing fixture empty-project"}
+{"ts": "2026-04-10T03:51:41Z", "type": "TaskCreated", "stage": "invoke", "source": "runtime_smoke", "status": "ok", "message": "Invoking provider=claude_cli for /workflowprogram-develop"}
+{"ts": "2026-04-10T03:51:42Z", "type": "EnvironmentSkip", "stage": "invoke", "source": "runtime_smoke", "status": "warn", "message": "{\n  \"loggedIn\": false,\n  \"authMethod\": \"none\",\n  \"apiProvider\": \"firstParty\"\n}"}
+{"ts": "2026-04-10T03:51:42Z", "type": "TaskCompleted", "stage": "invoke", "source": "runtime_smoke", "status": "ok", "message": "{\n  \"loggedIn\": false,\n  \"authMethod\": \"none\",\n  \"apiProvider\": \"firstParty\"\n}"}
+{"ts": "2026-04-10T03:51:43Z", "type": "OutputWritten", "stage": "invoke", "source": "runtime_smoke", "status": "ok", "message": "Captured plugin build manifest into RUN_ROOT outputs"}
+{"ts": "2026-04-10T03:51:43Z", "type": "RunFinished", "stage": "finished", "source": "runtime_smoke", "status": "warn", "message": "Run finished with result ENVIRONMENT-SKIP"}

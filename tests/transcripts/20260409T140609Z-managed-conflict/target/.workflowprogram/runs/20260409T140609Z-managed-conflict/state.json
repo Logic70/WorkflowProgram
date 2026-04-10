@@ -1,0 +1,13 @@
+{
+  "run_id": "20260409T140609Z-managed-conflict",
+  "status": "completed",
+  "stage": "finished",
+  "result": "FAIL",
+  "category": "CONFLICT_FAILURE",
+  "subagent_evidence": false,
+  "events_written": 6,
+  "started_at": "2026-04-09T14:06:09Z",
+  "updated_at": "2026-04-09T14:06:12Z",
+  "observed_result": "FAIL",
+  "observed_category": "CONFLICT_FAILURE"
+}

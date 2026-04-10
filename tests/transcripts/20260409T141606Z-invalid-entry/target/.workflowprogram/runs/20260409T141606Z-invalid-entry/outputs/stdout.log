@@ -1,0 +1,9 @@
+{
+  "result": "FAIL",
+  "failure_code": "STRUCTURE_FAILURE",
+  "message": "Mock host rejected an unknown workflow entry.",
+  "is_error": true,
+  "stage_history": [],
+  "current_stage": "requirement",
+  "next_action": "register the missing entry and rerun"
+}

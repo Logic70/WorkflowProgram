@@ -1,0 +1,114 @@
+{
+  "files": [
+    ".claude/settings.json",
+    ".claude/skills/bad-skill/SKILL.md",
+    ".workflowprogram/runs/20260410T034850234306Z-broken-workflow/context.json",
+    ".workflowprogram/runs/20260410T034850234306Z-broken-workflow/events.jsonl",
+    ".workflowprogram/runs/20260410T034850234306Z-broken-workflow/outputs/mock-runtime-host.log",
+    ".workflowprogram/runs/20260410T034850234306Z-broken-workflow/outputs/progress/current-progress.json",
+    ".workflowprogram/runs/20260410T034850234306Z-broken-workflow/outputs/progress/milestones.jsonl",
+    ".workflowprogram/runs/20260410T034850234306Z-broken-workflow/outputs/progress/user-progress.md",
+    ".workflowprogram/runs/20260410T034850234306Z-broken-workflow/outputs/stages/runner-summary.json",
+    ".workflowprogram/runs/20260410T034850234306Z-broken-workflow/outputs/stages/s0-route.json",
+    ".workflowprogram/runs/20260410T034850234306Z-broken-workflow/outputs/target-claude-before.json",
+    ".workflowprogram/runs/20260410T034850234306Z-broken-workflow/outputs/target-root-before.json",
+    ".workflowprogram/runs/20260410T034850234306Z-broken-workflow/state.json",
+    ".workflowprogram/runs/20260410T034850234306Z-broken-workflow/workflow-spec.yaml",
+    "CLAUDE.md",
+    "README.md",
+    "lessons.md",
+    "validation-report.md"
+  ],
+  "entries": [
+    {
+      "path": ".claude/settings.json",
+      "sha256": "10402487378ffc3df3e1f25b16e3f42e4c4073c4e90cc8927dd11fc21aa6ea1b",
+      "size": 141
+    },
+    {
+      "path": ".claude/skills/bad-skill/SKILL.md",
+      "sha256": "00b80cb9208077946c977ed599e3fbe14892019aecf92b68378e296d4fc4192c",
+      "size": 44
+    },
+    {
+      "path": ".workflowprogram/runs/20260410T034850234306Z-broken-workflow/context.json",
+      "sha256": "4b6a57fb67996f745b2d3252852d89ed5088833353799c391d489dff6921a485",
+      "size": 959
+    },
+    {
+      "path": ".workflowprogram/runs/20260410T034850234306Z-broken-workflow/events.jsonl",
+      "sha256": "0e965fb858d7afc8226214a6945d3a2023a6610b35c4db42773893c205d135c2",
+      "size": 759
+    },
+    {
+      "path": ".workflowprogram/runs/20260410T034850234306Z-broken-workflow/outputs/mock-runtime-host.log",
+      "sha256": "368fd5ff11a692d1076e6b0baff3b6e9eae5501cef4d2cc3a6d06a6016ff19c6",
+      "size": 158
+    },
+    {
+      "path": ".workflowprogram/runs/20260410T034850234306Z-broken-workflow/outputs/progress/current-progress.json",
+      "sha256": "3194e615c6c5e2644b62f7130710a673ea116108d7c33c7b505f1265cddb9bb4",
+      "size": 424
+    },
+    {
+      "path": ".workflowprogram/runs/20260410T034850234306Z-broken-workflow/outputs/progress/milestones.jsonl",
+      "sha256": "3f64cc5bbc95eec7564ed12a02ec52be6718bd3f2e4f7f3c74f18c168cf4c169",
+      "size": 80
+    },
+    {
+      "path": ".workflowprogram/runs/20260410T034850234306Z-broken-workflow/outputs/progress/user-progress.md",
+      "sha256": "d5736fd73cdb523bed9035c0d53aa9680af5f45ec1108849725235838f65ba12",
+      "size": 399
+    },
+    {
+      "path": ".workflowprogram/runs/20260410T034850234306Z-broken-workflow/outputs/stages/runner-summary.json",
+      "sha256": "ecdecb33a85f752604d3357cd5352762c7f1bdf92f849dcfe876afad6497bfd1",
+      "size": 185
+    },
+    {
+      "path": ".workflowprogram/runs/20260410T034850234306Z-broken-workflow/outputs/stages/s0-route.json",
+      "sha256": "17886a509c59c4fdf24a173dc3e691082d7eda5c29ab0a01ef3864092e1b2b81",
+      "size": 226
+    },
+    {
+      "path": ".workflowprogram/runs/20260410T034850234306Z-broken-workflow/outputs/target-claude-before.json",
+      "sha256": "b5be6a7ea55ccc5d73699be9ed157b648a2b95b65dfb11b2084149fc7a622aef",
+      "size": 396
+    },
+    {
+      "path": ".workflowprogram/runs/20260410T034850234306Z-broken-workflow/outputs/target-root-before.json",
+      "sha256": "0e4a025b0ef3f523c785e3130b690195bae1cd68d415c3d97220e912c7ab30e6",
+      "size": 1942
+    },
+    {
+      "path": ".workflowprogram/runs/20260410T034850234306Z-broken-workflow/state.json",
+      "sha256": "52c9ed99a7fb4769c531050f0604b2a23127407378b9cbd9d7f1520e9553e487",
+      "size": 272
+    },
+    {
+      "path": ".workflowprogram/runs/20260410T034850234306Z-broken-workflow/workflow-spec.yaml",
+      "sha256": "ed55005e3a0a4bd5ba05df0b051760476c133bc3529829beab0c1293eac20a79",
+      "size": 5603
+    },
+    {
+      "path": "CLAUDE.md",
+      "sha256": "ddf014762f01685ddb7e364d0eb9af637a604df7792a053d4415814f384c25af",
+      "size": 102
+    },
+    {
+      "path": "README.md",
+      "sha256": "01a9b2a49268bb3d944ff80bc0e0aa9e74eadc4f3feec6257eead271c4c42fd7",
+      "size": 93
+    },
+    {
+      "path": "lessons.md",
+      "sha256": "898a8b166c1c9b1fb012f948a8d45a4e8d469da6a20e34db6497f1f250aaef17",
+      "size": 73
+    },
+    {
+      "path": "validation-report.md",
+      "sha256": "548ddcb0e88bbf47e69d13689ce42fa8bd9ce523033ee33c53f7e4da831d5748",
+      "size": 145
+    }
+  ]
+}

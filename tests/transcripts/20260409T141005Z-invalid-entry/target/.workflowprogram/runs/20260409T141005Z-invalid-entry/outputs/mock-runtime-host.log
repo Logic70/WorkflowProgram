@@ -1,0 +1,3 @@
+fixture=invalid-entry
+entry=missing-workflowprogram-entry
+request=验证非法入口时是否被正确拒绝

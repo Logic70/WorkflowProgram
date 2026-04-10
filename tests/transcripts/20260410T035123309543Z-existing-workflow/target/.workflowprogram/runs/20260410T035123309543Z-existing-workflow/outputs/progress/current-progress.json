@@ -1,0 +1,17 @@
+{
+  "run_id": "20260410T035123309543Z-existing-workflow",
+  "updated_at": "2026-04-10T03:51:24Z",
+  "current_stage": "lessons",
+  "current_node": "lessons",
+  "percent": 100,
+  "last_status": "ok",
+  "last_verdict": "PASS",
+  "next_action": "complete",
+  "approval_status": "approved",
+  "stage_history": [
+    "validate",
+    "lessons"
+  ],
+  "result": "PASS",
+  "category": null
+}

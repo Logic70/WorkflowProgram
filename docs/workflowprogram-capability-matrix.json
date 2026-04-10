@@ -1,0 +1,124 @@
+{
+  "version": 1,
+  "capabilities": [
+    {
+      "id": "workflow-stage-truth",
+      "checks": [
+        {
+          "file": "docs/workflowprogram-stage-highlevel-design.md",
+          "markers": ["intent_flows", "approved", "auto-approved", "workflow-entry.py"]
+        },
+        {
+          "file": "docs/workflowprogram-stage-lowlevel-design.md",
+          "markers": ["intent_flows", "workflow-entry.py", "state.json", "events.jsonl"]
+        },
+        {
+          "file": "docs/workflowprogram-stage-consistency-check.md",
+          "markers": ["当前无显式冲突", "workflow-runner.py", "route-intent.py"]
+        }
+      ]
+    },
+    {
+      "id": "workflow-intent-and-entry",
+      "checks": [
+        {
+          "file": "docs/workflowprogram-stage-highlevel-design.md",
+          "markers": ["workflowprogram-orchestrate", "route-intent.py", "workflow-entry.py"]
+        },
+        {
+          "file": ".claude/skills/workflowprogram-orchestrate/SKILL.md",
+          "markers": ["route-intent.py", "workflow-entry.py", "workflowprogram-develop"]
+        },
+        {
+          "file": ".claude/scripts/route-intent.py",
+          "markers": ["ENTRY_SKILL_BY_INTENT", "fallback-default", "strict"]
+        }
+      ]
+    },
+    {
+      "id": "workflow-s1-quality",
+      "checks": [
+        {
+          "file": "docs/workflowprogram-stage-highlevel-design.md",
+          "markers": ["workflow-spec.md", "TBD/待补", "触发方式/输入/输出/质量门禁四段"]
+        },
+        {
+          "file": ".claude/scripts/validate-workflow-draft.py",
+          "markers": ["Trigger Model", "Inputs", "Outputs", "Quality Gates"]
+        },
+        {
+          "file": ".claude/skills/workflowprogram-develop/SKILL.md",
+          "markers": ["validate-workflow-draft.py", "workflow-entry.py"]
+        }
+      ]
+    },
+    {
+      "id": "workflow-entry-orchestration",
+      "checks": [
+        {
+          "file": ".claude/scripts/workflow-entry.py",
+          "markers": ["managed-assets.py", "workflow-runner.py", "validate-run-state.py", "entry-orchestration-summary.json"]
+        },
+        {
+          "file": ".claude/commands/develop.md",
+          "markers": ["workflow-entry.py run", "managed-assets.py", "workflow-runner.py"]
+        },
+        {
+          "file": ".claude/skills/workflowprogram-develop/SKILL.md",
+          "markers": ["workflow-entry.py run", "managed-assets.py", "workflow-runner.py", "validate-run-state.py"]
+        }
+      ]
+    },
+    {
+      "id": "workflow-runtime-evidence-and-s5",
+      "checks": [
+        {
+          "file": "docs/phase-03-step-02-runtime-evidence-spec.md",
+          "markers": ["state.json", "events.jsonl", "validation-runtime-report.md"]
+        },
+        {
+          "file": ".claude/scripts/workflow-s5-judge.py",
+          "markers": ["workflow_spec_draft_valid", "s6_lessons_delta_valid", "intent_flows"]
+        },
+        {
+          "file": "tools/runtime_smoke_matrix.py",
+          "markers": ["adapter-develop-pass", "fixture-develop-pass", "claude-cli-develop"]
+        }
+      ]
+    },
+    {
+      "id": "workflow-lessons-and-progress",
+      "checks": [
+        {
+          "file": "docs/workflowprogram-stage-highlevel-design.md",
+          "markers": ["s6-lessons-delta.md", "failure_kind", "历史关键节点结果"]
+        },
+        {
+          "file": ".claude/scripts/validate-lessons-delta.py",
+          "markers": ["run_id", "failure_kind", "历史关键节点结果"]
+        },
+        {
+          "file": ".claude/scripts/stage-progress.py",
+          "markers": ["历史关键节点结果", "当前阻塞点", "Next Action"]
+        }
+      ]
+    },
+    {
+      "id": "workflow-history-governance",
+      "checks": [
+        {
+          "file": "docs/workflowprogram-design-status.md",
+          "markers": ["当前生效设计真源", "历史追溯文档", "已关闭决策"]
+        },
+        {
+          "file": "docs/workflowprogram-test-change-plan.md",
+          "markers": ["历史文档治理", "workflowprogram-design-status.md", "capability matrix"]
+        },
+        {
+          "file": "docs/phase-07-implementation-plan.md",
+          "markers": ["workflowprogram-design-status.md", "workflowprogram-capability-matrix.json", "已完成"]
+        }
+      ]
+    }
+  ]
+}

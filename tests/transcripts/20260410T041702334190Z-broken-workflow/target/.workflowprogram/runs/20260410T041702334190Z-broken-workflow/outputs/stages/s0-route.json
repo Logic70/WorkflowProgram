@@ -1,0 +1,6 @@
+{
+  "intent": "validate",
+  "entry_skill": "workflowprogram-validate",
+  "target_root": "/mnt/d/Code/WorkflowProgram-CN/tests/transcripts/20260410T041702334190Z-broken-workflow/target",
+  "routed_at": "2026-04-10T04:17:03Z"
+}

@@ -1,0 +1,519 @@
+#!/usr/bin/env python3
+# AUTO-GENERATED FROM .claude/ - DO NOT EDIT DIRECTLY
+"""
+WorkflowProgram 的确定性产品入口封装器。
+
+它负责弥合“提示词层阶段说明”和“真正要执行的脚本链”之间的落差。
+一次产品级入口执行至少要完成：
+
+- 解析入口意图
+- 校验 workflow-spec.yaml
+- 生成 workflow-view.md
+- 对 develop 流程执行 managed assets 计划与应用
+- 运行控制面 runner
+- 校验落盘后的运行状态
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import subprocess
+import sys
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any, Dict, List, Tuple
+
+
+ENTRY_TO_INTENT = {
+    "workflowprogram-develop": "develop",
+    "workflowprogram-audit": "audit",
+    "workflowprogram-iterate": "iterate",
+    "workflowprogram-validate": "validate",
+}
+
+
+def utc_now() -> str:
+    """返回用于审计记录的 RFC3339/ISO-8601 UTC 时间戳。"""
+
+    return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+
+def parse_args() -> argparse.Namespace:
+    """解析确定性产品入口封装器的命令行参数。"""
+
+    parser = argparse.ArgumentParser(description="Deterministic WorkflowProgram product entry wrapper")
+    sub = parser.add_subparsers(dest="command", required=True)
+
+    run = sub.add_parser("run", help="Run deterministic product entry orchestration")
+    run.add_argument("--spec", required=True, help="Path to workflow-spec.yaml")
+    run.add_argument("--run-root", required=True, help="RUN_ROOT path")
+    run.add_argument("--target-root", required=True, help="TARGET_ROOT path")
+    run.add_argument("--request", default="", help="Original user request text")
+    run.add_argument("--entry-skill", default="", help="Explicit workflowprogram-* entry skill")
+    run.add_argument("--candidate-root", default="", help="Candidate .claude root for develop flows")
+    run.add_argument("--plugin-root", default="", help="Explicit PLUGIN_ROOT path")
+    run.add_argument("--auto-approve", action="store_true", help="Resolve approval gates automatically")
+    run.add_argument(
+        "--approval-status",
+        default="",
+        choices=["approved"],
+        help="Resolve approval gates as manually approved",
+    )
+    run.add_argument("--strict-route", action="store_true", help="Block on route mismatch or ambiguity")
+    run.add_argument("--runtime-provider", default="", help="Runtime host provider override")
+    run.add_argument("--provider-command", default="", help="External provider command for command_adapter")
+    run.add_argument("--claude-bin", default="claude", help="Claude binary for claude_cli")
+    run.add_argument("--json", action="store_true", help="Print JSON summary")
+    return parser.parse_args()
+
+
+def script_dir() -> Path:
+    """返回当前脚本目录，便于解析同级辅助脚本。"""
+
+    return Path(__file__).resolve().parent
+
+
+def resolve_plugin_root(explicit: str) -> Path:
+    """根据显式参数或安装布局解析 PLUGIN_ROOT。"""
+
+    if explicit:
+        return Path(explicit).resolve()
+    return script_dir().parents[1]
+
+
+def write_json(path: Path, payload: Dict[str, Any]) -> None:
+    """创建父目录后，以稳定格式写入 UTF-8 JSON。"""
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8", newline="\n")
+
+
+def parse_json_output(text: str) -> Dict[str, Any]:
+    """从混合的 stdout/stderr 文本中提取最后一个 JSON 对象。
+
+    一些辅助脚本虽然会输出结构化 JSON，但前后仍可能夹带 banner 或 traceback。
+    这里通过扫描最后一个合法 JSON 对象，保证入口编排仍然保持确定性。
+    """
+
+    if not text.strip():
+        return {}
+    try:
+        payload = json.loads(text)
+        return payload if isinstance(payload, dict) else {}
+    except json.JSONDecodeError:
+        pass
+
+    lines = [line for line in text.splitlines() if line.strip()]
+    for idx in range(len(lines)):
+        candidate = "\n".join(lines[idx:])
+        try:
+            payload = json.loads(candidate)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(payload, dict):
+            return payload
+    return {}
+
+
+def run_command(cmd: List[str]) -> Tuple[int, Dict[str, Any], str]:
+    """执行子进程，并返回退出码、解析后的 JSON 以及原始文本。"""
+
+    completed = subprocess.run(cmd, capture_output=True, text=True, check=False)
+    text = completed.stdout.strip() or completed.stderr.strip()
+    return completed.returncode, parse_json_output(text), text
+
+
+def entry_intent_for(entry_skill: str) -> str:
+    """把显式 workflowprogram-* 入口技能映射为逻辑 intent。"""
+
+    if entry_skill not in ENTRY_TO_INTENT:
+        raise RuntimeError(f"unsupported explicit entry skill '{entry_skill}'")
+    return ENTRY_TO_INTENT[entry_skill]
+
+
+def resolve_requested_entry(
+    *,
+    request: str,
+    target_root: Path,
+    explicit_entry_skill: str,
+    strict_route: bool,
+) -> Dict[str, Any]:
+    """解析本次调用实际应使用的入口技能和 intent。
+
+    即使调用方给了显式叶子入口，这里仍会经过 `route-intent.py`，
+    这样严格模式才能发现“用户请求和入口不匹配”，并把原始路由证据保存在编排摘要里。
+    """
+
+    cmd = [
+        sys.executable,
+        str(script_dir() / "route-intent.py"),
+        "--request",
+        request or "设计一个基础工作流",
+        "--target-root",
+        str(target_root),
+        "--json",
+    ]
+    if strict_route:
+        cmd.append("--strict")
+    code, payload, text = run_command(cmd)
+    if code not in {0, 2}:
+        raise RuntimeError(f"route-intent.py failed: {text}")
+    if code == 2:
+        raise RuntimeError("route-intent.py blocked on ambiguous request under strict mode")
+
+    # 显式叶子入口可以覆盖路由结果，但原始路由载荷仍要保留，
+    # 这样后续审计才能看见是否存在不匹配。
+    if explicit_entry_skill and explicit_entry_skill != "workflowprogram-orchestrate":
+        explicit_intent = entry_intent_for(explicit_entry_skill)
+        mismatch = (
+            bool(payload)
+            and str(payload.get("intent", "")).strip()
+            and str(payload.get("intent", "")).strip() != explicit_intent
+        )
+        if mismatch and strict_route:
+            raise RuntimeError(
+                "explicit entry skill does not match route-intent.py result under strict mode: "
+                f"entry_skill={explicit_entry_skill}, routed_intent={payload.get('intent')}"
+            )
+        return {
+            "intent": explicit_intent,
+            "entry_skill": explicit_entry_skill,
+            "route_payload": payload,
+            "route_source": "explicit-entry-skill",
+            "route_mismatch": mismatch,
+        }
+
+    if not payload:
+        raise RuntimeError("route-intent.py did not return a JSON payload")
+    return {
+        "intent": str(payload.get("intent", "")).strip(),
+        "entry_skill": str(payload.get("entry_skill", "")).strip(),
+        "route_payload": payload,
+        "route_source": "route-intent",
+        "route_mismatch": False,
+    }
+
+
+def run_required_json_command(name: str, cmd: List[str]) -> Dict[str, Any]:
+    """运行一个“必须成功且必须返回 JSON”的辅助脚本。"""
+
+    code, payload, text = run_command(cmd)
+    if code != 0:
+        raise RuntimeError(f"{name} failed: {text}")
+    if not payload:
+        raise RuntimeError(f"{name} did not return JSON output")
+    return payload
+
+
+def validate_spec(spec_path: Path) -> Dict[str, Any]:
+    """在尝试任何变更前，先校验控制面 spec。"""
+
+    payload = run_required_json_command(
+        "validate-workflow-spec.py",
+        [
+            sys.executable,
+            str(script_dir() / "validate-workflow-spec.py"),
+            "--spec",
+            str(spec_path),
+            "--json",
+        ],
+    )
+    if payload.get("status") != "PASS":
+        raise RuntimeError(f"workflow spec is not valid: {payload}")
+    return payload
+
+
+def generate_view(spec_path: Path, out_path: Path) -> Dict[str, Any]:
+    """根据 workflow-spec.yaml 生成人类可读的 workflow 视图。"""
+
+    payload = run_required_json_command(
+        "generate-workflow-view.py",
+        [
+            sys.executable,
+            str(script_dir() / "generate-workflow-view.py"),
+            "--spec",
+            str(spec_path),
+            "--out",
+            str(out_path),
+            "--json",
+        ],
+    )
+    if payload.get("status") != "PASS":
+        raise RuntimeError(f"workflow view generation failed: {payload}")
+    return payload
+
+
+def run_managed_apply(target_root: Path, run_root: Path, candidate_root: Path) -> Tuple[Dict[str, Any], Dict[str, Any], bool]:
+    """为 develop 流程执行候选资产的规划与应用。
+
+    这里同时返回 plan 和最终 result，因为入口摘要需要保留完整的变更过程，
+    而不只是应用后的结果。
+    """
+
+    plan = run_required_json_command(
+        "managed-assets.py plan",
+        [
+            sys.executable,
+            str(script_dir() / "managed-assets.py"),
+            "plan",
+            "--target-root",
+            str(target_root),
+            "--run-root",
+            str(run_root),
+            "--source-root",
+            str(candidate_root),
+            "--json",
+        ],
+    )
+    code, payload, text = run_command(
+        [
+            sys.executable,
+            str(script_dir() / "managed-assets.py"),
+            "apply-staged",
+            "--target-root",
+            str(target_root),
+            "--run-root",
+            str(run_root),
+            "--source-root",
+            str(candidate_root),
+            "--json",
+        ]
+    )
+    if code not in {0, 2}:
+        raise RuntimeError(f"managed-assets.py apply-staged failed: {text}")
+    if not payload:
+        raise RuntimeError("managed-assets.py apply-staged did not return JSON output")
+    return plan, payload, bool(payload.get("conflicts"))
+
+
+def run_runner(
+    *,
+    spec_path: Path,
+    run_root: Path,
+    target_root: Path,
+    plugin_root: Path,
+    request: str,
+    intent: str,
+    auto_approve: bool,
+    approval_status: str,
+    strict_route: bool,
+    runtime_provider: str,
+    provider_command: str,
+    claude_bin: str,
+) -> Tuple[int, Dict[str, Any]]:
+    """调用控制面 runner，并保留非 PASS 的终态结果。"""
+
+    cmd = [
+        sys.executable,
+        str(script_dir() / "workflow-runner.py"),
+        "run",
+        "--spec",
+        str(spec_path),
+        "--run-root",
+        str(run_root),
+        "--target-root",
+        str(target_root),
+        "--plugin-root",
+        str(plugin_root),
+        "--request",
+        request,
+        "--intent",
+        intent,
+        "--runtime-provider",
+        runtime_provider,
+        "--provider-command",
+        provider_command,
+        "--claude-bin",
+        claude_bin,
+        "--json",
+    ]
+    if auto_approve:
+        cmd.append("--auto-approve")
+    if approval_status:
+        cmd.extend(["--approval-status", approval_status])
+    if strict_route:
+        cmd.append("--strict-route")
+    code, payload, text = run_command(cmd)
+    if code not in {0, 2, 3}:
+        raise RuntimeError(f"workflow-runner.py failed: {text}")
+    if not payload:
+        raise RuntimeError("workflow-runner.py did not return JSON output")
+    return code, payload
+
+
+def validate_run_state(run_root: Path) -> Dict[str, Any]:
+    """在 runner 完成后校验落盘的 state.json。"""
+
+    payload = run_required_json_command(
+        "validate-run-state.py",
+        [
+            sys.executable,
+            str(script_dir() / "validate-run-state.py"),
+            "--state",
+            str(run_root / "state.json"),
+            "--json",
+        ],
+    )
+    if payload.get("status") != "PASS":
+        raise RuntimeError(f"run state is not valid: {payload}")
+    return payload
+
+
+def command_run(args: argparse.Namespace) -> int:
+    """执行确定性的 WorkflowProgram 产品入口流水线。
+
+    它负责把提示词层的产品技能桥接到真实脚本级控制面：
+    - 解析有效入口和 intent
+    - 校验并渲染 spec
+    - 在 develop 流程中按需执行 managed apply
+    - 运行控制面 runner
+    - 校验持久化状态
+    - 写出单一的入口编排摘要，供后续审计使用
+    """
+
+    spec_path = Path(args.spec).resolve()
+    run_root = Path(args.run_root).resolve()
+    target_root = Path(args.target_root).resolve()
+    plugin_root = resolve_plugin_root(args.plugin_root)
+    candidate_root = Path(args.candidate_root).resolve() if args.candidate_root else (run_root / "outputs" / "candidate" / ".claude")
+    run_root.mkdir(parents=True, exist_ok=True)
+
+    # 在碰 spec 之前先固化路由证据，保证每次运行都能回答“为什么执行了这个入口”。
+    resolved = resolve_requested_entry(
+        request=args.request,
+        target_root=target_root,
+        explicit_entry_skill=args.entry_skill.strip(),
+        strict_route=bool(args.strict_route),
+    )
+    intent = str(resolved["intent"])
+    entry_skill = str(resolved["entry_skill"])
+
+    spec_validation = validate_spec(spec_path)
+    view_path = run_root / "workflow-view.md"
+    view_generation = generate_view(spec_path, view_path)
+
+    managed_plan: Dict[str, Any] | None = None
+    managed_result: Dict[str, Any] | None = None
+    runner_code: int | None = None
+    runner_summary: Dict[str, Any] | None = None
+    state_validation: Dict[str, Any] | None = None
+    stopped_before_runner = False
+    final_status = "PASS"
+
+    # 只有 develop 流程允许修改 TARGET_ROOT。
+    # audit/iterate/validate 流程会直接进入控制面 runner。
+    if intent == "develop":
+        if not candidate_root.exists():
+            raise RuntimeError(f"develop flow requires candidate root before orchestration: {candidate_root}")
+        if not candidate_root.is_dir():
+            raise RuntimeError(f"candidate root must be a directory: {candidate_root}")
+        managed_plan, managed_result, conflicts = run_managed_apply(target_root, run_root, candidate_root)
+        # managed apply 冲突要在 runner 之前中止。
+        # 这样既能保持 S4 归属清晰，也避免在写入门禁未打开时假装控制面已经执行。
+        if conflicts:
+            stopped_before_runner = True
+            final_status = "CONFLICT"
+        else:
+            runner_code, runner_summary = run_runner(
+                spec_path=spec_path,
+                run_root=run_root,
+                target_root=target_root,
+                plugin_root=plugin_root,
+                request=args.request,
+                intent=intent,
+                auto_approve=bool(args.auto_approve),
+                approval_status=args.approval_status,
+                strict_route=bool(args.strict_route),
+                runtime_provider=args.runtime_provider,
+                provider_command=args.provider_command,
+                claude_bin=args.claude_bin,
+            )
+            state_validation = validate_run_state(run_root)
+    else:
+        runner_code, runner_summary = run_runner(
+            spec_path=spec_path,
+            run_root=run_root,
+            target_root=target_root,
+            plugin_root=plugin_root,
+            request=args.request,
+            intent=intent,
+            auto_approve=bool(args.auto_approve),
+            approval_status=args.approval_status,
+            strict_route=bool(args.strict_route),
+            runtime_provider=args.runtime_provider,
+            provider_command=args.provider_command,
+            claude_bin=args.claude_bin,
+        )
+        state_validation = validate_run_state(run_root)
+
+    # 如果已经进入 runner，则最终入口 verdict 以 runner 结果为准；
+    # 否则保留进入 runner 之前的编排状态，例如 managed conflict。
+    if runner_summary is not None:
+        final_status = str(runner_summary.get("status", "PASS")).strip() or final_status
+
+    summary = {
+        "generated_at": utc_now(),
+        "run_id": run_root.name,
+        "request": args.request,
+        "spec": str(spec_path),
+        "run_root": str(run_root),
+        "target_root": str(target_root),
+        "plugin_root": str(plugin_root),
+        "resolved_intent": intent,
+        "resolved_entry_skill": entry_skill,
+        "route_source": resolved["route_source"],
+        "route_mismatch": resolved["route_mismatch"],
+        "route_payload": resolved["route_payload"],
+        "view_path": str(view_path),
+        "candidate_root": str(candidate_root) if intent == "develop" else None,
+        "spec_validation": {
+            "status": spec_validation.get("status"),
+            "error_count": len(spec_validation.get("errors", [])),
+            "warning_count": len(spec_validation.get("warnings", [])),
+        },
+        "view_generation": view_generation,
+        "managed_plan_path": str(run_root / "outputs" / "managed-change-plan.json") if managed_plan else None,
+        "managed_result_path": str(run_root / "outputs" / "managed-change-result.json") if managed_result else None,
+        "managed_conflict_count": len(managed_result.get("conflicts", [])) if managed_result else 0,
+        "runner_status_code": runner_code,
+        "runner_summary": runner_summary,
+        "state_validation": state_validation,
+        "stopped_before_runner": stopped_before_runner,
+        "status": final_status,
+    }
+    summary_path = run_root / "outputs" / "stages" / "entry-orchestration-summary.json"
+    write_json(summary_path, summary)
+
+    if args.json:
+        print(json.dumps(summary, ensure_ascii=False, indent=2))
+    else:
+        print(
+            f"[{summary['status']}] entry={entry_skill} intent={intent} "
+            f"run={run_root.name} summary={summary_path}"
+        )
+
+    if final_status == "CONFLICT":
+        return 2
+    if final_status == "BLOCKED":
+        return 2
+    if final_status == "ENVIRONMENT-SKIP":
+        return 3
+    return 0
+
+
+def main() -> int:
+    """带统一错误整形逻辑的 CLI 入口。"""
+
+    args = parse_args()
+    try:
+        if args.command == "run":
+            return command_run(args)
+        return 1
+    except Exception as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        return 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

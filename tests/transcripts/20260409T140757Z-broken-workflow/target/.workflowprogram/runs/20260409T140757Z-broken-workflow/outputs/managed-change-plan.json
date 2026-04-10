@@ -1,0 +1,16 @@
+{
+  "generated_at": "2026-04-09T14:07:58Z",
+  "entries": [
+    {
+      "relative_path": ".claude/settings.json",
+      "source_path": "/mnt/d/Code/WorkflowProgram-CN/tests/transcripts/20260409T140757Z-broken-workflow/target/.workflowprogram/runs/20260409T140757Z-broken-workflow/outputs/candidate/.claude/settings.json",
+      "target_path": "/mnt/d/Code/WorkflowProgram-CN/tests/transcripts/20260409T140757Z-broken-workflow/target/.claude/settings.json",
+      "decision": "update"
+    }
+  ],
+  "summary": {
+    "create": 0,
+    "update": 1,
+    "conflict": 0
+  }
+}

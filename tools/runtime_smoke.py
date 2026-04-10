@@ -1,41 +1,83 @@
 #!/usr/bin/env python3
-"""Runtime smoke harness for WorkflowProgram-CN.
+"""WorkflowProgram-CN 的 runtime smoke harness。
 
-This script runs a minimal end-to-end plugin invocation against a copied fixture
-workspace and writes runtime evidence into RUN_ROOT under the copied target.
+该脚本会在复制出来的 fixture workspace 上执行一次最小端到端插件调用，
+并把运行证据写入复制目标下的 RUN_ROOT。
 """
 
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
+import shlex
 import shutil
 import subprocess
 import sys
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
+
+import yaml
+
+SCRIPT_ROOT = Path(__file__).resolve().parents[1] / ".claude" / "scripts"
+if str(SCRIPT_ROOT) not in sys.path:
+    sys.path.insert(0, str(SCRIPT_ROOT))
+
+from runtime_host import RuntimeHostInvocation, invoke_runtime_host, probe_runtime_host, resolve_runtime_host_config
 
 
 FIXTURE_PRESETS: Dict[str, Dict[str, str]] = {
     "empty-project": {
+        "workspace_fixture": "empty-project",
         "entry_skill": "workflowprogram-develop",
         "request": "为当前项目设计一个最小 Claude Code workflow，至少包含 settings、一个 skill 和一个 rule 文件",
+        "contract_categories": "entry,flow,artifacts,failure",
     },
     "existing-workflow": {
+        "workspace_fixture": "existing-workflow",
         "entry_skill": "workflowprogram-audit",
         "request": "审计当前项目中的 workflow 结构，并输出结构问题、模式偏离和下一步建议",
+        "contract_categories": "entry,flow,artifacts,failure",
     },
     "broken-workflow": {
+        "workspace_fixture": "broken-workflow",
         "entry_skill": "workflowprogram-validate",
         "request": "验证当前项目中的 workflow 资产，并输出失败项、影响范围和修复优先级",
+        "contract_categories": "entry,artifacts,failure",
+    },
+    "invalid-entry": {
+        "workspace_fixture": "empty-project",
+        "entry_skill": "missing-workflowprogram-entry",
+        "request": "验证非法入口时是否被正确拒绝",
+        "contract_categories": "entry,failure",
+    },
+    "missing-args": {
+        "workspace_fixture": "empty-project",
+        "entry_skill": "workflowprogram-develop",
+        "request": "",
+        "contract_categories": "entry,failure",
+    },
+    "external-write": {
+        "workspace_fixture": "empty-project",
+        "entry_skill": "workflowprogram-develop",
+        "request": "触发 external-write 验证路径",
+        "contract_categories": "boundary,artifacts,failure",
+    },
+    "managed-conflict": {
+        "workspace_fixture": "existing-workflow",
+        "entry_skill": "workflowprogram-develop",
+        "request": "触发 managed-conflict 验证路径",
+        "contract_categories": "boundary,artifacts,failure",
     },
 }
 
 
 @dataclass
 class RunVerdict:
+    """smoke harness 在 S5 judge 前后统一使用的归一化 verdict。"""
+
     result: str
     category: Optional[str]
     message: str
@@ -43,54 +85,132 @@ class RunVerdict:
     subagent_evidence: bool
 
 
+@dataclass
+class InvocationResult:
+    """记录 runtime host 调用结果以及由此推导出的初步 verdict。"""
+
+    command_text: str
+    stdout: str
+    stderr: str
+    parsed: Dict[str, Any]
+    verdict: RunVerdict
+
+
 class RuntimeSmokeError(Exception):
+    """表示在 provider 结果进入 judge 之前，harness 自身发生了失败。"""
+
     pass
 
 
 def now_utc() -> datetime:
+    """返回去掉微秒的当前 UTC 时间。"""
+
     return datetime.now(timezone.utc).replace(microsecond=0)
 
 
 def iso_now() -> str:
+    """返回 smoke 证据中统一使用的标准时间戳格式。"""
+
     return now_utc().isoformat().replace("+00:00", "Z")
 
 
 def make_run_id(fixture: str) -> str:
-    return f"{now_utc().strftime('%Y%m%dT%H%M%SZ')}-{fixture}"
+    """为一次 smoke 运行生成唯一的 transcript/run 目录 id。"""
+
+    return f"{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S%fZ')}-{fixture}"
 
 
 def write_text(path: Path, content: str) -> None:
+    """创建父目录后写入 UTF-8 文本。"""
+
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(content, encoding="utf-8", newline="\n")
 
 
 def write_json(path: Path, payload: Dict[str, Any]) -> None:
+    """写出规范化 JSON。"""
+
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8", newline="\n")
 
 
 def append_event(path: Path, payload: Dict[str, Any]) -> None:
+    """向 smoke JSONL 事件流追加一条结构化事件。"""
+
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("a", encoding="utf-8", newline="\n") as handle:
         handle.write(json.dumps(payload, ensure_ascii=False) + "\n")
 
 
-def read_json_from_output(stdout: str, stderr: str) -> Optional[Dict[str, Any]]:
-    candidates = []
-    for stream in (stdout, stderr):
-        for line in stream.splitlines():
-            stripped = line.strip()
-            if stripped.startswith("{") and stripped.endswith("}"):
-                candidates.append(stripped)
-    for raw in reversed(candidates):
-        try:
-            return json.loads(raw)
-        except json.JSONDecodeError:
-            continue
-    return None
+def preprocess_yaml_text(text: str) -> str:
+    """在解析 YAML 前去掉 BOM 和开头的 HTML 注释。"""
+
+    cleaned = text.lstrip("\ufeff")
+    while True:
+        stripped = cleaned.lstrip()
+        if not stripped.startswith("<!--"):
+            return cleaned
+        end = stripped.find("-->")
+        if end < 0:
+            return cleaned
+        cleaned = stripped[end + 3 :].lstrip("\r\n")
+
+
+def load_yaml_mapping(path: Path) -> Optional[Dict[str, Any]]:
+    """在存在运行时生成的 workflow spec 时加载其 YAML 映射。"""
+
+    if not path.exists():
+        return None
+    try:
+        payload = yaml.safe_load(preprocess_yaml_text(path.read_text(encoding="utf-8")))
+    except Exception:
+        return None
+    return payload if isinstance(payload, dict) else None
+
+
+def derive_contract_summary(run_root: Path, fixture_meta: Dict[str, str]) -> Dict[str, Any]:
+    """为报告渲染推导 test/runtime contract 摘要。
+
+    如果真实 workflow-spec.yaml 存在，smoke harness 会优先把它当作真源。
+    fixture preset 只用于负例和特别早期的失败路径兜底。
+    """
+
+    spec_path = run_root / "workflow-spec.yaml"
+    spec = load_yaml_mapping(spec_path)
+    if spec is not None:
+        test_contract = spec.get("test_contract", {})
+        runtime_contract = spec.get("runtime_contract", {})
+        if isinstance(test_contract, dict) and test_contract:
+            categories = [name for name in ("entry", "boundary", "flow", "artifacts", "failure") if name in test_contract]
+            failure = test_contract.get("failure", {})
+            implemented_now = failure.get("implemented_now", []) if isinstance(failure, dict) else []
+            environment_skip = runtime_contract.get("environment_skip", []) if isinstance(runtime_contract, dict) else []
+            env_codes = []
+            if isinstance(environment_skip, list):
+                for item in environment_skip:
+                    if isinstance(item, dict) and item.get("code"):
+                        env_codes.append(str(item["code"]))
+            return {
+                "contract_source": "workflow-spec.yaml.test_contract",
+                "contract_categories": categories,
+                "implemented_failure_kinds": implemented_now if isinstance(implemented_now, list) else [],
+                "environment_skip_codes": env_codes,
+                "spec_path": str(spec_path),
+            }
+
+    preset_categories = [item.strip() for item in fixture_meta.get("contract_categories", "").split(",") if item.strip()]
+    return {
+        "contract_source": "fixture_preset",
+        "contract_categories": preset_categories,
+        "implemented_failure_kinds": [],
+        "environment_skip_codes": [],
+        "spec_path": str(spec_path) if spec_path.exists() else None,
+    }
 
 
 def detect_subagent_evidence(text: str) -> bool:
+    """推断自由文本运行输出是否暗示了 subagent/task 活动。"""
+
     lowered = text.lower()
     tokens = [
         "subagentstart",
@@ -102,13 +222,57 @@ def detect_subagent_evidence(text: str) -> bool:
     return any(token in lowered for token in tokens)
 
 
-def snapshot_tree(root: Path) -> list[str]:
+def sha256_file(path: Path) -> str:
+    """为目标目录前后快照中的文件计算哈希。"""
+
+    hasher = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(65536), b""):
+            hasher.update(chunk)
+    return hasher.hexdigest()
+
+
+def snapshot_tree(root: Path) -> List[Dict[str, Any]]:
+    """对根目录下所有文件做快照，供后续基于 diff 的边界检查使用。"""
+
     if not root.exists():
         return []
-    return sorted(str(path.relative_to(root)) for path in root.rglob("*") if path.is_file())
+    entries: List[Dict[str, Any]] = []
+    for path in sorted(root.rglob("*")):
+        if not path.is_file():
+            continue
+        rel_path = str(path.relative_to(root))
+        entries.append(
+            {
+                "path": rel_path,
+                "sha256": sha256_file(path),
+                "size": path.stat().st_size,
+            }
+        )
+    return entries
+
+
+def snapshot_paths(entries: List[Dict[str, Any]]) -> List[str]:
+    """把快照条目投影成相对路径列表。"""
+
+    return [str(item.get("path", "")) for item in entries if str(item.get("path", "")).strip()]
+
+
+def write_snapshot(path: Path, entries: List[Dict[str, Any]]) -> None:
+    """按 S5 judge 需要的格式持久化文件树快照。"""
+
+    write_json(
+        path,
+        {
+            "files": snapshot_paths(entries),
+            "entries": entries,
+        },
+    )
 
 
 def update_state(state_path: Path, **changes: Any) -> Dict[str, Any]:
+    """对 smoke 状态快照应用局部更新。"""
+
     if state_path.exists():
         state = json.loads(state_path.read_text(encoding="utf-8"))
     else:
@@ -120,6 +284,8 @@ def update_state(state_path: Path, **changes: Any) -> Dict[str, Any]:
 
 
 def prepare_workspace(repo_root: Path, fixture: str, run_id: str) -> tuple[Path, Path]:
+    """为单次 smoke 运行把 fixture 复制到隔离的 transcript 工作区。"""
+
     fixture_root = repo_root / "tests" / "fixtures" / fixture
     if not fixture_root.exists():
         raise RuntimeSmokeError(f"Fixture not found: {fixture_root}")
@@ -134,79 +300,64 @@ def prepare_workspace(repo_root: Path, fixture: str, run_id: str) -> tuple[Path,
     return workspace_root, target_root
 
 
-def classify_result(stdout: str, stderr: str, parsed: Optional[Dict[str, Any]], returncode: int) -> RunVerdict:
-    combined = "\n".join(part for part in [stdout.strip(), stderr.strip()] if part)
-    subagent_evidence = detect_subagent_evidence(combined + "\n" + json.dumps(parsed or {}, ensure_ascii=False))
+def run_s5_judge(
+    repo_root: Path,
+    run_root: Path,
+    target_root: Path,
+    verdict: RunVerdict,
+    context: Dict[str, Any],
+    checked_files: list[str],
+    fixture_meta: Dict[str, str],
+) -> Dict[str, Any]:
+    """对收集到的 smoke 证据执行确定性的 S5 judge。"""
 
-    if "Not logged in · Please run /login" in combined:
-        return RunVerdict(
-            result="ENVIRONMENT-SKIP",
-            category="CLAUDE_NOT_LOGGED_IN",
-            message="Claude CLI is installed but not logged in.",
-            is_error=False,
-            subagent_evidence=subagent_evidence,
-        )
-
-    if "Unknown skill:" in combined or "Unknown command" in combined:
-        return RunVerdict(
-            result="FAIL",
-            category="STRUCTURE_FAILURE",
-            message="Plugin entry was not discovered by Claude CLI.",
-            is_error=True,
-            subagent_evidence=subagent_evidence,
-        )
-
-    if parsed is not None:
-        result_text = str(parsed.get("result", ""))
-        is_error = bool(parsed.get("is_error", False))
-        if is_error:
-            return RunVerdict(
-                result="FAIL",
-                category="RUNTIME_FAILURE",
-                message=result_text or "Claude CLI returned an error result.",
-                is_error=True,
-                subagent_evidence=subagent_evidence,
-            )
-        return RunVerdict(
-            result="PASS",
-            category=None,
-            message=result_text or "Claude CLI completed successfully.",
-            is_error=False,
-            subagent_evidence=subagent_evidence,
-        )
-
-    if returncode != 0:
-        return RunVerdict(
-            result="FAIL",
-            category="RUNTIME_FAILURE",
-            message="Claude CLI exited with non-zero status without structured JSON output.",
-            is_error=True,
-            subagent_evidence=subagent_evidence,
-        )
-
-    return RunVerdict(
-        result="FAIL",
-        category="EVIDENCE_FAILURE",
-        message="No structured Claude CLI JSON output was captured.",
-        is_error=True,
-        subagent_evidence=subagent_evidence,
-    )
-
-
-def build_command(claude_bin: str, plugin_root: Path, entry_skill: str, request: str) -> list[str]:
-    invocation = f"/{entry_skill} {request}".strip()
-    return [
-        claude_bin,
-        "-p",
-        "--plugin-dir",
-        str(plugin_root),
-        "--output-format",
-        "json",
-        invocation,
+    cmd = [
+        sys.executable,
+        str(repo_root / ".claude" / "scripts" / "workflow-s5-judge.py"),
+        "--run-root",
+        str(run_root),
+        "--target-root",
+        str(target_root),
+        "--result",
+        verdict.result,
+        "--failure-code",
+        verdict.category or "",
+        "--summary-message",
+        verdict.message,
+        "--entry-skill",
+        str(context.get("entry_skill", "")),
+        "--request",
+        str(context.get("request", "")),
+        "--fixture",
+        str(context.get("fixture", "")),
+        "--provider",
+        str(context.get("runtime_provider", "")),
+        "--fallback-contract-categories",
+        fixture_meta.get("contract_categories", ""),
+        "--json",
     ]
+    for rel_path in checked_files:
+        cmd.extend(["--checked-file", rel_path])
+    completed = subprocess.run(cmd, capture_output=True, text=True, check=False)
+    if completed.returncode != 0:
+        raise RuntimeSmokeError(
+            f"S5 judge failed: {completed.stderr.strip() or completed.stdout.strip() or completed.returncode}"
+        )
+    try:
+        payload = json.loads(completed.stdout)
+    except json.JSONDecodeError as exc:
+        raise RuntimeSmokeError(f"S5 judge returned invalid JSON: {exc}") from exc
+    return payload if isinstance(payload, dict) else {}
 
 
 def write_report(report_path: Path, context: Dict[str, Any], verdict: RunVerdict, state: Dict[str, Any], target_claude_files: list[str]) -> None:
+    """写出人类可读的 runtime validation 报告。
+
+    这份报告现在更多是 fallback/harness 视图；
+    权威的最终 verdict 仍然以 workflow-s5-judge.py 为准。
+    """
+
+    contract_summary = context.get("contract_summary", {})
     lines = [
         "# Runtime Validation Report",
         "",
@@ -221,12 +372,28 @@ def write_report(report_path: Path, context: Dict[str, Any], verdict: RunVerdict
         f"- Target root: `{context['target_root']}`",
         f"- Plugin root: `{context['plugin_root']}`",
         f"- Plugin build manifest: `{context.get('plugin_build_manifest', 'not-captured')}`",
+        f"- Contract source: `{contract_summary.get('contract_source', 'unknown')}`",
+        f"- Contract categories: `{', '.join(contract_summary.get('contract_categories', [])) or 'none'}`",
         f"- Subagent evidence: `{str(state['subagent_evidence']).lower()}`",
         "",
         "## Message",
         "",
         verdict.message,
         "",
+    ])
+    implemented_failure_kinds = contract_summary.get("implemented_failure_kinds", [])
+    environment_skip_codes = contract_summary.get("environment_skip_codes", [])
+    if implemented_failure_kinds or environment_skip_codes:
+        lines.extend([
+            "## Contract Details",
+            "",
+        ])
+        if implemented_failure_kinds:
+            lines.extend(f"- Implemented failure kind: `{item}`" for item in implemented_failure_kinds)
+        if environment_skip_codes:
+            lines.extend(f"- Environment skip code: `{item}`" for item in environment_skip_codes)
+        lines.append("")
+    lines.extend([
         "## Output Snapshot",
         "",
     ])
@@ -237,19 +404,25 @@ def write_report(report_path: Path, context: Dict[str, Any], verdict: RunVerdict
     write_text(report_path, "\n".join(lines) + "\n")
 
 
-def write_transcript(transcript_path: Path, command: list[str], stdout: str, stderr: str, verdict: RunVerdict, context: Dict[str, Any]) -> None:
+def write_transcript(transcript_path: Path, command_text: str, stdout: str, stderr: str, verdict: RunVerdict, context: Dict[str, Any]) -> None:
+    """写出供 S5 和人工审查使用的原始调用 transcript。"""
+
+    contract_summary = context.get("contract_summary", {})
     lines = [
         "# Runtime Smoke Transcript",
         "",
         f"- Run ID: `{context['run_id']}`",
         f"- Fixture: `{context['fixture']}`",
         f"- Entry skill: `{context['entry_skill']}`",
+        f"- Runtime provider: `{context.get('runtime_provider', 'unknown')}`",
         f"- Result: `{verdict.result}`",
+        f"- Contract source: `{contract_summary.get('contract_source', 'unknown')}`",
+        f"- Contract categories: `{', '.join(contract_summary.get('contract_categories', [])) or 'none'}`",
         "",
         "## Command",
         "",
         "```bash",
-        " ".join(command),
+        command_text,
         "```",
         "",
         "## Stdout",
@@ -267,12 +440,114 @@ def write_transcript(transcript_path: Path, command: list[str], stdout: str, std
     write_text(transcript_path, "\n".join(lines) + "\n")
 
 
+def write_validation_summary(
+    summary_path: Path,
+    verdict: RunVerdict,
+    checked_files: list[str],
+    target_claude_files: list[str],
+    contract_summary: Dict[str, Any],
+) -> None:
+    """在 Markdown 报告旁边写一份轻量级摘要载荷。"""
+
+    payload = {
+        "verdict": verdict.result,
+        "failure_kind": verdict.category or "none",
+        "checked_files": checked_files,
+        "contract_source": contract_summary.get("contract_source"),
+        "contract_categories": contract_summary.get("contract_categories", []),
+        "implemented_failure_kinds": contract_summary.get("implemented_failure_kinds", []),
+        "environment_skip_codes": contract_summary.get("environment_skip_codes", []),
+        "target_claude_files": target_claude_files,
+        "summary": verdict.message,
+    }
+    write_json(summary_path, payload)
+
+
+def ensure_progress_outputs(run_root: Path, context: Dict[str, Any], verdict: RunVerdict) -> None:
+    """当被调 provider 未生成 progress 产物时进行补齐。"""
+
+    progress_root = run_root / "outputs" / "progress"
+    current_path = progress_root / "current-progress.json"
+    milestones_path = progress_root / "milestones.jsonl"
+    user_progress_path = progress_root / "user-progress.md"
+
+    current_stage = "S5" if verdict.result == "ENVIRONMENT-SKIP" else "finished"
+    last_status = "warn" if verdict.result == "ENVIRONMENT-SKIP" else ("ok" if verdict.result == "PASS" else "error")
+    next_action = (
+        "fix environment and rerun"
+        if verdict.result == "ENVIRONMENT-SKIP"
+        else ("complete" if verdict.result == "PASS" else "inspect runtime failure and rerun")
+    )
+
+    if not current_path.exists():
+        write_json(
+            current_path,
+            {
+                "run_id": context["run_id"],
+                "current_stage": current_stage,
+                "current_node": "runtime_smoke",
+                "percent": 100 if verdict.result == "PASS" else 60,
+                "last_status": last_status,
+                "last_verdict": verdict.result,
+                "approval_status": "unknown",
+                "next_action": next_action,
+                "updated_at": iso_now(),
+            },
+        )
+    if not milestones_path.exists():
+        append_event(
+            milestones_path,
+            {
+                "ts": iso_now(),
+                "stage": current_stage,
+                "node": "runtime_smoke",
+                "event": "StageCompleted",
+                "status": last_status,
+                "result": verdict.result,
+                "artifact_refs": [],
+            },
+        )
+    if not user_progress_path.exists():
+        write_text(
+            user_progress_path,
+            "\n".join(
+                [
+                    "# Workflow Progress",
+                    "",
+                    f"- run_id: `{context['run_id']}`",
+                    f"- current_stage: `{current_stage}`",
+                    "- current_node: `runtime_smoke`",
+                    f"- percent: `{100 if verdict.result == 'PASS' else 60}`",
+                    f"- last_status: `{last_status}`",
+                    f"- last_verdict: `{verdict.result}`",
+                    "- approval_status: `unknown`",
+                    f"- updated_at: `{iso_now()}`",
+                    "",
+                    "## 历史关键节点结果",
+                    "",
+                    f"- runtime_smoke | {verdict.result} | {verdict.category or 'none'}",
+                    "",
+                    "## Next Action",
+                    "",
+                    f"- {next_action}",
+                    "",
+                ]
+            ),
+        )
+
+
 def main() -> int:
+    """端到端运行一个 smoke fixture，并输出最终 JSON 摘要。"""
+
     parser = argparse.ArgumentParser(description="Run runtime smoke validation for WorkflowProgram-CN")
     parser.add_argument("--fixture", default="empty-project", choices=sorted(FIXTURE_PRESETS.keys()))
     parser.add_argument("--entry-skill", help="Override fixture default entry skill")
     parser.add_argument("--request", help="Override fixture default request text")
     parser.add_argument("--claude-bin", default="claude")
+    parser.add_argument("--runtime-provider", help="Runtime host provider")
+    parser.add_argument("--provider-command", help="Provider command for runtime-provider=command_adapter")
+    parser.add_argument("--execution-provider", help=argparse.SUPPRESS)
+    parser.add_argument("--execution-command", help=argparse.SUPPRESS)
     parser.add_argument("--plugin-root", help="Override plugin root, defaults to dist/plugin")
     parser.add_argument("--timeout", type=int, default=90)
     parser.add_argument("--json", action="store_true", help="Print final summary as JSON")
@@ -284,6 +559,11 @@ def main() -> int:
     fixture_meta = FIXTURE_PRESETS[args.fixture]
     entry_skill = args.entry_skill or fixture_meta["entry_skill"]
     request = args.request or fixture_meta["request"]
+    runtime_host = resolve_runtime_host_config(
+        provider=args.runtime_provider or args.execution_provider or "",
+        claude_bin=args.claude_bin,
+        provider_command=args.provider_command or args.execution_command or "",
+    )
     run_id = make_run_id(args.fixture)
 
     workspace_root = repo_root / "tests" / "transcripts" / run_id
@@ -300,8 +580,11 @@ def main() -> int:
         "entry_skill": entry_skill,
         "request": request,
         "claude_bin": args.claude_bin,
+        "runtime_provider": runtime_host.provider,
+        "provider_command": runtime_host.provider_command or None,
         "mode": "runtime-smoke",
         "plugin_build_manifest": str(plugin_build_manifest) if plugin_build_manifest.exists() else None,
+        "contract_summary": derive_contract_summary(run_root, fixture_meta),
     }
 
     def emit(event_type: str, stage: str, status: str, message: str) -> None:
@@ -326,7 +609,10 @@ def main() -> int:
         if not plugin_root.exists():
             raise RuntimeSmokeError(f"Plugin root not found: {plugin_root}")
 
-        workspace_root, target_root = prepare_workspace(repo_root, args.fixture, run_id)
+        # 每次 smoke 运行都基于复制出来的 fixture，
+        # 这样源 fixture 保持干净，且本次运行会留下可回放的 transcript 目录。
+        workspace_fixture = fixture_meta.get("workspace_fixture", args.fixture)
+        workspace_root, target_root = prepare_workspace(repo_root, workspace_fixture, run_id)
         run_root = target_root / ".workflowprogram" / "runs" / run_id
         outputs_root = run_root / "outputs"
         outputs_root.mkdir(parents=True, exist_ok=True)
@@ -344,133 +630,202 @@ def main() -> int:
             started_at=context["started_at"],
         )
         emit("RunStarted", "prepare", "ok", f"Preparing fixture {args.fixture}")
+        before_target_root = snapshot_tree(target_root)
+        before_target_claude = snapshot_tree(target_root / ".claude")
+        write_snapshot(outputs_root / "target-root-before.json", before_target_root)
+        write_snapshot(outputs_root / "target-claude-before.json", before_target_claude)
 
-        claude_path = shutil.which(args.claude_bin)
-        if claude_path is None:
-            verdict = RunVerdict(
-                result="ENVIRONMENT-SKIP",
-                category="CLAUDE_NOT_FOUND",
-                message=f"Claude binary not found: {args.claude_bin}",
-                is_error=False,
-                subagent_evidence=False,
-            )
-            emit("EnvironmentSkip", "prepare", "warn", verdict.message)
-            stdout = ""
-            stderr = ""
-            command = [args.claude_bin]
-            write_text(outputs_root / "stdout.log", stdout)
-            write_text(outputs_root / "stderr.log", stderr)
-        else:
-            update_state(
-                run_root / "state.json",
-                status="running",
-                stage="invoke",
-                result=None,
-                category=None,
-                subagent_evidence=False,
-            )
-            emit("TaskCreated", "invoke", "ok", f"Invoking /{entry_skill} against copied fixture")
-            command = build_command(args.claude_bin, plugin_root, entry_skill, request)
-
-            try:
-                completed = subprocess.run(
-                    command,
-                    cwd=target_root,
-                    capture_output=True,
-                    text=True,
-                    timeout=args.timeout,
-                    check=False,
-                )
-                stdout = completed.stdout
-                stderr = completed.stderr
-                parsed = read_json_from_output(stdout, stderr)
-                verdict = classify_result(stdout, stderr, parsed, completed.returncode)
-                if verdict.result == "ENVIRONMENT-SKIP":
-                    emit("EnvironmentSkip", "invoke", "warn", verdict.message)
-            except subprocess.TimeoutExpired as exc:
-                stdout = exc.stdout or ""
-                stderr = exc.stderr or ""
-                verdict = RunVerdict(
-                    result="FAIL",
-                    category="RUNTIME_FAILURE",
-                    message=f"Claude CLI timed out after {args.timeout}s.",
-                    is_error=True,
-                    subagent_evidence=False,
-                )
-                emit("RuntimeError", "invoke", "error", verdict.message)
-                command = build_command(args.claude_bin, plugin_root, entry_skill, request)
-
-            emit("TaskCompleted", "invoke", "ok" if not verdict.is_error else "error", verdict.message)
-
-            target_claude_files = snapshot_tree(target_root / ".claude")
-            write_json(outputs_root / "target-claude-files.json", {"files": target_claude_files})
-            write_json(outputs_root / "target-root-files.json", {"files": snapshot_tree(target_root)})
-            if plugin_build_manifest.exists():
-                shutil.copy2(plugin_build_manifest, outputs_root / "plugin-build-manifest.json")
-                emit("OutputWritten", "invoke", "ok", "Captured plugin build manifest into RUN_ROOT outputs")
-            write_text(outputs_root / "stdout.log", stdout)
-            write_text(outputs_root / "stderr.log", stderr)
-            update_state(
-                run_root / "state.json",
-                status="completed" if verdict.result != "ENVIRONMENT-SKIP" else "skipped",
-                stage="finished",
-                result=verdict.result,
-                category=verdict.category,
-                subagent_evidence=verdict.subagent_evidence,
-            )
-            write_transcript(run_root / "transcript.md", command, stdout, stderr, verdict, context)
-            write_report(run_root / "validation-runtime-report.md", context, verdict, json.loads((run_root / "state.json").read_text(encoding="utf-8")), target_claude_files)
-            emit("RunFinished", "finished", "ok" if verdict.result == "PASS" else "warn", f"Run finished with result {verdict.result}")
-
-            summary = {
-                "run_id": run_id,
-                "fixture": args.fixture,
-                "entry_skill": entry_skill,
-                "result": verdict.result,
-                "category": verdict.category,
-                "run_root": str(run_root),
-                "target_root": str(target_root),
-            }
-            if args.json:
-                print(json.dumps(summary, ensure_ascii=False, indent=2))
-            else:
-                print(f"Result: {verdict.result}")
-                if verdict.category:
-                    print(f"Category: {verdict.category}")
-                print(f"Run root: {run_root}")
-            return 0 if verdict.result in {"PASS", "ENVIRONMENT-SKIP"} else 1
-
-        # Environment skip path before workspace copy.
-        write_text(run_root / "transcript.md", "# Runtime Smoke Transcript\n\nClaude binary was not found.\n")
         update_state(
             run_root / "state.json",
-            status="skipped",
+            status="running",
+            stage="invoke",
+            result=None,
+            category=None,
+            subagent_evidence=False,
+        )
+        emit("TaskCreated", "invoke", "ok", f"Invoking provider={runtime_host.provider} for /{entry_skill}")
+        # 先做 probe，这样环境失败会产出结构化 skip，
+        # 而不是低信号的子进程错误。
+        host_probe = probe_runtime_host(runtime_host)
+        if not host_probe.available:
+            host_invocation = RuntimeHostInvocation(
+                provider=runtime_host.provider,
+                result="ENVIRONMENT-SKIP",
+                failure_code="RUNTIME_HOST_MISSING",
+                message=host_probe.message,
+                is_error=False,
+                parsed={
+                    "provider": runtime_host.provider,
+                    "probe_available": host_probe.available,
+                    "probe_ready": host_probe.ready,
+                    "probe_message": host_probe.message,
+                },
+            )
+        elif not host_probe.ready:
+            host_invocation = RuntimeHostInvocation(
+                provider=runtime_host.provider,
+                result="ENVIRONMENT-SKIP",
+                failure_code="RUNTIME_HOST_NOT_READY",
+                message=host_probe.message,
+                is_error=False,
+                parsed={
+                    "provider": runtime_host.provider,
+                    "probe_available": host_probe.available,
+                    "probe_ready": host_probe.ready,
+                    "probe_message": host_probe.message,
+                },
+            )
+        else:
+            try:
+                host_invocation = invoke_runtime_host(
+                    runtime_host,
+                    plugin_root,
+                    target_root,
+                    run_root,
+                    entry_skill,
+                    request,
+                    args.timeout,
+                    fixture=args.fixture,
+                )
+            except RuntimeError as exc:
+                raise RuntimeSmokeError(str(exc)) from exc
+        invocation = InvocationResult(
+            command_text=" ".join(shlex.quote(item) for item in host_invocation.command) if host_invocation.command else f"<provider={runtime_host.provider}>",
+            stdout=host_invocation.stdout,
+            stderr=host_invocation.stderr,
+            parsed=host_invocation.to_dict(),
+            verdict=RunVerdict(
+                result=host_invocation.result,
+                category=host_invocation.failure_code or None,
+                message=host_invocation.message,
+                is_error=host_invocation.is_error,
+                subagent_evidence=host_invocation.subagent_evidence,
+            ),
+        )
+
+        verdict = invocation.verdict
+        if verdict.result == "ENVIRONMENT-SKIP":
+            emit("EnvironmentSkip", "invoke", "warn", verdict.message)
+        elif verdict.is_error:
+            emit("RuntimeError", "invoke", "error", verdict.message)
+
+        emit("TaskCompleted", "invoke", "ok" if not verdict.is_error else "error", verdict.message)
+
+        # 同时采集 target-root 和仅 .claude 范围的前后快照，
+        # 这样 S5 才能同时推断交付情况与边界违规。
+        after_target_claude = snapshot_tree(target_root / ".claude")
+        after_target_root = snapshot_tree(target_root)
+        write_snapshot(outputs_root / "target-claude-before.json", before_target_claude)
+        write_snapshot(outputs_root / "target-claude-files.json", after_target_claude)
+        write_snapshot(outputs_root / "target-root-before.json", before_target_root)
+        write_snapshot(outputs_root / "target-root-files.json", after_target_root)
+        write_json(
+            outputs_root / "runtime-provider-result.json",
+            invocation.parsed,
+        )
+        if plugin_build_manifest.exists():
+            shutil.copy2(plugin_build_manifest, outputs_root / "plugin-build-manifest.json")
+            emit("OutputWritten", "invoke", "ok", "Captured plugin build manifest into RUN_ROOT outputs")
+        write_text(outputs_root / "stdout.log", invocation.stdout)
+        write_text(outputs_root / "stderr.log", invocation.stderr)
+        update_state(
+            run_root / "state.json",
+            status="completed" if verdict.result != "ENVIRONMENT-SKIP" else "skipped",
             stage="finished",
             result=verdict.result,
             category=verdict.category,
-            subagent_evidence=False,
+            subagent_evidence=verdict.subagent_evidence,
         )
-        write_report(run_root / "validation-runtime-report.md", context, verdict, json.loads((run_root / "state.json").read_text(encoding="utf-8")), [])
-        emit("RunFinished", "finished", "warn", f"Run finished with result {verdict.result}")
+        ensure_progress_outputs(run_root, context, verdict)
+        context["contract_summary"] = derive_contract_summary(run_root, fixture_meta)
+        checked_files = [
+            "context.json",
+            "state.json",
+            "events.jsonl",
+            "transcript.md",
+            "validation-runtime-report.md",
+            "outputs/progress/current-progress.json",
+            "outputs/progress/milestones.jsonl",
+            "outputs/progress/user-progress.md",
+            "outputs/stdout.log",
+            "outputs/stderr.log",
+            "outputs/runtime-provider-result.json",
+            "outputs/target-claude-before.json",
+            "outputs/target-claude-files.json",
+            "outputs/target-root-before.json",
+            "outputs/target-root-files.json",
+        ]
+        for rel_path in (
+            "outputs/managed-change-plan.json",
+            "outputs/managed-change-result.json",
+            "outputs/managed-change-summary.md",
+            "outputs/mock-runtime-host.log",
+            "workflow-spec.md",
+            "outputs/stages/s6-lessons-delta.md",
+        ):
+            if (run_root / rel_path).exists():
+                checked_files.append(rel_path)
+        if plugin_build_manifest.exists():
+            checked_files.append("outputs/plugin-build-manifest.json")
+        write_transcript(run_root / "transcript.md", invocation.command_text, invocation.stdout, invocation.stderr, verdict, context)
+        # provider 给出的初步 verdict 不是最终结果。
+        # judge 会结合 test_contract/runtime_contract 和已记录证据重新评估，
+        # 并可能覆盖原始观测结果。
+        judge_payload = run_s5_judge(
+            repo_root,
+            run_root,
+            target_root,
+            verdict,
+            context,
+            checked_files,
+            fixture_meta,
+        )
+        context["contract_summary"] = {
+            "contract_source": judge_payload.get("contract_source"),
+            "contract_categories": judge_payload.get("contract_categories", []),
+            "implemented_failure_kinds": judge_payload.get("implemented_failure_kinds", []),
+            "environment_skip_codes": judge_payload.get("environment_skip_codes", []),
+        }
+        final_result = str(judge_payload.get("verdict", verdict.result))
+        final_failure_code = str(judge_payload.get("failure_code", verdict.category or "none"))
+        update_state(
+            run_root / "state.json",
+            status="completed" if final_result != "ENVIRONMENT-SKIP" else "skipped",
+            stage="finished",
+            result=final_result,
+            category=final_failure_code,
+            observed_result=verdict.result,
+            observed_category=verdict.category,
+            subagent_evidence=verdict.subagent_evidence,
+        )
+        emit("RunFinished", "finished", "ok" if final_result == "PASS" else "warn", f"Run finished with result {final_result}")
+
         summary = {
             "run_id": run_id,
             "fixture": args.fixture,
             "entry_skill": entry_skill,
-            "result": verdict.result,
-            "category": verdict.category,
+            "runtime_provider": runtime_host.provider,
+            "result": final_result,
+            "category": final_failure_code if final_failure_code != "none" else None,
+            "observed_result": verdict.result,
+            "observed_category": verdict.category,
+            "contract_source": context["contract_summary"].get("contract_source"),
+            "contract_categories": context["contract_summary"].get("contract_categories", []),
             "run_root": str(run_root),
             "target_root": str(target_root),
         }
         if args.json:
             print(json.dumps(summary, ensure_ascii=False, indent=2))
         else:
-            print(f"Result: {verdict.result}")
-            if verdict.category:
-                print(f"Category: {verdict.category}")
+            print(f"Result: {final_result}")
+            if summary["category"]:
+                print(f"Category: {summary['category']}")
             print(f"Run root: {run_root}")
-        return 0
+        return 0 if final_result in {"PASS", "ENVIRONMENT-SKIP"} else 1
 
     except RuntimeSmokeError as exc:
+        # 即使是 harness 级失败，也要进入 judge，
+        # 这样负例路径也能产出与成功路径同形状的 S5 输出。
         emit("RuntimeError", "prepare", "error", str(exc))
         update_state(
             run_root / "state.json",
@@ -487,13 +842,68 @@ def main() -> int:
             is_error=True,
             subagent_evidence=False,
         )
+        context["contract_summary"] = derive_contract_summary(run_root, fixture_meta)
         write_text(run_root / "transcript.md", f"# Runtime Smoke Transcript\n\n{exc}\n")
-        write_report(run_root / "validation-runtime-report.md", context, verdict, json.loads((run_root / "state.json").read_text(encoding="utf-8")), [])
-        emit("RunFinished", "finished", "error", f"Run finished with result {verdict.result}")
-        print(f"Result: {verdict.result}")
-        print(f"Category: {verdict.category}")
-        print(f"Run root: {run_root}")
-        return 1
+        ensure_progress_outputs(run_root, context, verdict)
+        judge_payload = run_s5_judge(
+            repo_root,
+            run_root,
+            target_root,
+            verdict,
+            context,
+            [
+                "context.json",
+                "state.json",
+                "events.jsonl",
+                "transcript.md",
+                "validation-runtime-report.md",
+                "outputs/progress/current-progress.json",
+                "outputs/progress/milestones.jsonl",
+                "outputs/progress/user-progress.md",
+            ],
+            fixture_meta,
+        )
+        context["contract_summary"] = {
+            "contract_source": judge_payload.get("contract_source"),
+            "contract_categories": judge_payload.get("contract_categories", []),
+            "implemented_failure_kinds": judge_payload.get("implemented_failure_kinds", []),
+            "environment_skip_codes": judge_payload.get("environment_skip_codes", []),
+        }
+        final_result = str(judge_payload.get("verdict", verdict.result))
+        final_failure_code = str(judge_payload.get("failure_code", verdict.category or "STRUCTURE_FAILURE"))
+        update_state(
+            run_root / "state.json",
+            status="completed" if final_result != "ENVIRONMENT-SKIP" else "skipped",
+            stage="finished",
+            result=final_result,
+            category=final_failure_code,
+            observed_result=verdict.result,
+            observed_category=verdict.category,
+            subagent_evidence=verdict.subagent_evidence,
+        )
+        emit("RunFinished", "finished", "error", f"Run finished with result {final_result}")
+        summary = {
+            "run_id": run_id,
+            "fixture": args.fixture,
+            "entry_skill": entry_skill,
+            "runtime_provider": runtime_host.provider,
+            "result": final_result,
+            "category": final_failure_code if final_failure_code != "none" else None,
+            "observed_result": verdict.result,
+            "observed_category": verdict.category,
+            "contract_source": context["contract_summary"].get("contract_source"),
+            "contract_categories": context["contract_summary"].get("contract_categories", []),
+            "run_root": str(run_root),
+            "target_root": str(target_root),
+        }
+        if args.json:
+            print(json.dumps(summary, ensure_ascii=False, indent=2))
+        else:
+            print(f"Result: {final_result}")
+            if summary["category"]:
+                print(f"Category: {summary['category']}")
+            print(f"Run root: {run_root}")
+        return 0 if final_result in {"PASS", "ENVIRONMENT-SKIP"} else 1
 
 
 if __name__ == "__main__":

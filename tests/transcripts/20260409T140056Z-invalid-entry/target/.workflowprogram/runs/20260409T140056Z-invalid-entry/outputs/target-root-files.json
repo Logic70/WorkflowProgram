@@ -1,0 +1,42 @@
+{
+  "files": [
+    ".workflowprogram/runs/20260409T140056Z-invalid-entry/context.json",
+    ".workflowprogram/runs/20260409T140056Z-invalid-entry/events.jsonl",
+    ".workflowprogram/runs/20260409T140056Z-invalid-entry/outputs/target-claude-before.json",
+    ".workflowprogram/runs/20260409T140056Z-invalid-entry/outputs/target-root-before.json",
+    ".workflowprogram/runs/20260409T140056Z-invalid-entry/state.json",
+    "README.md"
+  ],
+  "entries": [
+    {
+      "path": ".workflowprogram/runs/20260409T140056Z-invalid-entry/context.json",
+      "sha256": "6ef93614cd682f302b0d8b2521732a3b9d617e4f479cbebe27c931e3fcb77f60",
+      "size": 840
+    },
+    {
+      "path": ".workflowprogram/runs/20260409T140056Z-invalid-entry/events.jsonl",
+      "sha256": "ce99fd2eaa85122030fb6e2b2a5efaf39538de68eee327866c4cf60cec74b8c1",
+      "size": 777
+    },
+    {
+      "path": ".workflowprogram/runs/20260409T140056Z-invalid-entry/outputs/target-claude-before.json",
+      "sha256": "7c945ff589fa3bd7fb359be79fd57d389823e42527de5d1f2ca7cab44f192f4f",
+      "size": 35
+    },
+    {
+      "path": ".workflowprogram/runs/20260409T140056Z-invalid-entry/outputs/target-root-before.json",
+      "sha256": "71b4f892c464d9816dab7c280c41e02ce410f427517dcc43eb77a9f26bde42c6",
+      "size": 1006
+    },
+    {
+      "path": ".workflowprogram/runs/20260409T140056Z-invalid-entry/state.json",
+      "sha256": "be0de71ad0399d536a3894e7d489edb797166d857c2eeb657a1c79cec832dacd",
+      "size": 264
+    },
+    {
+      "path": "README.md",
+      "sha256": "b3a389139b841c66ea3ee695ea55256b8bd4de4e4b80bf52e47551f650e25be0",
+      "size": 77
+    }
+  ]
+}

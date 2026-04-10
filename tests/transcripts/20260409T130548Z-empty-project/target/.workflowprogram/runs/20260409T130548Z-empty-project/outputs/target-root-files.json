@@ -1,0 +1,9 @@
+{
+  "files": [
+    ".workflowprogram/runs/20260409T130548Z-empty-project/context.json",
+    ".workflowprogram/runs/20260409T130548Z-empty-project/events.jsonl",
+    ".workflowprogram/runs/20260409T130548Z-empty-project/outputs/target-claude-files.json",
+    ".workflowprogram/runs/20260409T130548Z-empty-project/state.json",
+    "README.md"
+  ]
+}

@@ -1,0 +1,60 @@
+{
+  "files": [
+    ".claude/settings.json",
+    ".claude/skills/bad-skill/SKILL.md",
+    ".workflowprogram/runs/20260410T032203Z-broken-workflow/context.json",
+    ".workflowprogram/runs/20260410T032203Z-broken-workflow/events.jsonl",
+    ".workflowprogram/runs/20260410T032203Z-broken-workflow/state.json",
+    "CLAUDE.md",
+    "README.md",
+    "lessons.md",
+    "validation-report.md"
+  ],
+  "entries": [
+    {
+      "path": ".claude/settings.json",
+      "sha256": "10402487378ffc3df3e1f25b16e3f42e4c4073c4e90cc8927dd11fc21aa6ea1b",
+      "size": 141
+    },
+    {
+      "path": ".claude/skills/bad-skill/SKILL.md",
+      "sha256": "00b80cb9208077946c977ed599e3fbe14892019aecf92b68378e296d4fc4192c",
+      "size": 44
+    },
+    {
+      "path": ".workflowprogram/runs/20260410T032203Z-broken-workflow/context.json",
+      "sha256": "9bd18f3894dabe0a62eca7459e0014651bad0ef5a20360335c9f3c718525c0e9",
+      "size": 947
+    },
+    {
+      "path": ".workflowprogram/runs/20260410T032203Z-broken-workflow/events.jsonl",
+      "sha256": "2cb2bd6f7b836217e48d69cc08f3f43016edad3417fe6bb875fdb02a033a4a91",
+      "size": 164
+    },
+    {
+      "path": ".workflowprogram/runs/20260410T032203Z-broken-workflow/state.json",
+      "sha256": "aba8d7fa9c501068e3d6a7accdfcf08a4aabf272e38b767307a770d9f7939f1e",
+      "size": 272
+    },
+    {
+      "path": "CLAUDE.md",
+      "sha256": "ddf014762f01685ddb7e364d0eb9af637a604df7792a053d4415814f384c25af",
+      "size": 102
+    },
+    {
+      "path": "README.md",
+      "sha256": "01a9b2a49268bb3d944ff80bc0e0aa9e74eadc4f3feec6257eead271c4c42fd7",
+      "size": 93
+    },
+    {
+      "path": "lessons.md",
+      "sha256": "898a8b166c1c9b1fb012f948a8d45a4e8d469da6a20e34db6497f1f250aaef17",
+      "size": 73
+    },
+    {
+      "path": "validation-report.md",
+      "sha256": "ccd1739cc41aceca663431ee20f4df34d6bed33bf317da7cee10bf092c1ce8d7",
+      "size": 66
+    }
+  ]
+}

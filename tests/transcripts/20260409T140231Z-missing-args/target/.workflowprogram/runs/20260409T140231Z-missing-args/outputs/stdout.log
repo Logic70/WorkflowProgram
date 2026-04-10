@@ -1,0 +1,12 @@
+{
+  "result": "FAIL",
+  "failure_code": "MISSING_ARGUMENT",
+  "message": "Mock host rejected an empty request payload.",
+  "is_error": true,
+  "stage_history": [
+    "requirement"
+  ],
+  "stage_status": "failed",
+  "current_stage": "requirement",
+  "next_action": "provide the required request arguments"
+}

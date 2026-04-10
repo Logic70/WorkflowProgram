@@ -1,0 +1,6 @@
+{"ts": "2026-04-10T07:49:10Z", "type": "RunStarted", "stage": "prepare", "source": "runtime_smoke", "status": "ok", "message": "Preparing fixture managed-conflict"}
+{"ts": "2026-04-10T07:49:11Z", "type": "TaskCreated", "stage": "invoke", "source": "runtime_smoke", "status": "ok", "message": "Invoking provider=command_adapter for /workflowprogram-develop"}
+{"ts": "2026-04-10T07:49:11Z", "type": "RuntimeError", "stage": "invoke", "source": "runtime_smoke", "status": "error", "message": "Mock host detected a managed asset conflict and kept candidate copies."}
+{"ts": "2026-04-10T07:49:11Z", "type": "TaskCompleted", "stage": "invoke", "source": "runtime_smoke", "status": "error", "message": "Mock host detected a managed asset conflict and kept candidate copies."}
+{"ts": "2026-04-10T07:49:12Z", "type": "OutputWritten", "stage": "invoke", "source": "runtime_smoke", "status": "ok", "message": "Captured plugin build manifest into RUN_ROOT outputs"}
+{"ts": "2026-04-10T07:49:13Z", "type": "RunFinished", "stage": "finished", "source": "runtime_smoke", "status": "warn", "message": "Run finished with result FAIL"}

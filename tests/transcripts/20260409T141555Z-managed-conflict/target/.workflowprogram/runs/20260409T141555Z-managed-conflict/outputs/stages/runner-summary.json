@@ -1,0 +1,7 @@
+{
+  "run_id": "20260409T141555Z-managed-conflict",
+  "status": "FAIL",
+  "entry_skill": "workflowprogram-develop",
+  "transition_count": 5,
+  "failure_code": "CONFLICT"
+}

@@ -1,0 +1,30 @@
+{
+  "files": [
+    "commands/generated-smoke.md",
+    "rules/constraints.md",
+    "settings.json",
+    "skills/generated-smoke/SKILL.md"
+  ],
+  "entries": [
+    {
+      "path": "commands/generated-smoke.md",
+      "sha256": "937c8a301478ccf1a57bf457e44642983c117c7f1fa79a1f5785e46c004d3fd4",
+      "size": 77
+    },
+    {
+      "path": "rules/constraints.md",
+      "sha256": "6a9653e0e8754340b328589eb7a13d8374c3cf57b047ec52a1590f1d8c84c5f3",
+      "size": 148
+    },
+    {
+      "path": "settings.json",
+      "sha256": "517fa393b839c915eb371b9b46cdd89cf78c401c995956e4e22765547e80f1ae",
+      "size": 188
+    },
+    {
+      "path": "skills/generated-smoke/SKILL.md",
+      "sha256": "2dabedf82e310b8b1591ae2072b35b803ff467e6a5b2ab4b036751523795689c",
+      "size": 156
+    }
+  ]
+}

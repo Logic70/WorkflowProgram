@@ -1,0 +1,5 @@
+{"ts": "2026-04-10T03:51:26Z", "type": "RunStarted", "stage": "prepare", "source": "runtime_smoke", "status": "ok", "message": "Preparing fixture existing-workflow"}
+{"ts": "2026-04-10T03:51:26Z", "type": "TaskCreated", "stage": "invoke", "source": "runtime_smoke", "status": "ok", "message": "Invoking provider=command_adapter for /workflowprogram-iterate"}
+{"ts": "2026-04-10T03:51:27Z", "type": "TaskCompleted", "stage": "invoke", "source": "runtime_smoke", "status": "ok", "message": "Mock host completed workflow audit successfully."}
+{"ts": "2026-04-10T03:51:27Z", "type": "OutputWritten", "stage": "invoke", "source": "runtime_smoke", "status": "ok", "message": "Captured plugin build manifest into RUN_ROOT outputs"}
+{"ts": "2026-04-10T03:51:28Z", "type": "RunFinished", "stage": "finished", "source": "runtime_smoke", "status": "ok", "message": "Run finished with result PASS"}

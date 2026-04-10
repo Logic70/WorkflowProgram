@@ -1,0 +1,132 @@
+{
+  "files": [
+    ".claude/commands/example.md",
+    ".claude/rules/constraints.md",
+    ".claude/settings.json",
+    ".workflowprogram/runs/20260410T034700699347Z-empty-project/context.json",
+    ".workflowprogram/runs/20260410T034700699347Z-empty-project/events.jsonl",
+    ".workflowprogram/runs/20260410T034700699347Z-empty-project/outputs/candidate/.claude/settings.json",
+    ".workflowprogram/runs/20260410T034700699347Z-empty-project/outputs/managed-change-plan.json",
+    ".workflowprogram/runs/20260410T034700699347Z-empty-project/outputs/managed-change-result.json",
+    ".workflowprogram/runs/20260410T034700699347Z-empty-project/outputs/mock-runtime-host.log",
+    ".workflowprogram/runs/20260410T034700699347Z-empty-project/outputs/progress/current-progress.json",
+    ".workflowprogram/runs/20260410T034700699347Z-empty-project/outputs/progress/milestones.jsonl",
+    ".workflowprogram/runs/20260410T034700699347Z-empty-project/outputs/progress/user-progress.md",
+    ".workflowprogram/runs/20260410T034700699347Z-empty-project/outputs/stages/runner-summary.json",
+    ".workflowprogram/runs/20260410T034700699347Z-empty-project/outputs/stages/s0-route.json",
+    ".workflowprogram/runs/20260410T034700699347Z-empty-project/outputs/stages/s6-lessons-delta.md",
+    ".workflowprogram/runs/20260410T034700699347Z-empty-project/outputs/target-claude-before.json",
+    ".workflowprogram/runs/20260410T034700699347Z-empty-project/outputs/target-root-before.json",
+    ".workflowprogram/runs/20260410T034700699347Z-empty-project/state.json",
+    ".workflowprogram/runs/20260410T034700699347Z-empty-project/workflow-spec.md",
+    ".workflowprogram/runs/20260410T034700699347Z-empty-project/workflow-spec.yaml",
+    "README.md"
+  ],
+  "entries": [
+    {
+      "path": ".claude/commands/example.md",
+      "sha256": "14300b5f79d1cfd9eec123bcc307ffae9589395ed524bd36a97e55fa4d94f620",
+      "size": 28
+    },
+    {
+      "path": ".claude/rules/constraints.md",
+      "sha256": "8c4b59a0772798fe6873be1fe97184690a13d996a951963c9a294f090641917d",
+      "size": 47
+    },
+    {
+      "path": ".claude/settings.json",
+      "sha256": "3e63d9d9546d88c36ae56c28f4b295bf5145806878e1029ab4eec55ef6711e54",
+      "size": 30
+    },
+    {
+      "path": ".workflowprogram/runs/20260410T034700699347Z-empty-project/context.json",
+      "sha256": "711e66b4f6cf12f1e278a0813cc4434826f7c7c6e01d167a90a693e347713ef9",
+      "size": 987
+    },
+    {
+      "path": ".workflowprogram/runs/20260410T034700699347Z-empty-project/events.jsonl",
+      "sha256": "060ed7bb48b8a5ec8ca93e98c15c1d009f3781a68e2b13ce5a710f6c437427d9",
+      "size": 540
+    },
+    {
+      "path": ".workflowprogram/runs/20260410T034700699347Z-empty-project/outputs/candidate/.claude/settings.json",
+      "sha256": "d91f7dcf0527827f8a15165a46d6a30ccca00ef11c40240c3fa148d41d973df0",
+      "size": 49
+    },
+    {
+      "path": ".workflowprogram/runs/20260410T034700699347Z-empty-project/outputs/managed-change-plan.json",
+      "sha256": "b612ef0091ab50e313966d8b65de379f3ee7e6866579e33e8f02940d9bf7b906",
+      "size": 579
+    },
+    {
+      "path": ".workflowprogram/runs/20260410T034700699347Z-empty-project/outputs/managed-change-result.json",
+      "sha256": "07c8784406c03f5713a83fa207dba6da02427f9a7ab1bea0773a5c3e9feb62d5",
+      "size": 718
+    },
+    {
+      "path": ".workflowprogram/runs/20260410T034700699347Z-empty-project/outputs/mock-runtime-host.log",
+      "sha256": "e7445242f0ebdc582bba55afbf10fadab81f257236908e1265b95ed05ad122d5",
+      "size": 176
+    },
+    {
+      "path": ".workflowprogram/runs/20260410T034700699347Z-empty-project/outputs/progress/current-progress.json",
+      "sha256": "46e5170a2e071888cb825efbc8e0ab2fe43c5ccc2dc22ee2587c2254f981e4d3",
+      "size": 443
+    },
+    {
+      "path": ".workflowprogram/runs/20260410T034700699347Z-empty-project/outputs/progress/milestones.jsonl",
+      "sha256": "ec1d3fb3d08c531fc3265cc76ee26b7f4f8f4a522eaba5edfdda33b797dacefe",
+      "size": 139
+    },
+    {
+      "path": ".workflowprogram/runs/20260410T034700699347Z-empty-project/outputs/progress/user-progress.md",
+      "sha256": "a226d262bf77fe8cfc42a651d38c923cefdc620860244f90df1d4819267ba84a",
+      "size": 402
+    },
+    {
+      "path": ".workflowprogram/runs/20260410T034700699347Z-empty-project/outputs/stages/runner-summary.json",
+      "sha256": "33524453b2fbfcc170a7a8b4ea44855d4fdff8708c7ca14b9bc24d57b4bb14ff",
+      "size": 168
+    },
+    {
+      "path": ".workflowprogram/runs/20260410T034700699347Z-empty-project/outputs/stages/s0-route.json",
+      "sha256": "91abc7b95c9df1e00b46a22b2aed696c5c1186fb5de8f977289ab7b7e573159b",
+      "size": 222
+    },
+    {
+      "path": ".workflowprogram/runs/20260410T034700699347Z-empty-project/outputs/stages/s6-lessons-delta.md",
+      "sha256": "ba6fe8f9b566aeed621e77916c0149f2e633fae027c017f2387bc950d3396196",
+      "size": 445
+    },
+    {
+      "path": ".workflowprogram/runs/20260410T034700699347Z-empty-project/outputs/target-claude-before.json",
+      "sha256": "7c945ff589fa3bd7fb359be79fd57d389823e42527de5d1f2ca7cab44f192f4f",
+      "size": 35
+    },
+    {
+      "path": ".workflowprogram/runs/20260410T034700699347Z-empty-project/outputs/target-root-before.json",
+      "sha256": "a5c23e7b194857745d4cdb2dbd55596b41c87f49d12a1f3775c123f571e7f28e",
+      "size": 1042
+    },
+    {
+      "path": ".workflowprogram/runs/20260410T034700699347Z-empty-project/state.json",
+      "sha256": "a70d1419b2f1992644d58f5874541eb6ce441d948ff34bc8518965c558f132ad",
+      "size": 270
+    },
+    {
+      "path": ".workflowprogram/runs/20260410T034700699347Z-empty-project/workflow-spec.md",
+      "sha256": "b51b87f89200846613a51c5201ff9b8a9c70ac9a1d848948b7644a8069067174",
+      "size": 989
+    },
+    {
+      "path": ".workflowprogram/runs/20260410T034700699347Z-empty-project/workflow-spec.yaml",
+      "sha256": "931c7d592dc8a27c51dfee8ea0efc76cb9574b9549b0256ece601367df317186",
+      "size": 5611
+    },
+    {
+      "path": "README.md",
+      "sha256": "b3a389139b841c66ea3ee695ea55256b8bd4de4e4b80bf52e47551f650e25be0",
+      "size": 77
+    }
+  ]
+}

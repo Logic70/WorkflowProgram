@@ -1,0 +1,19 @@
+{
+  "generated_at": "2026-04-09T14:02:08Z",
+  "target_root": "/mnt/d/Code/WorkflowProgram-CN/tests/transcripts/20260409T140207Z-empty-project/target",
+  "run_root": "/mnt/d/Code/WorkflowProgram-CN/tests/transcripts/20260409T140207Z-empty-project/target/.workflowprogram/runs/20260409T140207Z-empty-project",
+  "summary": {
+    "create": 0,
+    "update": 1,
+    "conflict": 0
+  },
+  "applied": [
+    {
+      "relative_path": ".claude/settings.json",
+      "action": "update",
+      "target_path": "/mnt/d/Code/WorkflowProgram-CN/tests/transcripts/20260409T140207Z-empty-project/target/.claude/settings.json",
+      "run_id": "20260409T140207Z-empty-project"
+    }
+  ],
+  "conflicts": []
+}

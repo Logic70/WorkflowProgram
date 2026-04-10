@@ -1,0 +1,17 @@
+{
+  "result": "FAIL",
+  "failure_code": "EVIDENCE_FAILURE",
+  "message": "Mock host detected broken workflow assets and stopped validation.",
+  "is_error": true,
+  "stage_history": [
+    "requirement",
+    "context",
+    "design",
+    "generate",
+    "validate"
+  ],
+  "stage_status": "failed",
+  "current_stage": "validate",
+  "next_action": "repair broken workflow assets and rerun validate",
+  "generated_files": []
+}

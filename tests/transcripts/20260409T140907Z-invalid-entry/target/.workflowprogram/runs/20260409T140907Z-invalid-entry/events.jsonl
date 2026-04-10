@@ -1,0 +1,6 @@
+{"ts": "2026-04-09T14:09:07Z", "type": "RunStarted", "stage": "prepare", "source": "runtime_smoke", "status": "ok", "message": "Preparing fixture invalid-entry"}
+{"ts": "2026-04-09T14:09:07Z", "type": "TaskCreated", "stage": "invoke", "source": "runtime_smoke", "status": "ok", "message": "Invoking provider=command_adapter for /missing-workflowprogram-entry"}
+{"ts": "2026-04-09T14:09:07Z", "type": "RuntimeError", "stage": "invoke", "source": "runtime_smoke", "status": "error", "message": "Mock host rejected an unknown workflow entry."}
+{"ts": "2026-04-09T14:09:07Z", "type": "TaskCompleted", "stage": "invoke", "source": "runtime_smoke", "status": "error", "message": "Mock host rejected an unknown workflow entry."}
+{"ts": "2026-04-09T14:09:07Z", "type": "OutputWritten", "stage": "invoke", "source": "runtime_smoke", "status": "ok", "message": "Captured plugin build manifest into RUN_ROOT outputs"}
+{"ts": "2026-04-09T14:09:08Z", "type": "RunFinished", "stage": "finished", "source": "runtime_smoke", "status": "warn", "message": "Run finished with result FAIL"}

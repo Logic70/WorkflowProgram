@@ -1,5 +1,10 @@
 # Phase 2 Step 1 入口职责边界审计
 
+> Historical Note
+>
+> 本文档保留为 Phase 2 的边界审计记录，不再单独定义当前入口契约。
+> 当前真源和已关闭决策见 [workflowprogram-design-status.md](/mnt/d/Code/WorkflowProgram-CN/docs/workflowprogram-design-status.md)。
+
 ## 1. 目的
 
 本审计只回答三个问题：

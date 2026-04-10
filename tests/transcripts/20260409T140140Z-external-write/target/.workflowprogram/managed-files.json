@@ -1,0 +1,38 @@
+{
+  "manifest_version": 1,
+  "updated_at": "2026-04-09T14:01:41Z",
+  "entries": [
+    {
+      "relative_path": ".claude/commands/generated-smoke.md",
+      "producer_version": "0.1.0",
+      "last_applied_hash": "937c8a301478ccf1a57bf457e44642983c117c7f1fa79a1f5785e46c004d3fd4",
+      "ownership": "managed",
+      "last_applied_at": "2026-04-09T14:01:41Z",
+      "last_run_id": "20260409T140140Z-external-write"
+    },
+    {
+      "relative_path": ".claude/rules/constraints.md",
+      "producer_version": "0.1.0",
+      "last_applied_hash": "6a9653e0e8754340b328589eb7a13d8374c3cf57b047ec52a1590f1d8c84c5f3",
+      "ownership": "managed",
+      "last_applied_at": "2026-04-09T14:01:41Z",
+      "last_run_id": "20260409T140140Z-external-write"
+    },
+    {
+      "relative_path": ".claude/settings.json",
+      "producer_version": "0.1.0",
+      "last_applied_hash": "517fa393b839c915eb371b9b46cdd89cf78c401c995956e4e22765547e80f1ae",
+      "ownership": "managed",
+      "last_applied_at": "2026-04-09T14:01:41Z",
+      "last_run_id": "20260409T140140Z-external-write"
+    },
+    {
+      "relative_path": ".claude/skills/generated-smoke/SKILL.md",
+      "producer_version": "0.1.0",
+      "last_applied_hash": "2dabedf82e310b8b1591ae2072b35b803ff467e6a5b2ab4b036751523795689c",
+      "ownership": "managed",
+      "last_applied_at": "2026-04-09T14:01:41Z",
+      "last_run_id": "20260409T140140Z-external-write"
+    }
+  ]
+}

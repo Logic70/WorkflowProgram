@@ -1,0 +1,13 @@
+{
+  "run_id": "20260409T141606Z-missing-args",
+  "status": "completed",
+  "stage": "finished",
+  "result": "FAIL",
+  "category": "S5_ENTRY_REQUIRED_ARGUMENTS_PRESENT",
+  "subagent_evidence": false,
+  "events_written": 6,
+  "started_at": "2026-04-09T14:16:06Z",
+  "updated_at": "2026-04-09T14:16:09Z",
+  "observed_result": "FAIL",
+  "observed_category": "MISSING_ARGUMENT"
+}

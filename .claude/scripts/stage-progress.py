@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-Stage progress tracker for WorkflowProgram runs.
+WorkflowProgram 运行过程的阶段进度跟踪器。
 
-This script maintains three runtime progress artifacts under RUN_ROOT:
+该脚本维护 RUN_ROOT 下三份进度产物：
 - outputs/progress/current-progress.json
 - outputs/progress/milestones.jsonl
 - outputs/progress/user-progress.md
@@ -21,6 +21,7 @@ from typing import Any, Dict, List
 VALID_EVENTS = {"StageStarted", "StageCheckpoint", "StageCompleted"}
 VALID_STATUS = {"running", "ok", "warn", "error", "blocked"}
 VALID_STAGES = {"S0", "S1", "S2", "S3", "S4", "S5", "S6"}
+VALID_APPROVAL_STATUS = {"pending", "approved", "rejected", "auto-approved"}
 
 
 def utc_now() -> str:
@@ -75,9 +76,10 @@ def render_user_progress(
         f"- percent: `{current.get('percent', 0)}`",
         f"- last_status: `{current.get('last_status', 'unknown')}`",
         f"- last_verdict: `{current.get('last_verdict', 'unknown')}`",
+        f"- approval_status: `{current.get('approval_status', 'unknown')}`",
         f"- updated_at: `{current.get('updated_at', '')}`",
         "",
-        "## Recent Milestones",
+        "## 历史关键节点结果",
     ]
     if not latest:
         lines.append("- No milestones yet")
@@ -91,6 +93,15 @@ def render_user_progress(
                 f"{item.get('result','')} | refs: {refs}"
             )
 
+    if current.get("last_status") in {"blocked", "error"}:
+        lines.extend(
+            [
+                "",
+                "## 当前阻塞点",
+                f"- {current.get('last_status')} | {current.get('next_action', 'needs operator attention')}",
+            ]
+        )
+
     next_action = current.get("next_action")
     if next_action:
         lines.extend(["", "## Next Action", f"- {next_action}"])
@@ -99,12 +110,16 @@ def render_user_progress(
 
 @dataclass
 class ProgressPaths:
+    """描述单个 RUN_ROOT 下进度跟踪器使用的文件集合。"""
+
     current_json: Path
     milestones_jsonl: Path
     user_progress_md: Path
 
 
 def progress_paths(run_root: Path) -> ProgressPaths:
+    """返回 RUN_ROOT 下规范的进度产物路径。"""
+
     progress_root = run_root / "outputs" / "progress"
     return ProgressPaths(
         current_json=progress_root / "current-progress.json",
@@ -128,11 +143,23 @@ def parse_args() -> argparse.Namespace:
     update.add_argument("--next-action", default="", help="Suggested next action")
     update.add_argument("--artifact-ref", action="append", default=[], help="Artifact ref path")
     update.add_argument("--verdict", default="", help="Optional verdict such as PASS/WARN/FAIL")
+    update.add_argument(
+        "--approval-status",
+        default="",
+        choices=["", *sorted(VALID_APPROVAL_STATUS)],
+        help="Optional approval status to persist in current-progress.json",
+    )
     update.add_argument("--json", action="store_true", help="Print JSON result")
     return parser.parse_args()
 
 
 def command_update(args: argparse.Namespace) -> int:
+    """根据单个阶段事件同时更新三类进度视图。
+
+    JSON 快照、JSONL 里程碑流和面向用户的 Markdown 摘要会一起写入，
+    这样同一事件的人类视图和机器视图不会漂移。
+    """
+
     run_root = Path(args.run_root).resolve()
     paths = progress_paths(run_root)
     now = utc_now()
@@ -155,8 +182,12 @@ def command_update(args: argparse.Namespace) -> int:
             "updated_at": now,
         }
     )
+    if args.approval_status:
+        current["approval_status"] = args.approval_status
     write_json(paths.current_json, current)
 
+    # 里程碑流保持为紧凑的追加式结构；它既服务于最近进度展示，也用于 S6
+    # 对“历史关键节点结果”的校验。
     milestone = {
         "ts": now,
         "stage": args.stage,
@@ -191,6 +222,8 @@ def command_update(args: argparse.Namespace) -> int:
 
 
 def main() -> int:
+    """分发并执行支持的子命令。"""
+
     args = parse_args()
     if args.command == "update":
         return command_update(args)
@@ -199,4 +232,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

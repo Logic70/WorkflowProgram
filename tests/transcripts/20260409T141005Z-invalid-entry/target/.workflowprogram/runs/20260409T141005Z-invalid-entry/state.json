@@ -1,0 +1,13 @@
+{
+  "run_id": "20260409T141005Z-invalid-entry",
+  "status": "completed",
+  "stage": "finished",
+  "result": "FAIL",
+  "category": "STRUCTURE_FAILURE",
+  "subagent_evidence": false,
+  "events_written": 6,
+  "started_at": "2026-04-09T14:10:05Z",
+  "updated_at": "2026-04-09T14:10:08Z",
+  "observed_result": "FAIL",
+  "observed_category": "STRUCTURE_FAILURE"
+}

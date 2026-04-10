@@ -1,0 +1,7 @@
+{
+  "run_id": "20260410T041702334190Z-broken-workflow",
+  "status": "FAIL",
+  "entry_skill": "workflowprogram-validate",
+  "transition_count": 1,
+  "failure_code": "EVIDENCE_FAILURE"
+}

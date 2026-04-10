@@ -1,0 +1,6 @@
+{"ts": "2026-04-09T13:00:37Z", "type": "RunStarted", "stage": "prepare", "source": "runtime_smoke", "status": "ok", "message": "Preparing fixture empty-project"}
+{"ts": "2026-04-09T13:00:37Z", "type": "TaskCreated", "stage": "invoke", "source": "runtime_smoke", "status": "ok", "message": "Invoking /workflowprogram-develop against copied fixture"}
+{"ts": "2026-04-09T13:00:41Z", "type": "EnvironmentSkip", "stage": "invoke", "source": "runtime_smoke", "status": "warn", "message": "Claude CLI is installed but not logged in."}
+{"ts": "2026-04-09T13:00:41Z", "type": "TaskCompleted", "stage": "invoke", "source": "runtime_smoke", "status": "ok", "message": "Claude CLI is installed but not logged in."}
+{"ts": "2026-04-09T13:00:41Z", "type": "OutputWritten", "stage": "invoke", "source": "runtime_smoke", "status": "ok", "message": "Captured plugin build manifest into RUN_ROOT outputs"}
+{"ts": "2026-04-09T13:00:41Z", "type": "RunFinished", "stage": "finished", "source": "runtime_smoke", "status": "warn", "message": "Run finished with result ENVIRONMENT-SKIP"}

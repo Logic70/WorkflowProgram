@@ -1,0 +1,2 @@
+{"ts": "2026-04-09T11:55:13Z", "type": "RuntimeError", "stage": "prepare", "source": "runtime_smoke", "status": "error", "message": "Fixture not found: /mnt/d/Code/WorkflowProgram-CN/tests/fixtures/invalid-entry"}
+{"ts": "2026-04-09T11:55:13Z", "type": "RunFinished", "stage": "finished", "source": "runtime_smoke", "status": "error", "message": "Run finished with result FAIL"}

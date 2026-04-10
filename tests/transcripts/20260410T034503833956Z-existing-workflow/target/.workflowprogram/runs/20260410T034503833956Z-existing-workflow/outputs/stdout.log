@@ -1,0 +1,15 @@
+{
+  "result": "PASS",
+  "failure_code": "",
+  "message": "Mock host completed workflow audit successfully.",
+  "is_error": false,
+  "stage_history": [
+    "lessons"
+  ],
+  "stage_status": "done",
+  "current_stage": "lessons",
+  "next_action": "complete",
+  "generated_files": [
+    "validation-report.md"
+  ]
+}

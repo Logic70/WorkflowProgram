@@ -1,0 +1,10 @@
+{"ts": "2026-04-09T14:00:58Z", "type": "RunStarted", "stage": "prepare", "source": "runtime_smoke", "status": "ok", "message": "Preparing fixture managed-conflict"}
+{"ts": "2026-04-09T14:01:00Z", "type": "TaskCreated", "stage": "invoke", "source": "runtime_smoke", "status": "ok", "message": "Invoking provider=fixture_host for /workflowprogram-develop"}
+{"ts": "2026-04-09T14:01:03Z", "type": "ManagedAssetApplied", "stage": "managed-assets", "source": "managed-assets", "status": "ok", "message": "Applied .claude/commands/generated-smoke.md", "action": "create"}
+{"ts": "2026-04-09T14:01:03Z", "type": "ManagedAssetConflict", "stage": "managed-assets", "source": "managed-assets", "status": "warn", "message": "Conflict on .claude/rules/constraints.md", "decision": "conflict-unmanaged-existing"}
+{"ts": "2026-04-09T14:01:04Z", "type": "ManagedAssetConflict", "stage": "managed-assets", "source": "managed-assets", "status": "warn", "message": "Conflict on .claude/settings.json", "decision": "conflict-unmanaged-existing"}
+{"ts": "2026-04-09T14:01:04Z", "type": "ManagedAssetApplied", "stage": "managed-assets", "source": "managed-assets", "status": "ok", "message": "Applied .claude/skills/generated-smoke/SKILL.md", "action": "create"}
+{"ts": "2026-04-09T14:01:04Z", "type": "RuntimeError", "stage": "invoke", "source": "runtime_smoke", "status": "error", "message": "Managed asset conflicts detected: 2"}
+{"ts": "2026-04-09T14:01:04Z", "type": "TaskCompleted", "stage": "invoke", "source": "runtime_smoke", "status": "error", "message": "Managed asset conflicts detected: 2"}
+{"ts": "2026-04-09T14:01:18Z", "type": "OutputWritten", "stage": "invoke", "source": "runtime_smoke", "status": "ok", "message": "Captured plugin build manifest into RUN_ROOT outputs"}
+{"ts": "2026-04-09T14:01:23Z", "type": "RunFinished", "stage": "finished", "source": "runtime_smoke", "status": "warn", "message": "Run finished with result FAIL"}

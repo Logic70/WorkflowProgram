@@ -1,0 +1,13 @@
+{
+  "manifest_version": 1,
+  "updated_at": "2026-04-10T07:48:27Z",
+  "entries": [
+    {
+      "relative_path": ".claude/settings.json",
+      "last_applied_hash": "mock-managed-hash",
+      "ownership": "workflowprogram",
+      "producer_version": "mock-runtime-host",
+      "updated_at": "2026-04-10T07:48:27Z"
+    }
+  ]
+}

@@ -23,6 +23,17 @@ disable-model-invocation: true
 - 若出现目标文件冲突，应把候选版本保留在 `RUN_ROOT/outputs/`，而不是覆盖用户资产。
 - 对已应用文件，应维护 `TARGET_ROOT/.workflowprogram/managed-files.json`。
 - 执行过程中必须通过 `${CLAUDE_PLUGIN_ROOT}/scripts/stage-progress.py` 写入进展与关键节点结果。
+- `workflow-spec.md` 草案在进入 YAML 设计前必须通过 `${CLAUDE_PLUGIN_ROOT}/scripts/validate-workflow-draft.py` 的确定性质量门槛。
+- `workflow-spec.yaml` 产出后必须调用 `${CLAUDE_PLUGIN_ROOT}/scripts/validate-workflow-spec.py` 进行结构校验。
+- `workflow-spec.yaml` 必须包含 `intent_flows`，明确 `develop / audit / iterate / validate` 的逻辑阶段流。
+- `workflow-spec.yaml` 必须包含 `runtime_contract`，且至少声明：`write_boundaries`、`required_evidence`、`failure_kinds`、`environment_skip`。
+- `workflow-spec.yaml` 必须包含 `test_contract`，且至少声明：`entry`、`boundary`、`flow`、`artifacts`、`failure`。
+- `test_contract` 对执行字段必须使用 `runtime_contract.<field>` 固定引用语法，且不得复制 `runtime_contract` 同名字段。
+- `test_contract.failure.implemented_now` 必须是 `runtime_contract.failure_kinds` 的子集，且不得反向改变 runner 的 verdict/failure_kind 语义。
+- 生成链路完成后必须调用 `${CLAUDE_PLUGIN_ROOT}/scripts/workflow-runner.py` 进行程序化 stage 转移和状态落盘；runner 只负责控制面，不负责 S5 主判定。
+- develop 主链的确定性脚本入口是 `${CLAUDE_PLUGIN_ROOT}/scripts/workflow-entry.py run`；它负责串起 spec 校验、视图生成、managed apply、runner 与 run-state 校验。
+- S5 主判定必须由 `workflowprogram-validate` 承担，`runtime_smoke.py` 仅作为动态 harness 补证据。
+- `RUN_ROOT/state.json` 必须通过 `${CLAUDE_PLUGIN_ROOT}/scripts/validate-run-state.py`，确保 `kind/producer/status` 枚举合规。
 
 ## Step 1: Resolve Target
 
@@ -50,18 +61,27 @@ disable-model-invocation: true
 
 生成候选资产后，使用以下流程：
 
-1. 调用 `${CLAUDE_PLUGIN_ROOT}/scripts/managed-assets.py plan --target-root <TARGET_ROOT> --run-root <RUN_ROOT> --source-root <RUN_ROOT>/outputs/candidate/.claude`
-2. 若无冲突，再调用 `apply-staged`
-3. 若存在冲突，只输出候选版本与冲突摘要，不静默覆盖目标项目
-4. 写入进展事件：`S4 StageStarted`、`S4 StageCheckpoint`、`S4 StageCompleted`
+1. 调用 `${CLAUDE_PLUGIN_ROOT}/scripts/workflow-entry.py run --spec <RUN_ROOT>/workflow-spec.yaml --run-root <RUN_ROOT> --target-root <TARGET_ROOT> --entry-skill workflowprogram-develop --request "<原始需求>" [--auto-approve|--approval-status approved]`
+2. `workflow-entry.py` 必须按固定顺序调用：
+   - `validate-workflow-spec.py`
+   - `generate-workflow-view.py`
+   - `managed-assets.py plan`
+   - `managed-assets.py apply-staged`
+   - `workflow-runner.py run`
+   - `validate-run-state.py`
+3. 若 `managed-assets.py apply-staged` 报冲突，停止在 S4，保留 candidate 与 conflict 副本，不静默覆盖目标项目
+4. 交由 `workflowprogram-validate` 形成 S5 主判定，并在可用时运行 `runtime_smoke.py` 补充动态证据
+5. 读取 `RUN_ROOT/outputs/stages/entry-orchestration-summary.json` 作为产品入口编排摘要
+6. 写入进展事件：`S4 StageStarted`、`S4 StageCheckpoint`、`S4 StageCompleted`
 
 ## Step 4: Verify Readiness
 
 1. 检查命名是否一致。
 2. 检查新增资产是否可被后续 `workflowprogram-validate` 验证。
 3. 检查 `managed-files.json` 与本次应用结果是否一致。
-4. 输出建议的下一步动作。
-5. 更新 `RUN_ROOT/outputs/progress/user-progress.md`，向用户展示当前进展和历史关键节点结果。
+4. 检查 `s5-validation-summary.json`、`validation-runtime-report.md` 与 `transcript.md` 的边界是否清晰。
+5. 输出建议的下一步动作。
+6. 更新 `RUN_ROOT/outputs/progress/user-progress.md`，向用户展示当前进展和历史关键节点结果。
 
 ## Output
 

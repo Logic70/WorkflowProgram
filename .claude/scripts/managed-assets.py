@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """
-Managed asset guard for WorkflowProgram target writes.
+WorkflowProgram 目标写入的 managed asset 守卫。
 
-This tool enforces the design rule that WorkflowProgram should first generate
-candidate workflow assets under RUN_ROOT, then decide whether they can be
-applied back to TARGET_ROOT/.claude/ without silently overwriting user edits.
+该工具落实一条核心设计规则：
+WorkflowProgram 必须先在 RUN_ROOT 下生成候选 workflow 资产，
+再判断它们能否安全回写到 TARGET_ROOT/.claude/，
+而不能静默覆盖用户修改。
 """
 
 from __future__ import annotations
@@ -22,29 +23,41 @@ from typing import Any, Dict, Iterable, List, Optional
 
 
 def iso_now() -> str:
+    """返回 managed asset 证据文件统一使用的时间戳格式。"""
+
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 
 def make_run_id() -> str:
+    """在 managed-assets 独立运行时生成兜底 run id。"""
+
     return f"managed-assets-{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')}"
 
 
 def write_text(path: Path, content: str) -> None:
+    """创建父目录后写入 UTF-8 文本。"""
+
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(content, encoding="utf-8", newline="\n")
 
 
 def write_json(path: Path, payload: Dict[str, Any]) -> None:
+    """通过统一文本写入器写出规范化 JSON。"""
+
     write_text(path, json.dumps(payload, ensure_ascii=False, indent=2) + "\n")
 
 
 def append_event(path: Path, payload: Dict[str, Any]) -> None:
+    """为 managed-asset 审计追加一条 JSONL 事件。"""
+
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("a", encoding="utf-8", newline="\n") as handle:
         handle.write(json.dumps(payload, ensure_ascii=False) + "\n")
 
 
 def sha256_file(path: Path) -> str:
+    """对文件做哈希，便于 manifest 所有权模型检测后续漂移。"""
+
     digest = hashlib.sha256()
     with path.open("rb") as handle:
         for chunk in iter(lambda: handle.read(65536), b""):
@@ -53,6 +66,8 @@ def sha256_file(path: Path) -> str:
 
 
 def find_plugin_json(start: Path) -> Optional[Path]:
+    """定位插件元数据，用于写入 producer version。"""
+
     candidates: List[Path] = []
     env_plugin_root = os.environ.get("CLAUDE_PLUGIN_ROOT")
     if env_plugin_root:
@@ -67,6 +82,8 @@ def find_plugin_json(start: Path) -> Optional[Path]:
 
 
 def detect_producer_version(explicit: Optional[str]) -> str:
+    """解析写入 managed-files.json 的 producer version。"""
+
     if explicit:
         return explicit
     plugin_json = find_plugin_json(Path(__file__).resolve())
@@ -80,6 +97,8 @@ def detect_producer_version(explicit: Optional[str]) -> str:
 
 
 def resolve_run_root(target_root: Path, explicit: Optional[str]) -> Path:
+    """根据显式参数、环境变量或独立默认值解析 RUN_ROOT。"""
+
     if explicit:
         return Path(explicit).resolve()
     env_run_root = os.environ.get("WORKFLOWPROGRAM_RUN_ROOT")
@@ -89,10 +108,14 @@ def resolve_run_root(target_root: Path, explicit: Optional[str]) -> Path:
 
 
 def manifest_path_for(target_root: Path) -> Path:
+    """返回 TARGET_ROOT 下规范的 manifest 路径。"""
+
     return target_root / ".workflowprogram" / "managed-files.json"
 
 
 def load_manifest(path: Path) -> Dict[str, Any]:
+    """加载 managed-file manifest；不存在时返回空白结构。"""
+
     if not path.exists():
         return {
             "manifest_version": 1,
@@ -103,22 +126,34 @@ def load_manifest(path: Path) -> Dict[str, Any]:
 
 
 def save_manifest(path: Path, payload: Dict[str, Any]) -> None:
+    """更新 updated_at 后持久化 managed manifest。"""
+
     payload["updated_at"] = iso_now()
     write_json(path, payload)
 
 
 def iter_candidate_files(source_root: Path) -> Iterable[Path]:
+    """按稳定顺序遍历 staged candidate 文件。"""
+
     for path in sorted(source_root.rglob("*")):
         if path.is_file():
             yield path
 
 
 def entry_index(manifest: Dict[str, Any]) -> Dict[str, Dict[str, Any]]:
+    """按相对路径给 manifest 条目建立索引，便于做所有权查询。"""
+
     return {entry["relative_path"]: entry for entry in manifest.get("entries", [])}
 
 
 @dataclass
 class CandidateDecision:
+    """单个候选文件的决策记录。
+
+    plan 阶段绝不修改目标目录；
+    它只负责给每个候选文件分类，以便 apply-staged 后续严格执行既定动作。
+    """
+
     relative_path: str
     source_path: str
     source_sha256: str
@@ -146,6 +181,15 @@ class CandidateDecision:
 
 
 def decide_candidates(target_root: Path, source_root: Path, manifest: Dict[str, Any]) -> List[CandidateDecision]:
+    """把每个候选文件归类为 create、update 或 conflict。
+
+    这些决策规则就是 managed-write 契约的代码化表达：
+    - 目标不存在 => 可安全创建
+    - 目标存在但未托管 => 冲突
+    - 目标已托管且自上次应用后未变化 => 可安全更新
+    - 目标已托管但发生漂移 => 冲突
+    """
+
     decisions: List[CandidateDecision] = []
     manifest_entries = entry_index(manifest)
 
@@ -159,6 +203,7 @@ def decide_candidates(target_root: Path, source_root: Path, manifest: Dict[str, 
         target_sha = sha256_file(target_path) if target_exists else None
         ownership = manifest_entry.get("ownership") if manifest_entry else None
 
+        # 目标文件不存在时，总是可以安全创建，因为还没有用户内容需要保护。
         if not target_exists:
             decision = CandidateDecision(
                 relative_path=relative_path,
@@ -172,6 +217,7 @@ def decide_candidates(target_root: Path, source_root: Path, manifest: Dict[str, 
                 reason="Target file does not exist.",
                 manifest_entry=manifest_entry,
             )
+        # 已存在但未纳入托管的文件，默认视为用户所有。
         elif manifest_entry is None:
             decision = CandidateDecision(
                 relative_path=relative_path,
@@ -185,6 +231,7 @@ def decide_candidates(target_root: Path, source_root: Path, manifest: Dict[str, 
                 reason="Target file exists but is not registered as managed.",
                 manifest_entry=None,
             )
+        # 只有当线上文件仍与上次托管写入版本完全一致时，managed 文件才允许自动更新。
         elif target_sha == manifest_entry.get("last_applied_hash"):
             decision = CandidateDecision(
                 relative_path=relative_path,
@@ -198,6 +245,8 @@ def decide_candidates(target_root: Path, source_root: Path, manifest: Dict[str, 
                 reason="Managed file matches last applied hash and can be updated.",
                 manifest_entry=manifest_entry,
             )
+        # 任何漂移都表示用户或其他工具在上次托管写入后改动了文件；
+        # 此时必须停止并保留冲突副本，而不是直接覆盖。
         else:
             decision = CandidateDecision(
                 relative_path=relative_path,
@@ -217,6 +266,8 @@ def decide_candidates(target_root: Path, source_root: Path, manifest: Dict[str, 
 
 
 def summarize(decisions: List[CandidateDecision]) -> Dict[str, int]:
+    """把逐文件决策汇总成 plan 摘要计数。"""
+
     summary = {
         "candidate_files": len(decisions),
         "create": 0,
@@ -234,6 +285,8 @@ def summarize(decisions: List[CandidateDecision]) -> Dict[str, int]:
 
 
 def ensure_candidate_root(source_root: Path) -> None:
+    """校验 staged candidate 根目录存在且为目录。"""
+
     if not source_root.exists():
         raise FileNotFoundError(f"Candidate source root not found: {source_root}")
     if not source_root.is_dir():
@@ -241,6 +294,8 @@ def ensure_candidate_root(source_root: Path) -> None:
 
 
 def plan_payload(target_root: Path, source_root: Path, run_root: Path, producer_version: str) -> Dict[str, Any]:
+    """在不修改 TARGET_ROOT 的前提下构建结构化 managed-asset plan。"""
+
     manifest = load_manifest(manifest_path_for(target_root))
     decisions = decide_candidates(target_root, source_root, manifest)
     payload = {
@@ -257,6 +312,8 @@ def plan_payload(target_root: Path, source_root: Path, run_root: Path, producer_
 
 
 def emit(run_root: Path, event_type: str, status: str, message: str, **extra: Any) -> None:
+    """向共享 RUN_ROOT 事件流追加一条 managed-assets 事件。"""
+
     append_event(
         run_root / "events.jsonl",
         {
@@ -272,6 +329,8 @@ def emit(run_root: Path, event_type: str, status: str, message: str, **extra: An
 
 
 def copy_candidate_for_conflict(run_root: Path, relative_path: str, source_path: Path) -> str:
+    """保留无法应用的候选版本副本。"""
+
     conflict_path = run_root / "outputs" / "conflicts" / relative_path
     conflict_path.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy2(source_path, conflict_path)
@@ -283,6 +342,8 @@ def update_manifest_entries(
     applied: List[Dict[str, Any]],
     producer_version: str,
 ) -> Dict[str, Any]:
+    """把新应用的文件合并回 managed manifest。"""
+
     entries = entry_index(manifest)
     now = iso_now()
     for item in applied:
@@ -299,6 +360,8 @@ def update_manifest_entries(
 
 
 def write_markdown_summary(path: Path, result: Dict[str, Any]) -> None:
+    """在结构化 JSON 结果旁边写一份人类可读摘要。"""
+
     lines = [
         "# Managed Asset Apply Summary",
         "",
@@ -327,6 +390,8 @@ def write_markdown_summary(path: Path, result: Dict[str, Any]) -> None:
 
 
 def command_plan(args: argparse.Namespace) -> int:
+    """只读 planning 阶段的 CLI 处理器。"""
+
     target_root = Path(args.target_root).resolve()
     source_root = Path(args.source_root).resolve()
     ensure_candidate_root(source_root)
@@ -344,6 +409,13 @@ def command_plan(args: argparse.Namespace) -> int:
 
 
 def command_apply_staged(args: argparse.Namespace) -> int:
+    """apply 阶段的 CLI 处理器。
+
+    这里只会执行 plan 中已被判定为安全的动作。
+    所有冲突都会复制到 RUN_ROOT 供检查，并返回专用退出码，
+    以便调用方在 S4 终止流水线。
+    """
+
     target_root = Path(args.target_root).resolve()
     source_root = Path(args.source_root).resolve()
     ensure_candidate_root(source_root)
@@ -372,6 +444,7 @@ def command_apply_staged(args: argparse.Namespace) -> int:
             applied.append(applied_item)
             emit(run_root, "ManagedAssetApplied", "ok", f"Applied {item['relative_path']}", action=item["decision"])
         else:
+            # 冲突副本保留“原本要写入”的版本，方便用户和线上目标文件做 diff。
             conflict_copy = copy_candidate_for_conflict(run_root, item["relative_path"], source_path)
             conflict_item = {
                 **item,
@@ -408,6 +481,8 @@ def command_apply_staged(args: argparse.Namespace) -> int:
 
 
 def build_parser() -> argparse.ArgumentParser:
+    """为两个 managed-asset 子命令构建 CLI 解析器。"""
+
     parser = argparse.ArgumentParser(description="Manage WorkflowProgram writes into TARGET_ROOT/.claude")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
@@ -424,6 +499,8 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main() -> int:
+    """带稳定非零失败契约的 CLI 入口。"""
+
     parser = build_parser()
     args = parser.parse_args()
     try:

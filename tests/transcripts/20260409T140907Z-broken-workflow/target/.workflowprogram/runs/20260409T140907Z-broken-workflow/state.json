@@ -1,0 +1,13 @@
+{
+  "run_id": "20260409T140907Z-broken-workflow",
+  "status": "completed",
+  "stage": "finished",
+  "result": "FAIL",
+  "category": "EVIDENCE_FAILURE",
+  "subagent_evidence": false,
+  "events_written": 6,
+  "started_at": "2026-04-09T14:09:07Z",
+  "updated_at": "2026-04-09T14:09:09Z",
+  "observed_result": "FAIL",
+  "observed_category": "EVIDENCE_FAILURE"
+}

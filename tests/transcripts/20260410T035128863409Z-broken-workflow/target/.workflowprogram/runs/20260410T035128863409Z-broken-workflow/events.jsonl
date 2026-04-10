@@ -1,0 +1,6 @@
+{"ts": "2026-04-10T03:51:29Z", "type": "RunStarted", "stage": "prepare", "source": "runtime_smoke", "status": "ok", "message": "Preparing fixture broken-workflow"}
+{"ts": "2026-04-10T03:51:29Z", "type": "TaskCreated", "stage": "invoke", "source": "runtime_smoke", "status": "ok", "message": "Invoking provider=command_adapter for /workflowprogram-validate"}
+{"ts": "2026-04-10T03:51:29Z", "type": "RuntimeError", "stage": "invoke", "source": "runtime_smoke", "status": "error", "message": "Mock host detected broken workflow assets and stopped validation."}
+{"ts": "2026-04-10T03:51:29Z", "type": "TaskCompleted", "stage": "invoke", "source": "runtime_smoke", "status": "error", "message": "Mock host detected broken workflow assets and stopped validation."}
+{"ts": "2026-04-10T03:51:30Z", "type": "OutputWritten", "stage": "invoke", "source": "runtime_smoke", "status": "ok", "message": "Captured plugin build manifest into RUN_ROOT outputs"}
+{"ts": "2026-04-10T03:51:31Z", "type": "RunFinished", "stage": "finished", "source": "runtime_smoke", "status": "warn", "message": "Run finished with result FAIL"}

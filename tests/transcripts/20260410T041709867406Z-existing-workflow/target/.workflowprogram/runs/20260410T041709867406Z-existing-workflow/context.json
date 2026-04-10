@@ -1,0 +1,26 @@
+{
+  "run_id": "20260410T041709867406Z-existing-workflow",
+  "started_at": "2026-04-10T04:17:09Z",
+  "plugin_root": "/mnt/d/Code/WorkflowProgram-CN/dist/plugin",
+  "target_root": "/mnt/d/Code/WorkflowProgram-CN/tests/transcripts/20260410T041709867406Z-existing-workflow/target",
+  "fixture": "existing-workflow",
+  "entry_skill": "workflowprogram-audit",
+  "request": "审计当前项目中的 workflow 结构，并输出结构问题、模式偏离和下一步建议",
+  "claude_bin": "claude",
+  "runtime_provider": "fixture_host",
+  "provider_command": null,
+  "mode": "runtime-smoke",
+  "plugin_build_manifest": "/mnt/d/Code/WorkflowProgram-CN/dist/plugin/build-manifest.json",
+  "contract_summary": {
+    "contract_source": "fixture_preset",
+    "contract_categories": [
+      "entry",
+      "flow",
+      "artifacts",
+      "failure"
+    ],
+    "implemented_failure_kinds": [],
+    "environment_skip_codes": [],
+    "spec_path": null
+  }
+}

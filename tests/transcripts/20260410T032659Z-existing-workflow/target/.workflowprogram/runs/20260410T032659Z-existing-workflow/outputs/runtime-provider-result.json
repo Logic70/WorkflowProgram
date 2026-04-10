@@ -1,0 +1,22 @@
+{
+  "provider": "fixture_host",
+  "result": "PASS",
+  "failure_code": "",
+  "message": "fixture_host completed audit.",
+  "is_error": false,
+  "command": [],
+  "returncode": 0,
+  "stdout": "",
+  "stderr": "",
+  "parsed": null,
+  "subagent_evidence": false,
+  "stage_history": [
+    "validate",
+    "lessons"
+  ],
+  "current_stage": "lessons",
+  "stage_status": "done",
+  "next_action": "complete",
+  "next_stage_on_failure": "",
+  "metadata": {}
+}

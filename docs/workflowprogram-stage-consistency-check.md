@@ -16,15 +16,18 @@
 | Stage 命名与顺序一致性 | PASS | 两份文档均采用 `S0..S6` |
 | 路径模型一致性 | PASS | `PLUGIN_ROOT/TARGET_ROOT/RUN_ROOT` 定义一致 |
 | 安装与分发契约一致性 | PASS | `dist/plugin` 被定义为 canonical 载荷目录，支持 Source Build 与 GitHub Release 两种通道 |
-| 入口契约一致性 | PASS | 自然语言仅由 `workflowprogram-orchestrate` 承接 |
+| 入口契约一致性 | PASS | 自然语言由 `workflowprogram-orchestrate` 承接，并通过 `route-intent.py` 提供确定性路由 |
 | 输出结论枚举一致性 | PASS | `PASS/WARN/FAIL/ENVIRONMENT-SKIP` 已统一 |
 | state 字段约束完整性 | PASS | Lowlevel 定义了固定字段与枚举 |
-| artifact 字段约束完整性 | PASS | `kind/root/producer/status` 均已枚举化 |
+| artifact 字段约束完整性 | PASS | `kind/root/producer/status` 已由 `validate-run-state.py` 强制校验 |
+| spec 运行契约完整性 | PASS | `runtime_contract` 已覆盖写入边界、最小证据集、失败枚举、环境 skip 条件 |
+| spec 测试契约完整性 | PASS | `test_contract` 已覆盖入口、边界、流程、产物、失败五类判定，并与 `runtime_contract` 通过固定引用语法对接 |
+| 视图渲染链路一致性 | PASS | 设计与实现均明确 `tools/generate-view.py` 负责 `workflow-view.md` 渲染 |
 | Stage 间 I/O 依赖闭合 | PASS | `S1->S2->S3->S4->S5->S6` 无未定义依赖 |
 | Stage 准出可验证性 | PASS | 每个 Stage 已补充证据路径和可验证检查条目 |
 | 进展与关键节点可视化契约 | PASS | 增加 `current-progress/milestones/user-progress` 三类进展资产 |
 | 与现有实现贴合度 | PASS | 未引入强依赖的新外部运行时 |
-| 设计与实现差距可见性 | WARN | spec 控制面是目标架构，仍需后续脚本级强化 |
+| 设计与实现差距可见性 | PASS | 已提供 `validate-workflow-spec.py` + `workflow-runner.py` + `validate-run-state.py` 脚本化闭环 |
 
 ## 3. Stage 依赖链检查
 
@@ -64,13 +67,17 @@
 - 冲突 C5：Stage 目标与输出缺少可判定标准。  
   处理：Highlevel 增加 Stage 验收矩阵，Lowlevel 为每个 Stage 增加证据路径与可验证检查。
 
-### 4.2 非阻断待实现项
+### 4.2 本轮新增工程化实现
 
-- 待实现 R1：`workflow-spec.yaml` 的字段约束尚未完全脚本化校验。
-- 待实现 R2：`producer/kind/status` 枚举尚未在生成链路强制执行。
-- 待实现 R3：Stage 转移规则目前主要由 prompt/流程约定保证，尚未完全自动化调度。
+- 已实现 R1：`validate-workflow-spec.py` 对 `workflow-spec.yaml` 做脚本化字段与转移校验。
+- 已实现 R2：`validate-run-state.py` 对 `kind/root/producer/status` 枚举进行强制验证。
+- 已实现 R3：`workflow-runner.py` 提供程序化 Stage 转移、状态落盘与证据输出。
+- 已实现 R4：`route-intent.py` 提供确定性路由，strict 模式下可对歧义请求执行硬阻断。
+- 已实现 R5：`runtime_contract` 已程序化生效，`workflow-runner.py` 强制执行写入边界、最小证据集校验、失败类别枚举约束与环境 skip。
+- 已实现 R6：`test_contract` 已由 `validate-workflow-spec.py` 做字段级、引用一致性与覆盖度校验；`generate-view.py` 负责渲染但不改变 runner 语义。
 
 ## 5. 结论
 
-当前文档级设计已经满足“前后文逻辑一致、Stage 交互无定义冲突、state 与路径模型统一”的要求。  
-剩余差距集中在“把文档约束进一步工程化为脚本校验和执行约束”，属于后续实施问题，不影响本轮设计文档成立。
+当前文档级设计与实现已形成“规范 -> 脚本校验 -> 程序执行 -> 证据回写”的闭环。
+当前无显式冲突：`runtime_contract` 负责执行约束，`test_contract` 负责基础运行测试判定，二者通过固定引用语法衔接而不重复定义。
+后续重点从“补缺”转为“稳定性与覆盖度提升”（如增加更多真实场景 smoke 和冲突恢复策略）。

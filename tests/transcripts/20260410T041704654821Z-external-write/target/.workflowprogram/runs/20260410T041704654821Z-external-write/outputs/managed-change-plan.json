@@ -1,0 +1,16 @@
+{
+  "generated_at": "2026-04-10T04:17:05Z",
+  "entries": [
+    {
+      "relative_path": ".claude/settings.json",
+      "source_path": "/mnt/d/Code/WorkflowProgram-CN/tests/transcripts/20260410T041704654821Z-external-write/target/.workflowprogram/runs/20260410T041704654821Z-external-write/outputs/candidate/.claude/settings.json",
+      "target_path": "/mnt/d/Code/WorkflowProgram-CN/tests/transcripts/20260410T041704654821Z-external-write/target/.claude/settings.json",
+      "decision": "update"
+    }
+  ],
+  "summary": {
+    "create": 0,
+    "update": 1,
+    "conflict": 0
+  }
+}

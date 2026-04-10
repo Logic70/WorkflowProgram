@@ -1,0 +1,27 @@
+{
+  "verdict": "ENVIRONMENT-SKIP",
+  "failure_kind": "CLAUDE_NOT_LOGGED_IN",
+  "checked_files": [
+    "context.json",
+    "state.json",
+    "events.jsonl",
+    "transcript.md",
+    "validation-runtime-report.md",
+    "outputs/stdout.log",
+    "outputs/stderr.log",
+    "outputs/target-claude-files.json",
+    "outputs/target-root-files.json",
+    "outputs/plugin-build-manifest.json"
+  ],
+  "contract_source": "fixture_preset",
+  "contract_categories": [
+    "entry",
+    "flow",
+    "artifacts",
+    "failure"
+  ],
+  "implemented_failure_kinds": [],
+  "environment_skip_codes": [],
+  "target_claude_files": [],
+  "summary": "Claude CLI is installed but not logged in."
+}

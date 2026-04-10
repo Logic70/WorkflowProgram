@@ -1,0 +1,6 @@
+{"ts": "2026-04-10T03:22:04Z", "type": "RunStarted", "stage": "prepare", "source": "runtime_smoke", "status": "ok", "message": "Preparing fixture broken-workflow"}
+{"ts": "2026-04-10T03:22:04Z", "type": "TaskCreated", "stage": "invoke", "source": "runtime_smoke", "status": "ok", "message": "Invoking provider=command_adapter for /workflowprogram-validate"}
+{"ts": "2026-04-10T03:22:04Z", "type": "RuntimeError", "stage": "invoke", "source": "runtime_smoke", "status": "error", "message": "python3: can't open file '/mnt/d/Code/WorkflowProgram-CN/tests/transcripts/20260410T032203Z-broken-workflow/target/tools/mock_runtime_host.py': [Errno 2] No such file or directory"}
+{"ts": "2026-04-10T03:22:04Z", "type": "TaskCompleted", "stage": "invoke", "source": "runtime_smoke", "status": "error", "message": "python3: can't open file '/mnt/d/Code/WorkflowProgram-CN/tests/transcripts/20260410T032203Z-broken-workflow/target/tools/mock_runtime_host.py': [Errno 2] No such file or directory"}
+{"ts": "2026-04-10T03:22:04Z", "type": "OutputWritten", "stage": "invoke", "source": "runtime_smoke", "status": "ok", "message": "Captured plugin build manifest into RUN_ROOT outputs"}
+{"ts": "2026-04-10T03:22:05Z", "type": "RunFinished", "stage": "finished", "source": "runtime_smoke", "status": "warn", "message": "Run finished with result FAIL"}

@@ -1,0 +1,5 @@
+{"ts": "2026-04-10T03:26:59Z", "type": "RunStarted", "stage": "prepare", "source": "runtime_smoke", "status": "ok", "message": "Preparing fixture existing-workflow"}
+{"ts": "2026-04-10T03:27:00Z", "type": "TaskCreated", "stage": "invoke", "source": "runtime_smoke", "status": "ok", "message": "Invoking provider=fixture_host for /workflowprogram-audit"}
+{"ts": "2026-04-10T03:27:00Z", "type": "TaskCompleted", "stage": "invoke", "source": "runtime_smoke", "status": "ok", "message": "fixture_host completed audit."}
+{"ts": "2026-04-10T03:27:01Z", "type": "OutputWritten", "stage": "invoke", "source": "runtime_smoke", "status": "ok", "message": "Captured plugin build manifest into RUN_ROOT outputs"}
+{"ts": "2026-04-10T03:27:01Z", "type": "RunFinished", "stage": "finished", "source": "runtime_smoke", "status": "ok", "message": "Run finished with result PASS"}

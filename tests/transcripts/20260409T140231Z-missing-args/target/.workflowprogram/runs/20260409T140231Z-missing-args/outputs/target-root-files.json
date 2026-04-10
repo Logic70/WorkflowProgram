@@ -1,0 +1,54 @@
+{
+  "files": [
+    ".workflowprogram/runs/20260409T140231Z-missing-args/context.json",
+    ".workflowprogram/runs/20260409T140231Z-missing-args/events.jsonl",
+    ".workflowprogram/runs/20260409T140231Z-missing-args/outputs/mock-runtime-host.log",
+    ".workflowprogram/runs/20260409T140231Z-missing-args/outputs/target-claude-before.json",
+    ".workflowprogram/runs/20260409T140231Z-missing-args/outputs/target-root-before.json",
+    ".workflowprogram/runs/20260409T140231Z-missing-args/state.json",
+    ".workflowprogram/runs/20260409T140231Z-missing-args/workflow-spec.yaml",
+    "README.md"
+  ],
+  "entries": [
+    {
+      "path": ".workflowprogram/runs/20260409T140231Z-missing-args/context.json",
+      "sha256": "d75901045d4a6a38619db717cb3c95ef00cf265404d27ecc7b22d133dc6e3f5c",
+      "size": 855
+    },
+    {
+      "path": ".workflowprogram/runs/20260409T140231Z-missing-args/events.jsonl",
+      "sha256": "9bfa7919871db47e0539bfde60695d1244c7e5269d3e681ab47b2a96a1c9a30d",
+      "size": 713
+    },
+    {
+      "path": ".workflowprogram/runs/20260409T140231Z-missing-args/outputs/mock-runtime-host.log",
+      "sha256": "ba6ccdd1c4d13f9e663ffd89f653dd70e2267730fbbee16d52d8889caf1ec704",
+      "size": 60
+    },
+    {
+      "path": ".workflowprogram/runs/20260409T140231Z-missing-args/outputs/target-claude-before.json",
+      "sha256": "7c945ff589fa3bd7fb359be79fd57d389823e42527de5d1f2ca7cab44f192f4f",
+      "size": 35
+    },
+    {
+      "path": ".workflowprogram/runs/20260409T140231Z-missing-args/outputs/target-root-before.json",
+      "sha256": "13b23d9c2e2de43ceca1fafefa11c45e213574c8e4034fe8e10f7cb018777559",
+      "size": 1000
+    },
+    {
+      "path": ".workflowprogram/runs/20260409T140231Z-missing-args/state.json",
+      "sha256": "1bf69d494f003d28bdc3f4599a20bded8c9d4a38b95c8e5890b1d7f9ca069e33",
+      "size": 263
+    },
+    {
+      "path": ".workflowprogram/runs/20260409T140231Z-missing-args/workflow-spec.yaml",
+      "sha256": "8a8c6852570ad4337ed3fe0ca5b6b5d7567089496297bbd0fdfac7ec0dc9923d",
+      "size": 6432
+    },
+    {
+      "path": "README.md",
+      "sha256": "b3a389139b841c66ea3ee695ea55256b8bd4de4e4b80bf52e47551f650e25be0",
+      "size": 77
+    }
+  ]
+}

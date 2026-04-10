@@ -1,0 +1,144 @@
+{
+  "files": [
+    ".claude/commands/generated-smoke.md",
+    ".claude/rules/constraints.md",
+    ".claude/settings.json",
+    ".claude/skills/generated-smoke/SKILL.md",
+    ".workflowprogram/managed-files.json",
+    ".workflowprogram/runs/20260410T041707102177Z-empty-project/context.json",
+    ".workflowprogram/runs/20260410T041707102177Z-empty-project/events.jsonl",
+    ".workflowprogram/runs/20260410T041707102177Z-empty-project/outputs/candidate/.claude/commands/generated-smoke.md",
+    ".workflowprogram/runs/20260410T041707102177Z-empty-project/outputs/candidate/.claude/rules/constraints.md",
+    ".workflowprogram/runs/20260410T041707102177Z-empty-project/outputs/candidate/.claude/settings.json",
+    ".workflowprogram/runs/20260410T041707102177Z-empty-project/outputs/candidate/.claude/skills/generated-smoke/SKILL.md",
+    ".workflowprogram/runs/20260410T041707102177Z-empty-project/outputs/managed-change-plan.json",
+    ".workflowprogram/runs/20260410T041707102177Z-empty-project/outputs/managed-change-result.json",
+    ".workflowprogram/runs/20260410T041707102177Z-empty-project/outputs/managed-change-summary.md",
+    ".workflowprogram/runs/20260410T041707102177Z-empty-project/outputs/progress/current-progress.json",
+    ".workflowprogram/runs/20260410T041707102177Z-empty-project/outputs/progress/milestones.jsonl",
+    ".workflowprogram/runs/20260410T041707102177Z-empty-project/outputs/progress/user-progress.md",
+    ".workflowprogram/runs/20260410T041707102177Z-empty-project/outputs/stages/s6-lessons-delta.md",
+    ".workflowprogram/runs/20260410T041707102177Z-empty-project/outputs/target-claude-before.json",
+    ".workflowprogram/runs/20260410T041707102177Z-empty-project/outputs/target-root-before.json",
+    ".workflowprogram/runs/20260410T041707102177Z-empty-project/state.json",
+    ".workflowprogram/runs/20260410T041707102177Z-empty-project/workflow-spec.md",
+    "README.md"
+  ],
+  "entries": [
+    {
+      "path": ".claude/commands/generated-smoke.md",
+      "sha256": "937c8a301478ccf1a57bf457e44642983c117c7f1fa79a1f5785e46c004d3fd4",
+      "size": 77
+    },
+    {
+      "path": ".claude/rules/constraints.md",
+      "sha256": "16ec17838fa2a9f02a015fceb11af32bdb8ee70943159e2cfe21a5deee96e532",
+      "size": 228
+    },
+    {
+      "path": ".claude/settings.json",
+      "sha256": "517fa393b839c915eb371b9b46cdd89cf78c401c995956e4e22765547e80f1ae",
+      "size": 188
+    },
+    {
+      "path": ".claude/skills/generated-smoke/SKILL.md",
+      "sha256": "2dabedf82e310b8b1591ae2072b35b803ff467e6a5b2ab4b036751523795689c",
+      "size": 156
+    },
+    {
+      "path": ".workflowprogram/managed-files.json",
+      "sha256": "0b8e7baea7e94659e82ed5e3716ca3e1588890f85653e804d8187f59a4cf325b",
+      "size": 1446
+    },
+    {
+      "path": ".workflowprogram/runs/20260410T041707102177Z-empty-project/context.json",
+      "sha256": "0f48a938ec72645fb9c3761f10fb55baea3a710c90886f3ba63c26c314d1339e",
+      "size": 952
+    },
+    {
+      "path": ".workflowprogram/runs/20260410T041707102177Z-empty-project/events.jsonl",
+      "sha256": "b7ca822be45724ba5d0c6a6c21c17add2bb2e150cf6464c4e68dd9ac3d9e8295",
+      "size": 1359
+    },
+    {
+      "path": ".workflowprogram/runs/20260410T041707102177Z-empty-project/outputs/candidate/.claude/commands/generated-smoke.md",
+      "sha256": "937c8a301478ccf1a57bf457e44642983c117c7f1fa79a1f5785e46c004d3fd4",
+      "size": 77
+    },
+    {
+      "path": ".workflowprogram/runs/20260410T041707102177Z-empty-project/outputs/candidate/.claude/rules/constraints.md",
+      "sha256": "16ec17838fa2a9f02a015fceb11af32bdb8ee70943159e2cfe21a5deee96e532",
+      "size": 228
+    },
+    {
+      "path": ".workflowprogram/runs/20260410T041707102177Z-empty-project/outputs/candidate/.claude/settings.json",
+      "sha256": "517fa393b839c915eb371b9b46cdd89cf78c401c995956e4e22765547e80f1ae",
+      "size": 188
+    },
+    {
+      "path": ".workflowprogram/runs/20260410T041707102177Z-empty-project/outputs/candidate/.claude/skills/generated-smoke/SKILL.md",
+      "sha256": "2dabedf82e310b8b1591ae2072b35b803ff467e6a5b2ab4b036751523795689c",
+      "size": 156
+    },
+    {
+      "path": ".workflowprogram/runs/20260410T041707102177Z-empty-project/outputs/managed-change-plan.json",
+      "sha256": "05eab3f7b773016928e26ed7e4c2e5bcf2380bd65ccb9f4151e9ffb6f0fc3476",
+      "size": 3721
+    },
+    {
+      "path": ".workflowprogram/runs/20260410T041707102177Z-empty-project/outputs/managed-change-result.json",
+      "sha256": "5c2c860f7d7e997dc54d0ca8676ce559bc5d2714c490e5ece2dc351ca60124a2",
+      "size": 2413
+    },
+    {
+      "path": ".workflowprogram/runs/20260410T041707102177Z-empty-project/outputs/managed-change-summary.md",
+      "sha256": "00d12e119e44121b2784451bff5b83c87709425d468bfc672284fa1ece9ca1ab",
+      "size": 815
+    },
+    {
+      "path": ".workflowprogram/runs/20260410T041707102177Z-empty-project/outputs/progress/current-progress.json",
+      "sha256": "a18808b684335f721b3589cc8389bb063d551c05df78e0bcfd309da14831446d",
+      "size": 243
+    },
+    {
+      "path": ".workflowprogram/runs/20260410T041707102177Z-empty-project/outputs/progress/milestones.jsonl",
+      "sha256": "36ece69fc1aeaab92729cdcbf0db1634c9b83493a92085a62e586f1adb3bd31d",
+      "size": 122
+    },
+    {
+      "path": ".workflowprogram/runs/20260410T041707102177Z-empty-project/outputs/progress/user-progress.md",
+      "sha256": "2499a11f397e3092abb1ebe1312b3d62e0a28635197b5c40bb8d01e17eb32a4f",
+      "size": 365
+    },
+    {
+      "path": ".workflowprogram/runs/20260410T041707102177Z-empty-project/outputs/stages/s6-lessons-delta.md",
+      "sha256": "2b1784046ee6d39620aa940cc56f442c63bcf69b679a6cd55a94338c1524132e",
+      "size": 480
+    },
+    {
+      "path": ".workflowprogram/runs/20260410T041707102177Z-empty-project/outputs/target-claude-before.json",
+      "sha256": "7c945ff589fa3bd7fb359be79fd57d389823e42527de5d1f2ca7cab44f192f4f",
+      "size": 35
+    },
+    {
+      "path": ".workflowprogram/runs/20260410T041707102177Z-empty-project/outputs/target-root-before.json",
+      "sha256": "313df965a8161c73b1aa2f7c70533185d27aea7b22c73731d956cab135d9abbb",
+      "size": 1042
+    },
+    {
+      "path": ".workflowprogram/runs/20260410T041707102177Z-empty-project/state.json",
+      "sha256": "ff34527e03697dd6554f1db72213c9a9ceefde5dd5301b96f356435a24a8dce4",
+      "size": 270
+    },
+    {
+      "path": ".workflowprogram/runs/20260410T041707102177Z-empty-project/workflow-spec.md",
+      "sha256": "5121a94182fe7082e72b3a06193104755e585a914d51eaf7aac73918fa0d3bf2",
+      "size": 963
+    },
+    {
+      "path": "README.md",
+      "sha256": "b3a389139b841c66ea3ee695ea55256b8bd4de4e4b80bf52e47551f650e25be0",
+      "size": 77
+    }
+  ]
+}

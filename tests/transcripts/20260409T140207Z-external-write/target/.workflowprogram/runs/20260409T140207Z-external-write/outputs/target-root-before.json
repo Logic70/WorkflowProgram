@@ -1,0 +1,30 @@
+{
+  "files": [
+    ".workflowprogram/runs/20260409T140207Z-external-write/context.json",
+    ".workflowprogram/runs/20260409T140207Z-external-write/events.jsonl",
+    ".workflowprogram/runs/20260409T140207Z-external-write/state.json",
+    "README.md"
+  ],
+  "entries": [
+    {
+      "path": ".workflowprogram/runs/20260409T140207Z-external-write/context.json",
+      "sha256": "b37bddae265bc3d31e98349fb8d57460111cabd7fe0dad34a61fed04e5854431",
+      "size": 917
+    },
+    {
+      "path": ".workflowprogram/runs/20260409T140207Z-external-write/events.jsonl",
+      "sha256": "0348929f9723eed8a9a224ab13716290f7fdb65e6684c6702fc7b6acb58957ee",
+      "size": 163
+    },
+    {
+      "path": ".workflowprogram/runs/20260409T140207Z-external-write/state.json",
+      "sha256": "603f2be366574fefff8aaacabe8dd72395466627837fd173c6605fca34572e55",
+      "size": 271
+    },
+    {
+      "path": "README.md",
+      "sha256": "b3a389139b841c66ea3ee695ea55256b8bd4de4e4b80bf52e47551f650e25be0",
+      "size": 77
+    }
+  ]
+}

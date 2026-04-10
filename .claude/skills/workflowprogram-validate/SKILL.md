@@ -19,6 +19,12 @@ disable-model-invocation: true
 - `preflight` 面向当前仓库 diff；本 skill 面向目标项目 workflow 资产。
 - 单文件检查优先复用 `validate-file`；workflow 级结论由本 skill 汇总输出。
 - 若项目已有专门 workflow 验证命令，可作为补充信息纳入结果。
+- 若存在 `RUN_ROOT/workflow-spec.yaml` 且其中声明了 `test_contract`，验证目标应优先从 `entry / boundary / flow / artifacts / failure` 五类契约派生。
+- 执行期边界、最小证据集、失败枚举与环境 skip 仍以 `runtime_contract` 为准，`test_contract` 只负责判定来源。
+- S5 judge 是唯一验证主承载；runner 只负责 `runner-summary.json`，不负责 `validation-runtime-report.md` 或 `s5-validation-summary.json`。
+- 验证阶段必须通过 `${CLAUDE_PLUGIN_ROOT}/scripts/workflow-s5-judge.py`（或等效 harness）写入：
+  - `RUN_ROOT/validation-runtime-report.md`
+  - `RUN_ROOT/outputs/stages/s5-validation-summary.json`
 
 ## Step 1: Resolve Validation Scope
 
@@ -30,7 +36,14 @@ disable-model-invocation: true
 
 1. 对关键文件调用 `validate-file`。
 2. 汇总目录级存在性、注册一致性和文件格式状态。
-3. 如有必要，补充调用 `test` 运行项目定义的 workflow 校验命令。
+3. 若存在 `test_contract`，将检查项映射到：
+   - `entry`：主入口、缺参、非法入口预期
+   - `boundary`：写入边界引用、managed 覆盖/冲突/外部写入策略
+   - `flow`：required/skippable stages、失败回流、终止条件
+   - `artifacts`：关键交付物、关键证据、可缺失非关键输出
+   - `failure`：失败枚举引用、环境 skip 引用、`implemented_now` 覆盖度
+4. 如有必要，补充调用 `test` 运行项目定义的 workflow 校验命令。
+5. 将所有检查项按五类契约归档给 S5 judge，不能只输出 `contract_source` / `contract_categories` 元数据摘要。
 
 ## Step 3: Produce Verdict
 
@@ -39,12 +52,15 @@ disable-model-invocation: true
 - PASS
 - WARN
 - FAIL
+- ENVIRONMENT-SKIP
 
 并说明：
 
 - 失败项
 - 影响范围
 - 修复优先级
+- 每个检查项来源于哪类契约
+- runner 与 S5 judge 的职责边界
 
 ## Output
 
@@ -54,3 +70,6 @@ disable-model-invocation: true
 - 覆盖范围
 - 总体结论
 - 失败或警告清单
+- `s5-validation-summary.json` 路径
+- 若存在 `test_contract`，输出 `contract_source` 与 `contract_categories`
+- `validation-runtime-report.md` 路径

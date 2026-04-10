@@ -1,0 +1,7 @@
+{
+  "run_id": "20260409T140708Z-existing-workflow",
+  "status": "PASS",
+  "entry_skill": "workflowprogram-audit",
+  "transition_count": 6,
+  "failure_code": null
+}

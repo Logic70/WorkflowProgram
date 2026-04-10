@@ -1,0 +1,30 @@
+{
+  "files": [
+    ".workflowprogram/runs/20260410T034700698171Z-empty-project/context.json",
+    ".workflowprogram/runs/20260410T034700698171Z-empty-project/events.jsonl",
+    ".workflowprogram/runs/20260410T034700698171Z-empty-project/state.json",
+    "README.md"
+  ],
+  "entries": [
+    {
+      "path": ".workflowprogram/runs/20260410T034700698171Z-empty-project/context.json",
+      "sha256": "e8a11e49dd46fb0b1d2b69cc6d2123d42a02896f1fc2deae9a385cbc435b8419",
+      "size": 987
+    },
+    {
+      "path": ".workflowprogram/runs/20260410T034700698171Z-empty-project/events.jsonl",
+      "sha256": "8e3ad8ad99459e080f53a0ed5b309aa8dad8ed9de4b6bfb9e4d76b6992013bd5",
+      "size": 162
+    },
+    {
+      "path": ".workflowprogram/runs/20260410T034700698171Z-empty-project/state.json",
+      "sha256": "87013a836ab47f8d80290c004fe1479be32dc2a03bc0e37880e973eff0bd4520",
+      "size": 276
+    },
+    {
+      "path": "README.md",
+      "sha256": "b3a389139b841c66ea3ee695ea55256b8bd4de4e4b80bf52e47551f650e25be0",
+      "size": 77
+    }
+  ]
+}

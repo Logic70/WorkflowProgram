@@ -1,0 +1,20 @@
+{
+  "verdict": "FAIL",
+  "failure_kind": "STRUCTURE_FAILURE",
+  "checked_files": [
+    "context.json",
+    "state.json",
+    "events.jsonl",
+    "transcript.md",
+    "validation-runtime-report.md"
+  ],
+  "contract_source": "fixture_preset",
+  "contract_categories": [
+    "entry",
+    "failure"
+  ],
+  "implemented_failure_kinds": [],
+  "environment_skip_codes": [],
+  "target_claude_files": [],
+  "summary": "Fixture not found: /mnt/d/Code/WorkflowProgram-CN/tests/fixtures/invalid-entry"
+}

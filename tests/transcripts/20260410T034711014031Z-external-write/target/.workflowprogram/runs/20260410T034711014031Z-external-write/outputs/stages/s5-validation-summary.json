@@ -1,0 +1,390 @@
+{
+  "verdict": "FAIL",
+  "failure_kind": "implementation",
+  "failure_code": "S5_BOUNDARY_TARGET_ROOT_BOUNDARY_CHANGES",
+  "observed_verdict": "PASS",
+  "observed_failure_kind": "none",
+  "observed_failure_code": "none",
+  "environment_reason": null,
+  "contract_source": "workflow-spec.yaml.test_contract",
+  "contract_categories": [
+    "entry",
+    "boundary",
+    "flow",
+    "artifacts",
+    "failure"
+  ],
+  "implemented_failure_kinds": [
+    "none",
+    "environment"
+  ],
+  "environment_skip_codes": [
+    "RUNTIME_HOST_MISSING",
+    "TARGET_NOT_WRITABLE",
+    "RUNTIME_HOST_NOT_READY"
+  ],
+  "provider": "command_adapter",
+  "checked_files": [
+    "context.json",
+    "events.jsonl",
+    "outputs/managed-change-plan.json",
+    "outputs/managed-change-result.json",
+    "outputs/mock-runtime-host.log",
+    "outputs/plugin-build-manifest.json",
+    "outputs/progress/current-progress.json",
+    "outputs/progress/milestones.jsonl",
+    "outputs/progress/user-progress.md",
+    "outputs/runtime-provider-result.json",
+    "outputs/stages/s5-validation-summary.json",
+    "outputs/stages/s6-lessons-delta.md",
+    "outputs/stderr.log",
+    "outputs/stdout.log",
+    "outputs/target-claude-before.json",
+    "outputs/target-claude-files.json",
+    "outputs/target-root-before.json",
+    "outputs/target-root-files.json",
+    "state.json",
+    "transcript.md",
+    "validation-runtime-report.md",
+    "workflow-spec.md"
+  ],
+  "checks_by_category": {
+    "entry": [
+      {
+        "name": "smoke_entry_invoked",
+        "status": "PASS",
+        "detail": "Observed smoke entry skill: workflowprogram-develop",
+        "source": "smoke.invocation"
+      },
+      {
+        "name": "declared_main_entry",
+        "status": "PASS",
+        "detail": "Declared main_entry=workflowprogram-develop; smoke entry=workflowprogram-develop",
+        "source": "test_contract.entry.main_entry"
+      },
+      {
+        "name": "required_arguments_present",
+        "status": "PASS",
+        "detail": "Request payload is non-empty.",
+        "source": "test_contract.entry.required_args"
+      }
+    ],
+    "boundary": [
+      {
+        "name": "write_boundaries_reference",
+        "status": "PASS",
+        "detail": "Boundary contract must reference runtime_contract.write_boundaries.",
+        "source": "test_contract.boundary.write_boundaries_ref"
+      },
+      {
+        "name": "run_root_spec_boundary",
+        "status": "PASS",
+        "detail": "workflow-spec.yaml should be allowed in RUN_ROOT for control-plane execution.",
+        "source": "runtime_contract.write_boundaries.run_root_allow"
+      },
+      {
+        "name": "target_root_boundary_changes",
+        "status": "FAIL",
+        "detail": "Changed target-root paths=['.claude/commands/example.md', '.claude/rules/constraints.md', '.claude/settings.json', '.workflowprogram/runs/20260410T034711014031Z-external-write/events.jsonl', '.workflowprogram/runs/20260410T034711014031Z-external-write/outputs/candidate/.claude/settings.json', '.workflowprogram/runs/20260410T034711014031Z-external-write/outputs/managed-change-plan.json', '.workflowprogram/runs/20260410T034711014031Z-external-write/outputs/managed-change-result.json', '.workflowprogram/runs/20260410T034711014031Z-external-write/outputs/mock-runtime-host.log', '.workflowprogram/runs/20260410T034711014031Z-external-write/outputs/progress/current-progress.json', '.workflowprogram/runs/20260410T034711014031Z-external-write/outputs/progress/milestones.jsonl', '.workflowprogram/runs/20260410T034711014031Z-external-write/outputs/progress/user-progress.md', '.workflowprogram/runs/20260410T034711014031Z-external-write/outputs/stages/runner-summary.json', '.workflowprogram/runs/20260410T034711014031Z-external-write/outputs/stages/s0-route.json', '.workflowprogram/runs/20260410T034711014031Z-external-write/outputs/stages/s6-lessons-delta.md', '.workflowprogram/runs/20260410T034711014031Z-external-write/outputs/target-claude-before.json', '.workflowprogram/runs/20260410T034711014031Z-external-write/outputs/target-root-before.json', '.workflowprogram/runs/20260410T034711014031Z-external-write/state.json', '.workflowprogram/runs/20260410T034711014031Z-external-write/workflow-spec.md', '.workflowprogram/runs/20260410T034711014031Z-external-write/workflow-spec.yaml', 'rogue-output.txt']; disallowed=['rogue-output.txt']",
+        "source": "runtime_contract.write_boundaries.target_root_allow"
+      },
+      {
+        "name": "external_write_policy",
+        "status": "FAIL",
+        "detail": "external_write_policy=deny; disallowed_changes=['rogue-output.txt']",
+        "source": "test_contract.boundary.external_write_policy"
+      },
+      {
+        "name": "managed_candidate_sources_present",
+        "status": "PASS",
+        "detail": "Missing managed candidate source_path=['<none>']",
+        "source": "outputs/managed-change-plan.json"
+      },
+      {
+        "name": "managed_overwrite_policy_observed",
+        "status": "PASS",
+        "detail": "managed_overwrite_policy=reject-unmanaged-overwrite; planned managed paths=['.claude/settings.json']",
+        "source": "test_contract.boundary.managed_overwrite_policy"
+      },
+      {
+        "name": "conflict_artifacts_preserved",
+        "status": "INFO",
+        "detail": "conflict_expectation=keep-candidate-and-report; no conflicts were observed.",
+        "source": "test_contract.boundary.conflict_expectation"
+      }
+    ],
+    "flow": [
+      {
+        "name": "stage_history_available",
+        "status": "PASS",
+        "detail": "Observed stage_history=['requirement', 'context', 'design', 'generate', 'validate', 'lessons']",
+        "source": "runtime-provider.stage_history"
+      },
+      {
+        "name": "required_stages_executed",
+        "status": "PASS",
+        "detail": "Observed stage_history=['requirement', 'context', 'design', 'generate', 'validate', 'lessons']; missing=none",
+        "source": "intent_flows.develop.required_stage_slots"
+      },
+      {
+        "name": "unexpected_stages_absent",
+        "status": "PASS",
+        "detail": "Observed stage_history=['requirement', 'context', 'design', 'generate', 'validate', 'lessons']; allowed=['requirement', 'context', 'design', 'generate', 'validate', 'lessons']; unexpected=['<none>']",
+        "source": "intent_flows.develop.required_stage_slots+intent_flows.develop.optional_stage_slots"
+      },
+      {
+        "name": "stage_order_valid",
+        "status": "PASS",
+        "detail": "Observed stage_history=['requirement', 'context', 'design', 'generate', 'validate', 'lessons']; allowed_order=['requirement', 'context', 'design', 'generate', 'validate', 'lessons']",
+        "source": "intent_flows.develop.required_stage_slots+intent_flows.develop.optional_stage_slots"
+      },
+      {
+        "name": "stage_status_available",
+        "status": "PASS",
+        "detail": "Observed stage_status=done",
+        "source": "runtime-provider.stage_status"
+      },
+      {
+        "name": "terminal_condition_observed",
+        "status": "PASS",
+        "detail": "Observed stage_status=done; expected=done",
+        "source": "test_contract.flow.terminal_conditions"
+      },
+      {
+        "name": "skippable_stages_observed",
+        "status": "PASS",
+        "detail": "Present skippable stages=['<none>']; absent skippable stages=['<none>']",
+        "source": "intent_flows.develop.optional_stage_slots"
+      }
+    ],
+    "artifacts": [
+      {
+        "name": "evidence:context.json",
+        "status": "PASS",
+        "detail": "context.json exists in RUN_ROOT.",
+        "source": "runtime_smoke.evidence"
+      },
+      {
+        "name": "evidence:state.json",
+        "status": "PASS",
+        "detail": "state.json exists in RUN_ROOT.",
+        "source": "runtime_smoke.evidence"
+      },
+      {
+        "name": "evidence:events.jsonl",
+        "status": "PASS",
+        "detail": "events.jsonl exists in RUN_ROOT.",
+        "source": "runtime_smoke.evidence"
+      },
+      {
+        "name": "evidence:transcript.md",
+        "status": "PASS",
+        "detail": "transcript.md exists in RUN_ROOT.",
+        "source": "runtime_smoke.evidence"
+      },
+      {
+        "name": "evidence:validation-runtime-report.md",
+        "status": "PASS",
+        "detail": "validation-runtime-report.md is generated by the S5 judge.",
+        "source": "runtime_smoke.evidence"
+      },
+      {
+        "name": "evidence:outputs/progress/current-progress.json",
+        "status": "PASS",
+        "detail": "outputs/progress/current-progress.json exists in RUN_ROOT.",
+        "source": "runtime_smoke.evidence"
+      },
+      {
+        "name": "evidence:outputs/progress/milestones.jsonl",
+        "status": "PASS",
+        "detail": "outputs/progress/milestones.jsonl exists in RUN_ROOT.",
+        "source": "runtime_smoke.evidence"
+      },
+      {
+        "name": "evidence:outputs/progress/user-progress.md",
+        "status": "PASS",
+        "detail": "outputs/progress/user-progress.md exists in RUN_ROOT.",
+        "source": "runtime_smoke.evidence"
+      },
+      {
+        "name": "evidence:outputs/stdout.log",
+        "status": "PASS",
+        "detail": "outputs/stdout.log exists in RUN_ROOT.",
+        "source": "runtime_smoke.evidence"
+      },
+      {
+        "name": "evidence:outputs/stderr.log",
+        "status": "PASS",
+        "detail": "outputs/stderr.log exists in RUN_ROOT.",
+        "source": "runtime_smoke.evidence"
+      },
+      {
+        "name": "evidence:outputs/runtime-provider-result.json",
+        "status": "PASS",
+        "detail": "outputs/runtime-provider-result.json exists in RUN_ROOT.",
+        "source": "runtime_smoke.evidence"
+      },
+      {
+        "name": "evidence:outputs/target-claude-before.json",
+        "status": "PASS",
+        "detail": "outputs/target-claude-before.json exists in RUN_ROOT.",
+        "source": "runtime_smoke.evidence"
+      },
+      {
+        "name": "evidence:outputs/target-claude-files.json",
+        "status": "PASS",
+        "detail": "outputs/target-claude-files.json exists in RUN_ROOT.",
+        "source": "runtime_smoke.evidence"
+      },
+      {
+        "name": "evidence:outputs/target-root-before.json",
+        "status": "PASS",
+        "detail": "outputs/target-root-before.json exists in RUN_ROOT.",
+        "source": "runtime_smoke.evidence"
+      },
+      {
+        "name": "evidence:outputs/target-root-files.json",
+        "status": "PASS",
+        "detail": "outputs/target-root-files.json exists in RUN_ROOT.",
+        "source": "runtime_smoke.evidence"
+      },
+      {
+        "name": "evidence:outputs/managed-change-plan.json",
+        "status": "PASS",
+        "detail": "outputs/managed-change-plan.json exists in RUN_ROOT.",
+        "source": "runtime_smoke.evidence"
+      },
+      {
+        "name": "evidence:outputs/managed-change-result.json",
+        "status": "PASS",
+        "detail": "outputs/managed-change-result.json exists in RUN_ROOT.",
+        "source": "runtime_smoke.evidence"
+      },
+      {
+        "name": "evidence:outputs/mock-runtime-host.log",
+        "status": "PASS",
+        "detail": "outputs/mock-runtime-host.log exists in RUN_ROOT.",
+        "source": "runtime_smoke.evidence"
+      },
+      {
+        "name": "evidence:workflow-spec.md",
+        "status": "PASS",
+        "detail": "workflow-spec.md exists in RUN_ROOT.",
+        "source": "runtime_smoke.evidence"
+      },
+      {
+        "name": "evidence:outputs/stages/s6-lessons-delta.md",
+        "status": "PASS",
+        "detail": "outputs/stages/s6-lessons-delta.md exists in RUN_ROOT.",
+        "source": "runtime_smoke.evidence"
+      },
+      {
+        "name": "evidence:outputs/plugin-build-manifest.json",
+        "status": "PASS",
+        "detail": "outputs/plugin-build-manifest.json exists in RUN_ROOT.",
+        "source": "runtime_smoke.evidence"
+      },
+      {
+        "name": "evidence:outputs/stages/s5-validation-summary.json",
+        "status": "PASS",
+        "detail": "outputs/stages/s5-validation-summary.json is generated by the S5 judge.",
+        "source": "runtime_smoke.evidence"
+      },
+      {
+        "name": "evidence_reference",
+        "status": "PASS",
+        "detail": "evidence_ref=runtime_contract.required_evidence",
+        "source": "test_contract.artifacts.evidence_ref"
+      },
+      {
+        "name": "required_runtime_evidence",
+        "status": "PASS",
+        "detail": "Missing required_evidence=['<none>']",
+        "source": "runtime_contract.required_evidence"
+      },
+      {
+        "name": "route_evidence_matches_invocation",
+        "status": "PASS",
+        "detail": "Observed route entry_skill=workflowprogram-develop; intent=develop; expected entry_skill=workflowprogram-develop; intent=develop",
+        "source": "outputs/stages/s0-route.json"
+      },
+      {
+        "name": "runner_summary_matches_observed",
+        "status": "PASS",
+        "detail": "Observed runner-summary entry_skill=workflowprogram-develop; status=PASS; expected entry_skill=workflowprogram-develop; status=PASS",
+        "source": "outputs/stages/runner-summary.json"
+      },
+      {
+        "name": "workflow_spec_draft_exists",
+        "status": "PASS",
+        "detail": "workflow-spec.md exists at /mnt/d/Code/WorkflowProgram-CN/tests/transcripts/20260410T034711014031Z-external-write/target/.workflowprogram/runs/20260410T034711014031Z-external-write/workflow-spec.md",
+        "source": "S1.workflow-spec.md"
+      },
+      {
+        "name": "workflow_spec_draft_valid",
+        "status": "PASS",
+        "detail": "workflow-spec.md passed deterministic S1 quality validation.",
+        "source": "validate-workflow-draft.py"
+      },
+      {
+        "name": "s6_lessons_delta_exists",
+        "status": "PASS",
+        "detail": "s6-lessons-delta.md exists at /mnt/d/Code/WorkflowProgram-CN/tests/transcripts/20260410T034711014031Z-external-write/target/.workflowprogram/runs/20260410T034711014031Z-external-write/outputs/stages/s6-lessons-delta.md",
+        "source": "S6.outputs/stages/s6-lessons-delta.md"
+      },
+      {
+        "name": "s6_lessons_delta_valid",
+        "status": "PASS",
+        "detail": "S6 lessons delta and user progress passed deterministic validation.",
+        "source": "validate-lessons-delta.py"
+      },
+      {
+        "name": "deliverable:.claude/settings.json",
+        "status": "PASS",
+        "detail": "Deliverable pattern .claude/settings.json; matched_paths=['.claude/settings.json']; changed_matches=['.claude/settings.json']",
+        "source": "test_contract.artifacts.deliverables"
+      },
+      {
+        "name": "deliverable:.claude/rules/constraints.md",
+        "status": "PASS",
+        "detail": "Deliverable pattern .claude/rules/constraints.md; matched_paths=['.claude/rules/constraints.md']; changed_matches=['.claude/rules/constraints.md']",
+        "source": "test_contract.artifacts.deliverables"
+      }
+    ],
+    "failure": [
+      {
+        "name": "derived_failure_kind",
+        "status": "PASS",
+        "detail": "Derived failure_kind=none; raw failure_code=none",
+        "source": "judge.mapping"
+      },
+      {
+        "name": "implemented_now_coverage",
+        "status": "PASS",
+        "detail": "implemented_now=['none', 'environment']; observed=none",
+        "source": "test_contract.failure.implemented_now"
+      },
+      {
+        "name": "failure_kinds_reference",
+        "status": "PASS",
+        "detail": "failure_kinds_ref=runtime_contract.failure_kinds",
+        "source": "test_contract.failure.failure_kinds_ref"
+      },
+      {
+        "name": "environment_skip_reference",
+        "status": "PASS",
+        "detail": "environment_skip_ref=runtime_contract.environment_skip",
+        "source": "test_contract.failure.environment_skip_ref"
+      }
+    ]
+  },
+  "judge_basis": {
+    "category": "boundary",
+    "name": "target_root_boundary_changes",
+    "status": "FAIL",
+    "detail": "Changed target-root paths=['.claude/commands/example.md', '.claude/rules/constraints.md', '.claude/settings.json', '.workflowprogram/runs/20260410T034711014031Z-external-write/events.jsonl', '.workflowprogram/runs/20260410T034711014031Z-external-write/outputs/candidate/.claude/settings.json', '.workflowprogram/runs/20260410T034711014031Z-external-write/outputs/managed-change-plan.json', '.workflowprogram/runs/20260410T034711014031Z-external-write/outputs/managed-change-result.json', '.workflowprogram/runs/20260410T034711014031Z-external-write/outputs/mock-runtime-host.log', '.workflowprogram/runs/20260410T034711014031Z-external-write/outputs/progress/current-progress.json', '.workflowprogram/runs/20260410T034711014031Z-external-write/outputs/progress/milestones.jsonl', '.workflowprogram/runs/20260410T034711014031Z-external-write/outputs/progress/user-progress.md', '.workflowprogram/runs/20260410T034711014031Z-external-write/outputs/stages/runner-summary.json', '.workflowprogram/runs/20260410T034711014031Z-external-write/outputs/stages/s0-route.json', '.workflowprogram/runs/20260410T034711014031Z-external-write/outputs/stages/s6-lessons-delta.md', '.workflowprogram/runs/20260410T034711014031Z-external-write/outputs/target-claude-before.json', '.workflowprogram/runs/20260410T034711014031Z-external-write/outputs/target-root-before.json', '.workflowprogram/runs/20260410T034711014031Z-external-write/state.json', '.workflowprogram/runs/20260410T034711014031Z-external-write/workflow-spec.md', '.workflowprogram/runs/20260410T034711014031Z-external-write/workflow-spec.yaml', 'rogue-output.txt']; disallowed=['rogue-output.txt']",
+    "source": "runtime_contract.write_boundaries.target_root_allow"
+  },
+  "summary": "Mock host completed workflow execution successfully.",
+  "report_path": "/mnt/d/Code/WorkflowProgram-CN/tests/transcripts/20260410T034711014031Z-external-write/target/.workflowprogram/runs/20260410T034711014031Z-external-write/validation-runtime-report.md"
+}

@@ -1,0 +1,51 @@
+{
+  "provider": "command_adapter",
+  "result": "FAIL",
+  "failure_code": "MISSING_ARGUMENT",
+  "message": "Mock host rejected an empty request payload.",
+  "is_error": true,
+  "command": [
+    "python3",
+    "/mnt/d/Code/WorkflowProgram-CN/tools/mock_runtime_host.py",
+    "invoke",
+    "--plugin-root",
+    "/mnt/d/Code/WorkflowProgram-CN/dist/plugin",
+    "--target-root",
+    "/mnt/d/Code/WorkflowProgram-CN/tests/transcripts/20260409T141005Z-missing-args/target",
+    "--run-root",
+    "/mnt/d/Code/WorkflowProgram-CN/tests/transcripts/20260409T141005Z-missing-args/target/.workflowprogram/runs/20260409T141005Z-missing-args",
+    "--entry-skill",
+    "workflowprogram-develop",
+    "--request",
+    "",
+    "--fixture",
+    "missing-args",
+    "--timeout",
+    "90",
+    "--json"
+  ],
+  "returncode": 1,
+  "stdout": "{\n  \"result\": \"FAIL\",\n  \"failure_code\": \"MISSING_ARGUMENT\",\n  \"message\": \"Mock host rejected an empty request payload.\",\n  \"is_error\": true,\n  \"stage_history\": [\n    \"requirement\"\n  ],\n  \"stage_status\": \"failed\",\n  \"current_stage\": \"requirement\",\n  \"next_action\": \"provide the required request arguments\"\n}\n",
+  "stderr": "",
+  "parsed": {
+    "result": "FAIL",
+    "failure_code": "MISSING_ARGUMENT",
+    "message": "Mock host rejected an empty request payload.",
+    "is_error": true,
+    "stage_history": [
+      "requirement"
+    ],
+    "stage_status": "failed",
+    "current_stage": "requirement",
+    "next_action": "provide the required request arguments"
+  },
+  "subagent_evidence": false,
+  "stage_history": [
+    "requirement"
+  ],
+  "current_stage": "requirement",
+  "stage_status": "",
+  "next_action": "provide the required request arguments",
+  "next_stage_on_failure": "",
+  "metadata": {}
+}

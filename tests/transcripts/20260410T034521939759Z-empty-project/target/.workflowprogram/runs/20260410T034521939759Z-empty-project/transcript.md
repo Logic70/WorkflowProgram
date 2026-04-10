@@ -1,0 +1,71 @@
+# Runtime Smoke Transcript
+
+- Run ID: `20260410T034521939759Z-empty-project`
+- Fixture: `empty-project`
+- Entry skill: `workflowprogram-develop`
+- Runtime provider: `fixture_host`
+- Result: `PASS`
+- Contract source: `fixture_preset`
+- Contract categories: `entry, flow, artifacts, failure`
+
+## Command
+
+```bash
+/usr/bin/python3 /mnt/d/Code/WorkflowProgram-CN/.claude/scripts/managed-assets.py apply-staged --target-root /mnt/d/Code/WorkflowProgram-CN/tests/transcripts/20260410T034521939759Z-empty-project/target --source-root /mnt/d/Code/WorkflowProgram-CN/tests/transcripts/20260410T034521939759Z-empty-project/target/.workflowprogram/runs/20260410T034521939759Z-empty-project/outputs/candidate/.claude --run-root /mnt/d/Code/WorkflowProgram-CN/tests/transcripts/20260410T034521939759Z-empty-project/target/.workflowprogram/runs/20260410T034521939759Z-empty-project --json
+```
+
+## Stdout
+
+```text
+{
+  "generated_at": "2026-04-10T03:45:22Z",
+  "target_root": "/mnt/d/Code/WorkflowProgram-CN/tests/transcripts/20260410T034521939759Z-empty-project/target",
+  "source_root": "/mnt/d/Code/WorkflowProgram-CN/tests/transcripts/20260410T034521939759Z-empty-project/target/.workflowprogram/runs/20260410T034521939759Z-empty-project/outputs/candidate/.claude",
+  "run_root": "/mnt/d/Code/WorkflowProgram-CN/tests/transcripts/20260410T034521939759Z-empty-project/target/.workflowprogram/runs/20260410T034521939759Z-empty-project",
+  "manifest_path": "/mnt/d/Code/WorkflowProgram-CN/tests/transcripts/20260410T034521939759Z-empty-project/target/.workflowprogram/managed-files.json",
+  "producer_version": "0.1.0",
+  "summary": {
+    "candidate_files": 4,
+    "create": 4,
+    "update": 0,
+    "conflict": 0
+  },
+  "applied": [
+    {
+      "relative_path": ".claude/commands/generated-smoke.md",
+      "action": "create",
+      "target_path": "/mnt/d/Code/WorkflowProgram-CN/tests/transcripts/20260410T034521939759Z-empty-project/target/.claude/commands/generated-smoke.md",
+      "applied_sha256": "937c8a301478ccf1a57bf457e44642983c117c7f1fa79a1f5785e46c004d3fd4",
+      "run_id": "20260410T034521939759Z-empty-project"
+    },
+    {
+      "relative_path": ".claude/rules/constraints.md",
+      "action": "create",
+      "target_path": "/mnt/d/Code/WorkflowProgram-CN/tests/transcripts/20260410T034521939759Z-empty-project/target/.claude/rules/constraints.md",
+      "applied_sha256": "16ec17838fa2a9f02a015fceb11af32bdb8ee70943159e2cfe21a5deee96e532",
+      "run_id": "20260410T034521939759Z-empty-project"
+    },
+    {
+      "relative_path": ".claude/settings.json",
+      "action": "create",
+      "target_path": "/mnt/d/Code/WorkflowProgram-CN/tests/transcripts/20260410T034521939759Z-empty-project/target/.claude/settings.json",
+      "applied_sha256": "517fa393b839c915eb371b9b46cdd89cf78c401c995956e4e22765547e80f1ae",
+      "run_id": "20260410T034521939759Z-empty-project"
+    },
+    {
+      "relative_path": ".claude/skills/generated-smoke/SKILL.md",
+      "action": "create",
+      "target_path": "/mnt/d/Code/WorkflowProgram-CN/tests/transcripts/20260410T034521939759Z-empty-project/target/.claude/skills/generated-smoke/SKILL.md",
+      "applied_sha256": "2dabedf82e310b8b1591ae2072b35b803ff467e6a5b2ab4b036751523795689c",
+      "run_id": "20260410T034521939759Z-empty-project"
+    }
+  ],
+  "conflicts": []
+}
+```
+
+## Stderr
+
+```text
+<empty>
+```

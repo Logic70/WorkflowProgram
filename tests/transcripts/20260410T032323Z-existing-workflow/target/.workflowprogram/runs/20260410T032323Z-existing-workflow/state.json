@@ -1,0 +1,11 @@
+{
+  "run_id": "20260410T032323Z-existing-workflow",
+  "status": "completed",
+  "stage": "finished",
+  "result": "FAIL",
+  "category": "STRUCTURE_FAILURE",
+  "subagent_evidence": false,
+  "events_written": 5,
+  "started_at": "2026-04-10T03:23:23Z",
+  "updated_at": "2026-04-10T03:23:26Z"
+}

@@ -1,0 +1,25 @@
+{
+  "run_id": "20260409T141503Z-broken-workflow",
+  "started_at": "2026-04-09T14:15:03Z",
+  "plugin_root": "/mnt/d/Code/WorkflowProgram-CN/dist/plugin",
+  "target_root": "/mnt/d/Code/WorkflowProgram-CN/tests/transcripts/20260409T141503Z-broken-workflow/target",
+  "fixture": "broken-workflow",
+  "entry_skill": "workflowprogram-validate",
+  "request": "验证当前项目中的 workflow 资产，并输出失败项、影响范围和修复优先级",
+  "claude_bin": "claude",
+  "runtime_provider": "command_adapter",
+  "provider_command": "python3 /mnt/d/Code/WorkflowProgram-CN/tools/mock_runtime_host.py",
+  "mode": "runtime-smoke",
+  "plugin_build_manifest": "/mnt/d/Code/WorkflowProgram-CN/dist/plugin/build-manifest.json",
+  "contract_summary": {
+    "contract_source": "fixture_preset",
+    "contract_categories": [
+      "entry",
+      "artifacts",
+      "failure"
+    ],
+    "implemented_failure_kinds": [],
+    "environment_skip_codes": [],
+    "spec_path": null
+  }
+}

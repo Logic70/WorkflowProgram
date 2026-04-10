@@ -1,0 +1,38 @@
+{
+  "manifest_version": 1,
+  "updated_at": "2026-04-09T14:01:00Z",
+  "entries": [
+    {
+      "relative_path": ".claude/commands/generated-smoke.md",
+      "producer_version": "0.1.0",
+      "last_applied_hash": "937c8a301478ccf1a57bf457e44642983c117c7f1fa79a1f5785e46c004d3fd4",
+      "ownership": "managed",
+      "last_applied_at": "2026-04-09T14:01:00Z",
+      "last_run_id": "20260409T140056Z-empty-project"
+    },
+    {
+      "relative_path": ".claude/rules/constraints.md",
+      "producer_version": "0.1.0",
+      "last_applied_hash": "16ec17838fa2a9f02a015fceb11af32bdb8ee70943159e2cfe21a5deee96e532",
+      "ownership": "managed",
+      "last_applied_at": "2026-04-09T14:01:00Z",
+      "last_run_id": "20260409T140056Z-empty-project"
+    },
+    {
+      "relative_path": ".claude/settings.json",
+      "producer_version": "0.1.0",
+      "last_applied_hash": "517fa393b839c915eb371b9b46cdd89cf78c401c995956e4e22765547e80f1ae",
+      "ownership": "managed",
+      "last_applied_at": "2026-04-09T14:01:00Z",
+      "last_run_id": "20260409T140056Z-empty-project"
+    },
+    {
+      "relative_path": ".claude/skills/generated-smoke/SKILL.md",
+      "producer_version": "0.1.0",
+      "last_applied_hash": "2dabedf82e310b8b1591ae2072b35b803ff467e6a5b2ab4b036751523795689c",
+      "ownership": "managed",
+      "last_applied_at": "2026-04-09T14:01:00Z",
+      "last_run_id": "20260409T140056Z-empty-project"
+    }
+  ]
+}

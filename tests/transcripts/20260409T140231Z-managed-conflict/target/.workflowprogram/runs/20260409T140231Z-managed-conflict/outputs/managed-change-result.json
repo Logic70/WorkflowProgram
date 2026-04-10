@@ -1,0 +1,19 @@
+{
+  "generated_at": "2026-04-09T14:02:32Z",
+  "target_root": "/mnt/d/Code/WorkflowProgram-CN/tests/transcripts/20260409T140231Z-managed-conflict/target",
+  "run_root": "/mnt/d/Code/WorkflowProgram-CN/tests/transcripts/20260409T140231Z-managed-conflict/target/.workflowprogram/runs/20260409T140231Z-managed-conflict",
+  "summary": {
+    "create": 0,
+    "update": 0,
+    "conflict": 1
+  },
+  "applied": [],
+  "conflicts": [
+    {
+      "relative_path": ".claude/settings.json",
+      "target_path": "/mnt/d/Code/WorkflowProgram-CN/tests/transcripts/20260409T140231Z-managed-conflict/target/.claude/settings.json",
+      "decision": "conflict-managed-drift",
+      "conflict_copy": "/mnt/d/Code/WorkflowProgram-CN/tests/transcripts/20260409T140231Z-managed-conflict/target/.workflowprogram/runs/20260409T140231Z-managed-conflict/outputs/conflicts/.claude/settings.json"
+    }
+  ]
+}

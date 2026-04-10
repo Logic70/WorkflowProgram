@@ -1,0 +1,13 @@
+{
+  "run_id": "20260409T141503Z-empty-project",
+  "status": "completed",
+  "stage": "finished",
+  "result": "FAIL",
+  "category": "S5_BOUNDARY_MANAGED_OVERWRITE_POLICY_OBSERVED",
+  "subagent_evidence": false,
+  "events_written": 5,
+  "started_at": "2026-04-09T14:15:03Z",
+  "updated_at": "2026-04-09T14:15:07Z",
+  "observed_result": "PASS",
+  "observed_category": null
+}

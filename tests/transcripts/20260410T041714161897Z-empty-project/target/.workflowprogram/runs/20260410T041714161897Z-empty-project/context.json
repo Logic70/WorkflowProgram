@@ -1,0 +1,26 @@
+{
+  "run_id": "20260410T041714161897Z-empty-project",
+  "started_at": "2026-04-10T04:17:14Z",
+  "plugin_root": "/mnt/d/Code/WorkflowProgram-CN/dist/plugin",
+  "target_root": "/mnt/d/Code/WorkflowProgram-CN/tests/transcripts/20260410T041714161897Z-empty-project/target",
+  "fixture": "empty-project",
+  "entry_skill": "workflowprogram-develop",
+  "request": "为当前项目设计一个最小 Claude Code workflow，至少包含 settings、一个 skill 和一个 rule 文件",
+  "claude_bin": "claude",
+  "runtime_provider": "claude_cli",
+  "provider_command": null,
+  "mode": "runtime-smoke",
+  "plugin_build_manifest": "/mnt/d/Code/WorkflowProgram-CN/dist/plugin/build-manifest.json",
+  "contract_summary": {
+    "contract_source": "fixture_preset",
+    "contract_categories": [
+      "entry",
+      "flow",
+      "artifacts",
+      "failure"
+    ],
+    "implemented_failure_kinds": [],
+    "environment_skip_codes": [],
+    "spec_path": null
+  }
+}

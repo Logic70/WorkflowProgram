@@ -1,0 +1,13 @@
+{
+  "run_id": "20260409T140207Z-empty-project",
+  "status": "completed",
+  "stage": "finished",
+  "result": "PASS",
+  "category": "none",
+  "subagent_evidence": false,
+  "events_written": 5,
+  "started_at": "2026-04-09T14:02:07Z",
+  "updated_at": "2026-04-09T14:02:10Z",
+  "observed_result": "PASS",
+  "observed_category": null
+}

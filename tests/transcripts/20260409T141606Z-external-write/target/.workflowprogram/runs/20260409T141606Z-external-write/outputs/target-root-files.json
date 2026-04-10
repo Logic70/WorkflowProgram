@@ -1,0 +1,126 @@
+{
+  "files": [
+    ".claude/commands/example.md",
+    ".claude/rules/constraints.md",
+    ".claude/settings.json",
+    ".workflowprogram/runs/20260409T141606Z-external-write/context.json",
+    ".workflowprogram/runs/20260409T141606Z-external-write/events.jsonl",
+    ".workflowprogram/runs/20260409T141606Z-external-write/outputs/candidate/.claude/settings.json",
+    ".workflowprogram/runs/20260409T141606Z-external-write/outputs/managed-change-plan.json",
+    ".workflowprogram/runs/20260409T141606Z-external-write/outputs/managed-change-result.json",
+    ".workflowprogram/runs/20260409T141606Z-external-write/outputs/mock-runtime-host.log",
+    ".workflowprogram/runs/20260409T141606Z-external-write/outputs/progress/current-progress.json",
+    ".workflowprogram/runs/20260409T141606Z-external-write/outputs/progress/milestones.jsonl",
+    ".workflowprogram/runs/20260409T141606Z-external-write/outputs/progress/user-progress.md",
+    ".workflowprogram/runs/20260409T141606Z-external-write/outputs/stages/runner-summary.json",
+    ".workflowprogram/runs/20260409T141606Z-external-write/outputs/stages/s0-route.json",
+    ".workflowprogram/runs/20260409T141606Z-external-write/outputs/target-claude-before.json",
+    ".workflowprogram/runs/20260409T141606Z-external-write/outputs/target-root-before.json",
+    ".workflowprogram/runs/20260409T141606Z-external-write/state.json",
+    ".workflowprogram/runs/20260409T141606Z-external-write/workflow-spec.yaml",
+    "README.md",
+    "rogue-output.txt"
+  ],
+  "entries": [
+    {
+      "path": ".claude/commands/example.md",
+      "sha256": "14300b5f79d1cfd9eec123bcc307ffae9589395ed524bd36a97e55fa4d94f620",
+      "size": 28
+    },
+    {
+      "path": ".claude/rules/constraints.md",
+      "sha256": "8c4b59a0772798fe6873be1fe97184690a13d996a951963c9a294f090641917d",
+      "size": 47
+    },
+    {
+      "path": ".claude/settings.json",
+      "sha256": "3e63d9d9546d88c36ae56c28f4b295bf5145806878e1029ab4eec55ef6711e54",
+      "size": 30
+    },
+    {
+      "path": ".workflowprogram/runs/20260409T141606Z-external-write/context.json",
+      "sha256": "ad8ea39d175ced08c7b33aa7ec002a22fad62f6eef2584f579b7ff9bfbf8bdf4",
+      "size": 917
+    },
+    {
+      "path": ".workflowprogram/runs/20260409T141606Z-external-write/events.jsonl",
+      "sha256": "fe7e04b9818c2fea160b2a9160cf6558c16ddcf036b642106997347cac9277b7",
+      "size": 541
+    },
+    {
+      "path": ".workflowprogram/runs/20260409T141606Z-external-write/outputs/candidate/.claude/settings.json",
+      "sha256": "d91f7dcf0527827f8a15165a46d6a30ccca00ef11c40240c3fa148d41d973df0",
+      "size": 49
+    },
+    {
+      "path": ".workflowprogram/runs/20260409T141606Z-external-write/outputs/managed-change-plan.json",
+      "sha256": "bb4f42617abe212c3f60541e1ad4f09781d4c41e7ff1962f64bf3e0ff59a8ae3",
+      "size": 564
+    },
+    {
+      "path": ".workflowprogram/runs/20260409T141606Z-external-write/outputs/managed-change-result.json",
+      "sha256": "0ad77194f8052e043e0865ee78831b9a3f3b7bfa73e02a22ff33545d94d8d9c0",
+      "size": 693
+    },
+    {
+      "path": ".workflowprogram/runs/20260409T141606Z-external-write/outputs/mock-runtime-host.log",
+      "sha256": "8aedcd72c23ea7751c376f29f1a1458bf3625dc5854963355b0b472f9ccb1d68",
+      "size": 96
+    },
+    {
+      "path": ".workflowprogram/runs/20260409T141606Z-external-write/outputs/progress/current-progress.json",
+      "sha256": "884e6b647b04bdf3344224689548192c8b99c861ad2ee9aed23caf003ffca891",
+      "size": 203
+    },
+    {
+      "path": ".workflowprogram/runs/20260409T141606Z-external-write/outputs/progress/milestones.jsonl",
+      "sha256": "ce1466145725dc4f1d0d5bdb4bac6a3b438a01466d1dba65cf531d4fce66c34a",
+      "size": 139
+    },
+    {
+      "path": ".workflowprogram/runs/20260409T141606Z-external-write/outputs/progress/user-progress.md",
+      "sha256": "e845c38255a5c4e01f8e4bf05c28662473d83a1ceb07bcacee2d911ef5e49874",
+      "size": 111
+    },
+    {
+      "path": ".workflowprogram/runs/20260409T141606Z-external-write/outputs/stages/runner-summary.json",
+      "sha256": "955f00a32e62e204a71973f2f106e52353c651c66e623d8bb4a484c0ff26a222",
+      "size": 163
+    },
+    {
+      "path": ".workflowprogram/runs/20260409T141606Z-external-write/outputs/stages/s0-route.json",
+      "sha256": "b0067ccc0e9333b89b90c8fc76818e45080fd91a7c2e7afddf32085814381a8e",
+      "size": 217
+    },
+    {
+      "path": ".workflowprogram/runs/20260409T141606Z-external-write/outputs/target-claude-before.json",
+      "sha256": "7c945ff589fa3bd7fb359be79fd57d389823e42527de5d1f2ca7cab44f192f4f",
+      "size": 35
+    },
+    {
+      "path": ".workflowprogram/runs/20260409T141606Z-external-write/outputs/target-root-before.json",
+      "sha256": "ab9b7aedbf29b9a7ad58ffd2a7edf8a74a6a422c8e7dbcc4e6aea8ac20dd6a5f",
+      "size": 1012
+    },
+    {
+      "path": ".workflowprogram/runs/20260409T141606Z-external-write/state.json",
+      "sha256": "94e6e87a86556fdce2184e07e296cdf52dd30ceb600743e31d7f0a9091941c4d",
+      "size": 265
+    },
+    {
+      "path": ".workflowprogram/runs/20260409T141606Z-external-write/workflow-spec.yaml",
+      "sha256": "e22f69c985795123d06b33a9e15af75f8176f1407c0c8fb0819c5b363ae936c4",
+      "size": 5229
+    },
+    {
+      "path": "README.md",
+      "sha256": "b3a389139b841c66ea3ee695ea55256b8bd4de4e4b80bf52e47551f650e25be0",
+      "size": 77
+    },
+    {
+      "path": "rogue-output.txt",
+      "sha256": "c6c65a73e46624984bc06fc86cedb90a1c2a135635dca32c41a4eac0c678f8c6",
+      "size": 26
+    }
+  ]
+}

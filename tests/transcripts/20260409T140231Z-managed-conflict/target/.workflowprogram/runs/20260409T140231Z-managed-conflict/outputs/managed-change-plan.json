@@ -1,0 +1,16 @@
+{
+  "generated_at": "2026-04-09T14:02:32Z",
+  "entries": [
+    {
+      "relative_path": ".claude/settings.json",
+      "source_path": "/mnt/d/Code/WorkflowProgram-CN/tests/transcripts/20260409T140231Z-managed-conflict/target/.workflowprogram/runs/20260409T140231Z-managed-conflict/outputs/candidate/.claude/settings.json",
+      "target_path": "/mnt/d/Code/WorkflowProgram-CN/tests/transcripts/20260409T140231Z-managed-conflict/target/.claude/settings.json",
+      "decision": "conflict-managed-drift"
+    }
+  ],
+  "summary": {
+    "create": 0,
+    "update": 0,
+    "conflict": 1
+  }
+}

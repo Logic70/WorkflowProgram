@@ -1,0 +1,25 @@
+{
+  "verdict": "FAIL",
+  "failure_kind": "STRUCTURE_FAILURE",
+  "checked_files": [
+    "context.json",
+    "state.json",
+    "events.jsonl",
+    "transcript.md",
+    "validation-runtime-report.md",
+    "outputs/stdout.log",
+    "outputs/stderr.log",
+    "outputs/target-claude-files.json",
+    "outputs/target-root-files.json",
+    "outputs/plugin-build-manifest.json"
+  ],
+  "contract_source": "fixture_preset",
+  "contract_categories": [
+    "entry",
+    "failure"
+  ],
+  "implemented_failure_kinds": [],
+  "environment_skip_codes": [],
+  "target_claude_files": [],
+  "summary": "Plugin entry was not discovered by Claude CLI."
+}

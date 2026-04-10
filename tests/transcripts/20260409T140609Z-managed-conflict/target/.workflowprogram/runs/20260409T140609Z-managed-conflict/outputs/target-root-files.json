@@ -1,0 +1,150 @@
+{
+  "files": [
+    ".claude/agents/demo-agent.md",
+    ".claude/commands/demo.md",
+    ".claude/rules/constraints.md",
+    ".claude/settings.json",
+    ".claude/skills/demo-skill/SKILL.md",
+    ".workflowprogram/runs/20260409T140609Z-managed-conflict/context.json",
+    ".workflowprogram/runs/20260409T140609Z-managed-conflict/events.jsonl",
+    ".workflowprogram/runs/20260409T140609Z-managed-conflict/outputs/conflicts/.claude/settings.json",
+    ".workflowprogram/runs/20260409T140609Z-managed-conflict/outputs/managed-change-plan.json",
+    ".workflowprogram/runs/20260409T140609Z-managed-conflict/outputs/managed-change-result.json",
+    ".workflowprogram/runs/20260409T140609Z-managed-conflict/outputs/mock-runtime-host.log",
+    ".workflowprogram/runs/20260409T140609Z-managed-conflict/outputs/progress/current-progress.json",
+    ".workflowprogram/runs/20260409T140609Z-managed-conflict/outputs/progress/milestones.jsonl",
+    ".workflowprogram/runs/20260409T140609Z-managed-conflict/outputs/progress/user-progress.md",
+    ".workflowprogram/runs/20260409T140609Z-managed-conflict/outputs/stages/runner-summary.json",
+    ".workflowprogram/runs/20260409T140609Z-managed-conflict/outputs/stages/s0-route.json",
+    ".workflowprogram/runs/20260409T140609Z-managed-conflict/outputs/target-claude-before.json",
+    ".workflowprogram/runs/20260409T140609Z-managed-conflict/outputs/target-root-before.json",
+    ".workflowprogram/runs/20260409T140609Z-managed-conflict/state.json",
+    ".workflowprogram/runs/20260409T140609Z-managed-conflict/workflow-spec.yaml",
+    "CLAUDE.md",
+    "README.md",
+    "lessons.md",
+    "validation-report.md"
+  ],
+  "entries": [
+    {
+      "path": ".claude/agents/demo-agent.md",
+      "sha256": "f244f3e22e229633a79489d31af0cd69fb551249f4f489066d769d04566f70e2",
+      "size": 65
+    },
+    {
+      "path": ".claude/commands/demo.md",
+      "sha256": "a262e81b69d9b3ea974617fc83d123af1c234eef2c2c621fa953d568c34f71dc",
+      "size": 167
+    },
+    {
+      "path": ".claude/rules/constraints.md",
+      "sha256": "f876c0a1ebc44b13502f4ecacd647007be9c5ee19128ad15bbc19e62f895533d",
+      "size": 100
+    },
+    {
+      "path": ".claude/settings.json",
+      "sha256": "bbfb67c2aedeb5db6c377636864161beae83783a96c6614f9318e66eae8e1cf2",
+      "size": 308
+    },
+    {
+      "path": ".claude/skills/demo-skill/SKILL.md",
+      "sha256": "251eeaff5088d3309a4654d8a94672ae38366f70e7de7e37880f0bcafdb185e0",
+      "size": 152
+    },
+    {
+      "path": ".workflowprogram/runs/20260409T140609Z-managed-conflict/context.json",
+      "sha256": "d93d91cfae74050c91af594b2b3c1e4624ebe850ff30dd872744c0c6cfa47e2e",
+      "size": 925
+    },
+    {
+      "path": ".workflowprogram/runs/20260409T140609Z-managed-conflict/events.jsonl",
+      "sha256": "6781193882ba8b999fa45520afd2025ab1dedbda83a6cb45d802f28ef44832c9",
+      "size": 769
+    },
+    {
+      "path": ".workflowprogram/runs/20260409T140609Z-managed-conflict/outputs/conflicts/.claude/settings.json",
+      "sha256": "63e058fe0016750818be8b623b369482a7286921fc029746fcc3ebfcec8d1724",
+      "size": 19
+    },
+    {
+      "path": ".workflowprogram/runs/20260409T140609Z-managed-conflict/outputs/managed-change-plan.json",
+      "sha256": "e4ce3bcc18be36474c0b49c7dbc39710b7373a012620682f79f121a207118fb3",
+      "size": 586
+    },
+    {
+      "path": ".workflowprogram/runs/20260409T140609Z-managed-conflict/outputs/managed-change-result.json",
+      "sha256": "04b9988af247ab0c11faa7929054c29cce01b5ce29321e26889a628faba83529",
+      "size": 880
+    },
+    {
+      "path": ".workflowprogram/runs/20260409T140609Z-managed-conflict/outputs/mock-runtime-host.log",
+      "sha256": "31859c12f5b6a4fa8cff4f521780edb469829b645870afa21307288481e42fd0",
+      "size": 100
+    },
+    {
+      "path": ".workflowprogram/runs/20260409T140609Z-managed-conflict/outputs/progress/current-progress.json",
+      "sha256": "eb0d69229375c803ca7541f11f2c5e20690565c61ff871b8f339b99a57ae6cf6",
+      "size": 194
+    },
+    {
+      "path": ".workflowprogram/runs/20260409T140609Z-managed-conflict/outputs/progress/milestones.jsonl",
+      "sha256": "efbd5ab6eb09fba6b364580b8e35688238b28afcf089d68bf7f432474039af56",
+      "size": 128
+    },
+    {
+      "path": ".workflowprogram/runs/20260409T140609Z-managed-conflict/outputs/progress/user-progress.md",
+      "sha256": "abdf9c2461d255d59c43063479adc39ef9fd0854e1c21ba1f881a15cb69a34fb",
+      "size": 102
+    },
+    {
+      "path": ".workflowprogram/runs/20260409T140609Z-managed-conflict/outputs/stages/runner-summary.json",
+      "sha256": "cdae45e58a905469abcf7bf1368ab51e68016be764382f84eacfe82e397b00cc",
+      "size": 171
+    },
+    {
+      "path": ".workflowprogram/runs/20260409T140609Z-managed-conflict/outputs/stages/s0-route.json",
+      "sha256": "76f92625c39113cafe970bab7461893554d3ebc1032907574b9cb14dfccb265e",
+      "size": 219
+    },
+    {
+      "path": ".workflowprogram/runs/20260409T140609Z-managed-conflict/outputs/target-claude-before.json",
+      "sha256": "71438656e37d31df04ef0192e12934ce8db587761ab3630e1ca5059df4533c94",
+      "size": 933
+    },
+    {
+      "path": ".workflowprogram/runs/20260409T140609Z-managed-conflict/outputs/target-root-before.json",
+      "sha256": "7554b0749f2af47ffbc88d6a7016ddd29f69e33ff7048d61eff2a62d6fc8a6c9",
+      "size": 2498
+    },
+    {
+      "path": ".workflowprogram/runs/20260409T140609Z-managed-conflict/state.json",
+      "sha256": "6360882d48a1b29df34922cc5270d38a6d6abdc3dac046b2a094066563e310f5",
+      "size": 267
+    },
+    {
+      "path": ".workflowprogram/runs/20260409T140609Z-managed-conflict/workflow-spec.yaml",
+      "sha256": "8a8c6852570ad4337ed3fe0ca5b6b5d7567089496297bbd0fdfac7ec0dc9923d",
+      "size": 6432
+    },
+    {
+      "path": "CLAUDE.md",
+      "sha256": "ec0b0b9ae8d63f6879f79ee8173aa7f9fecc7ab2b9e281f139f49393b1fc1f60",
+      "size": 109
+    },
+    {
+      "path": "README.md",
+      "sha256": "690186784b8dad6d68236969e07e76bf8ea177445ccdf60abf1065c4b1a43d4c",
+      "size": 104
+    },
+    {
+      "path": "lessons.md",
+      "sha256": "e0deab90d69f8f5e28aef68c4682e95967968c0ecb5ab2ef666de264c1d084bc",
+      "size": 33
+    },
+    {
+      "path": "validation-report.md",
+      "sha256": "ccd1739cc41aceca663431ee20f4df34d6bed33bf317da7cee10bf092c1ce8d7",
+      "size": 66
+    }
+  ]
+}

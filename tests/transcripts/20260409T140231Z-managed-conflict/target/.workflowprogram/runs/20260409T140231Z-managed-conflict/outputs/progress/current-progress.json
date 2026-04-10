@@ -1,0 +1,12 @@
+{
+  "updated_at": "2026-04-09T14:02:32Z",
+  "stage_history": [
+    "requirement",
+    "context",
+    "design",
+    "generate",
+    "validate"
+  ],
+  "result": "FAIL",
+  "category": "CONFLICT"
+}

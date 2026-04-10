@@ -54,6 +54,29 @@ $forbiddenLegacyPaths = @(
     'tools\sync_plugin_assets.py'
 )
 
+$activeDesignDocs = @{
+    "docs\workflowprogram-stage-highlevel-design.md" = @("runtime_contract", "test_contract", "workflow-entry.py", "workflowprogram-validate", "runtime_smoke.py", "validation-runtime-report.md", "s5-validation-summary.json")
+    "docs\workflowprogram-stage-lowlevel-design.md" = @("runtime_contract", "test_contract", "workflow-entry.py", "runtime_contract.<field>", "implemented_now", "runner 只负责控制面", "workflowprogram-validate", "runtime_smoke.py", "validation-runtime-report.md", "s5-validation-summary.json")
+    "docs\workflowprogram-stage-consistency-check.md" = @("runtime_contract", "test_contract", "当前无显式冲突")
+}
+
+$activeEntryDocs = @{
+    ".claude\commands\develop.md" = @("runtime_contract", "test_contract", "workflow-entry.py", "runtime_contract.<field>", "workflowprogram-validate", "runtime_smoke.py", "s5-validation-summary.json")
+    ".claude\skills\workflowprogram-develop\SKILL.md" = @("runtime_contract", "test_contract", "workflow-entry.py", "implemented_now", "workflowprogram-validate", "runtime_smoke.py", "s5-validation-summary.json")
+}
+
+$activeTemplateDocs = @{
+    ".claude\skills\develop\yaml-spec-template.md" = @("stage_slot: S5", "workflowprogram-validate", "validation-runtime-report.md", "test_contract")
+}
+
+$activePlanDocs = @{
+    "docs\workflowprogram-test-change-plan.md" = @("P1", "workflowprogram-validate", "runtime_smoke.py", "workflowprogram-design-status.md", "capability matrix")
+}
+
+$activeStatusDocs = @{
+    "docs\workflowprogram-design-status.md" = @("当前生效设计真源", "历史追溯文档", "已关闭决策", "workflow-entry.py")
+}
+
 $requiredPaths = @(
     "CLAUDE.md",
     "README.md",
@@ -64,16 +87,37 @@ $requiredPaths = @(
     ".claude\skills",
     ".claude\rules\constraints.md",
     ".claude\scripts\managed-assets.py",
+    ".claude\scripts\route-intent.py",
+    ".claude\scripts\runtime_host.py",
+    ".claude\scripts\generate-workflow-view.py",
     ".claude\scripts\stage-progress.py",
+    ".claude\scripts\validate-lessons-delta.py",
+    ".claude\scripts\validate-run-state.py",
+    ".claude\scripts\validate-workflow-draft.py",
+    ".claude\scripts\validate-workflow-spec.py",
     ".claude\scripts\validate-workflow.ps1",
     ".claude\scripts\validate-workflow.py",
+    ".claude\scripts\workflow-entry.py",
+    ".claude\scripts\workflow-runner.py",
+    ".claude\scripts\workflow-s5-judge.py",
     ".claude-plugin\plugin.json",
     ".claude-plugin\marketplace.json",
     "tools\build_plugin.py",
+    "tools\generate-view.py",
+    "tools\mock_runtime_host.py",
     "tools\runtime_smoke.py",
     "tests\fixtures",
+    "tests\spec-fixtures",
     "tests\expectations",
-    "tests\transcripts"
+    "tests\transcripts",
+    "docs\workflowprogram-stage-highlevel-design.md",
+    "docs\workflowprogram-stage-lowlevel-design.md",
+    "docs\workflowprogram-stage-consistency-check.md",
+    "docs\workflowprogram-test-change-plan.md",
+    "docs\workflowprogram-design-status.md",
+    "docs\workflowprogram-capability-matrix.json",
+    "docs\phase-07-implementation-plan.md",
+    ".claude\skills\develop\yaml-spec-template.md"
 )
 
 foreach ($relativePath in $requiredPaths) {
@@ -93,6 +137,101 @@ foreach ($relativePath in $forbiddenLegacyPaths) {
     }
     else {
         Add-Pass "Legacy compatibility path removed: $relativePath"
+    }
+}
+
+foreach ($docPath in $activeDesignDocs.Keys) {
+    $fullPath = Join-Path $Root $docPath
+    if (-not (Test-Path $fullPath)) {
+        Add-Error "Missing active design doc: $docPath"
+        continue
+    }
+
+    Add-Pass "Active design doc present: $docPath"
+    $content = Get-Content -Raw -Path $fullPath
+    foreach ($marker in $activeDesignDocs[$docPath]) {
+        if ($content -like "*$marker*") {
+            Add-Pass "Active design doc '$docPath' includes '$marker'"
+        }
+        else {
+            Add-Error "Active design doc '$docPath' is missing '$marker'"
+        }
+    }
+}
+
+foreach ($docPath in $activePlanDocs.Keys) {
+    $fullPath = Join-Path $Root $docPath
+    if (-not (Test-Path $fullPath)) {
+        Add-Error "Missing active plan doc: $docPath"
+        continue
+    }
+
+    Add-Pass "Active plan doc present: $docPath"
+    $content = Get-Content -Raw -Path $fullPath
+    foreach ($marker in $activePlanDocs[$docPath]) {
+        if ($content -like "*$marker*") {
+            Add-Pass "Active plan doc '$docPath' includes '$marker'"
+        }
+        else {
+            Add-Error "Active plan doc '$docPath' is missing '$marker'"
+        }
+    }
+}
+
+foreach ($docPath in $activeStatusDocs.Keys) {
+    $fullPath = Join-Path $Root $docPath
+    if (-not (Test-Path $fullPath)) {
+        Add-Error "Missing active status doc: $docPath"
+        continue
+    }
+
+    Add-Pass "Active status doc present: $docPath"
+    $content = Get-Content -Raw -Path $fullPath
+    foreach ($marker in $activeStatusDocs[$docPath]) {
+        if ($content -like "*$marker*") {
+            Add-Pass "Active status doc '$docPath' includes '$marker'"
+        }
+        else {
+            Add-Error "Active status doc '$docPath' is missing '$marker'"
+        }
+    }
+}
+
+foreach ($docPath in $activeEntryDocs.Keys) {
+    $fullPath = Join-Path $Root $docPath
+    if (-not (Test-Path $fullPath)) {
+        Add-Error "Missing active entry doc: $docPath"
+        continue
+    }
+
+    Add-Pass "Active entry doc present: $docPath"
+    $content = Get-Content -Raw -Path $fullPath
+    foreach ($marker in $activeEntryDocs[$docPath]) {
+        if ($content -like "*$marker*") {
+            Add-Pass "Active entry doc '$docPath' includes '$marker'"
+        }
+        else {
+            Add-Error "Active entry doc '$docPath' is missing '$marker'"
+        }
+    }
+}
+
+foreach ($docPath in $activeTemplateDocs.Keys) {
+    $fullPath = Join-Path $Root $docPath
+    if (-not (Test-Path $fullPath)) {
+        Add-Error "Missing active template doc: $docPath"
+        continue
+    }
+
+    Add-Pass "Active template doc present: $docPath"
+    $content = Get-Content -Raw -Path $fullPath
+    foreach ($marker in $activeTemplateDocs[$docPath]) {
+        if ($content -like "*$marker*") {
+            Add-Pass "Active template doc '$docPath' includes '$marker'"
+        }
+        else {
+            Add-Error "Active template doc '$docPath' is missing '$marker'"
+        }
     }
 }
 
@@ -266,7 +405,17 @@ if (Test-Path $distRoot) {
         "dist\plugin\.claude-plugin\marketplace.json",
         "dist\plugin\build-manifest.json",
         "dist\plugin\scripts\managed-assets.py",
-        "dist\plugin\scripts\stage-progress.py"
+        "dist\plugin\scripts\route-intent.py",
+        "dist\plugin\scripts\runtime_host.py",
+        "dist\plugin\scripts\generate-workflow-view.py",
+        "dist\plugin\scripts\stage-progress.py",
+        "dist\plugin\scripts\validate-lessons-delta.py",
+        "dist\plugin\scripts\validate-run-state.py",
+        "dist\plugin\scripts\validate-workflow-draft.py",
+        "dist\plugin\scripts\validate-workflow-spec.py",
+        "dist\plugin\scripts\workflow-entry.py",
+        "dist\plugin\scripts\workflow-runner.py",
+        "dist\plugin\scripts\workflow-s5-judge.py"
     )) {
         $fullPath = Join-Path $Root $relativePath
         if (Test-Path $fullPath) {
@@ -308,7 +457,13 @@ if (Test-Path $distRoot) {
             }
 
             $hasManagedAssets = $false
+            $hasRouteIntent = $false
+            $hasRuntimeHost = $false
             $hasStageProgress = $false
+            $hasValidateRunState = $false
+            $hasValidateWorkflowSpec = $false
+            $hasWorkflowRunner = $false
+            $hasWorkflowS5Judge = $false
             foreach ($fileEntry in @($buildManifest.files)) {
                 if (-not $fileEntry.path) {
                     Add-Error "build-manifest contains an entry without path"
@@ -328,8 +483,26 @@ if (Test-Path $distRoot) {
                 if ($fileEntry.path -eq "scripts/managed-assets.py") {
                     $hasManagedAssets = $true
                 }
+                if ($fileEntry.path -eq "scripts/route-intent.py") {
+                    $hasRouteIntent = $true
+                }
+                if ($fileEntry.path -eq "scripts/runtime_host.py") {
+                    $hasRuntimeHost = $true
+                }
                 if ($fileEntry.path -eq "scripts/stage-progress.py") {
                     $hasStageProgress = $true
+                }
+                if ($fileEntry.path -eq "scripts/validate-run-state.py") {
+                    $hasValidateRunState = $true
+                }
+                if ($fileEntry.path -eq "scripts/validate-workflow-spec.py") {
+                    $hasValidateWorkflowSpec = $true
+                }
+                if ($fileEntry.path -eq "scripts/workflow-runner.py") {
+                    $hasWorkflowRunner = $true
+                }
+                if ($fileEntry.path -eq "scripts/workflow-s5-judge.py") {
+                    $hasWorkflowS5Judge = $true
                 }
             }
 
@@ -345,6 +518,48 @@ if (Test-Path $distRoot) {
             }
             else {
                 Add-Error "build-manifest must include scripts/stage-progress.py"
+            }
+
+            if ($hasRouteIntent) {
+                Add-Pass "build-manifest tracks scripts/route-intent.py"
+            }
+            else {
+                Add-Error "build-manifest must include scripts/route-intent.py"
+            }
+
+            if ($hasRuntimeHost) {
+                Add-Pass "build-manifest tracks scripts/runtime_host.py"
+            }
+            else {
+                Add-Error "build-manifest must include scripts/runtime_host.py"
+            }
+
+            if ($hasValidateRunState) {
+                Add-Pass "build-manifest tracks scripts/validate-run-state.py"
+            }
+            else {
+                Add-Error "build-manifest must include scripts/validate-run-state.py"
+            }
+
+            if ($hasValidateWorkflowSpec) {
+                Add-Pass "build-manifest tracks scripts/validate-workflow-spec.py"
+            }
+            else {
+                Add-Error "build-manifest must include scripts/validate-workflow-spec.py"
+            }
+
+            if ($hasWorkflowRunner) {
+                Add-Pass "build-manifest tracks scripts/workflow-runner.py"
+            }
+            else {
+                Add-Error "build-manifest must include scripts/workflow-runner.py"
+            }
+
+            if ($hasWorkflowS5Judge) {
+                Add-Pass "build-manifest tracks scripts/workflow-s5-judge.py"
+            }
+            else {
+                Add-Error "build-manifest must include scripts/workflow-s5-judge.py"
             }
         }
         catch {

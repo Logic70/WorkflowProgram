@@ -1,0 +1,64 @@
+{
+  "generated_at": "2026-04-10T04:17:07Z",
+  "target_root": "/mnt/d/Code/WorkflowProgram-CN/tests/transcripts/20260410T041707102177Z-empty-project/target",
+  "source_root": "/mnt/d/Code/WorkflowProgram-CN/tests/transcripts/20260410T041707102177Z-empty-project/target/.workflowprogram/runs/20260410T041707102177Z-empty-project/outputs/candidate/.claude",
+  "run_root": "/mnt/d/Code/WorkflowProgram-CN/tests/transcripts/20260410T041707102177Z-empty-project/target/.workflowprogram/runs/20260410T041707102177Z-empty-project",
+  "manifest_path": "/mnt/d/Code/WorkflowProgram-CN/tests/transcripts/20260410T041707102177Z-empty-project/target/.workflowprogram/managed-files.json",
+  "producer_version": "0.1.0",
+  "summary": {
+    "candidate_files": 4,
+    "create": 4,
+    "update": 0,
+    "conflict": 0
+  },
+  "entries": [
+    {
+      "relative_path": ".claude/commands/generated-smoke.md",
+      "source_path": "/mnt/d/Code/WorkflowProgram-CN/tests/transcripts/20260410T041707102177Z-empty-project/target/.workflowprogram/runs/20260410T041707102177Z-empty-project/outputs/candidate/.claude/commands/generated-smoke.md",
+      "source_sha256": "937c8a301478ccf1a57bf457e44642983c117c7f1fa79a1f5785e46c004d3fd4",
+      "target_path": "/mnt/d/Code/WorkflowProgram-CN/tests/transcripts/20260410T041707102177Z-empty-project/target/.claude/commands/generated-smoke.md",
+      "target_exists": false,
+      "target_sha256": null,
+      "ownership": null,
+      "decision": "create",
+      "reason": "Target file does not exist.",
+      "manifest_entry": null
+    },
+    {
+      "relative_path": ".claude/rules/constraints.md",
+      "source_path": "/mnt/d/Code/WorkflowProgram-CN/tests/transcripts/20260410T041707102177Z-empty-project/target/.workflowprogram/runs/20260410T041707102177Z-empty-project/outputs/candidate/.claude/rules/constraints.md",
+      "source_sha256": "16ec17838fa2a9f02a015fceb11af32bdb8ee70943159e2cfe21a5deee96e532",
+      "target_path": "/mnt/d/Code/WorkflowProgram-CN/tests/transcripts/20260410T041707102177Z-empty-project/target/.claude/rules/constraints.md",
+      "target_exists": false,
+      "target_sha256": null,
+      "ownership": null,
+      "decision": "create",
+      "reason": "Target file does not exist.",
+      "manifest_entry": null
+    },
+    {
+      "relative_path": ".claude/settings.json",
+      "source_path": "/mnt/d/Code/WorkflowProgram-CN/tests/transcripts/20260410T041707102177Z-empty-project/target/.workflowprogram/runs/20260410T041707102177Z-empty-project/outputs/candidate/.claude/settings.json",
+      "source_sha256": "517fa393b839c915eb371b9b46cdd89cf78c401c995956e4e22765547e80f1ae",
+      "target_path": "/mnt/d/Code/WorkflowProgram-CN/tests/transcripts/20260410T041707102177Z-empty-project/target/.claude/settings.json",
+      "target_exists": false,
+      "target_sha256": null,
+      "ownership": null,
+      "decision": "create",
+      "reason": "Target file does not exist.",
+      "manifest_entry": null
+    },
+    {
+      "relative_path": ".claude/skills/generated-smoke/SKILL.md",
+      "source_path": "/mnt/d/Code/WorkflowProgram-CN/tests/transcripts/20260410T041707102177Z-empty-project/target/.workflowprogram/runs/20260410T041707102177Z-empty-project/outputs/candidate/.claude/skills/generated-smoke/SKILL.md",
+      "source_sha256": "2dabedf82e310b8b1591ae2072b35b803ff467e6a5b2ab4b036751523795689c",
+      "target_path": "/mnt/d/Code/WorkflowProgram-CN/tests/transcripts/20260410T041707102177Z-empty-project/target/.claude/skills/generated-smoke/SKILL.md",
+      "target_exists": false,
+      "target_sha256": null,
+      "ownership": null,
+      "decision": "create",
+      "reason": "Target file does not exist.",
+      "manifest_entry": null
+    }
+  ]
+}

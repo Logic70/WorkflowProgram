@@ -1,0 +1,9 @@
+{
+  "events_written": 2,
+  "updated_at": "2026-04-09T11:55:13Z",
+  "status": "completed",
+  "stage": "finished",
+  "result": "FAIL",
+  "category": "STRUCTURE_FAILURE",
+  "subagent_evidence": false
+}

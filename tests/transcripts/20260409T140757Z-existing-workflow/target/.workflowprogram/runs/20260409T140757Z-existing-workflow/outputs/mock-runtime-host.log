@@ -1,0 +1,3 @@
+fixture=existing-workflow
+entry=workflowprogram-audit
+request=审计当前项目中的 workflow 结构，并输出结构问题、模式偏离和下一步建议

@@ -1,0 +1,7 @@
+{
+  "run_id": "20260409T141005Z-invalid-entry",
+  "status": "FAIL",
+  "entry_skill": "missing-workflowprogram-entry",
+  "transition_count": 0,
+  "failure_code": "STRUCTURE_FAILURE"
+}

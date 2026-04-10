@@ -1,0 +1,24 @@
+{
+  "run_id": "20260409T140907Z-invalid-entry",
+  "started_at": "2026-04-09T14:09:07Z",
+  "plugin_root": "/mnt/d/Code/WorkflowProgram-CN/dist/plugin",
+  "target_root": "/mnt/d/Code/WorkflowProgram-CN/tests/transcripts/20260409T140907Z-invalid-entry/target",
+  "fixture": "invalid-entry",
+  "entry_skill": "missing-workflowprogram-entry",
+  "request": "验证非法入口时是否被正确拒绝",
+  "claude_bin": "claude",
+  "runtime_provider": "command_adapter",
+  "provider_command": "python3 /mnt/d/Code/WorkflowProgram-CN/tools/mock_runtime_host.py",
+  "mode": "runtime-smoke",
+  "plugin_build_manifest": "/mnt/d/Code/WorkflowProgram-CN/dist/plugin/build-manifest.json",
+  "contract_summary": {
+    "contract_source": "fixture_preset",
+    "contract_categories": [
+      "entry",
+      "failure"
+    ],
+    "implemented_failure_kinds": [],
+    "environment_skip_codes": [],
+    "spec_path": null
+  }
+}

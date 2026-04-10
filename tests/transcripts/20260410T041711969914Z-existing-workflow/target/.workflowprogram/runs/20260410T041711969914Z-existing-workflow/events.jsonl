@@ -1,0 +1,5 @@
+{"ts": "2026-04-10T04:17:12Z", "type": "RunStarted", "stage": "prepare", "source": "runtime_smoke", "status": "ok", "message": "Preparing fixture existing-workflow"}
+{"ts": "2026-04-10T04:17:12Z", "type": "TaskCreated", "stage": "invoke", "source": "runtime_smoke", "status": "ok", "message": "Invoking provider=fixture_host for /workflowprogram-iterate"}
+{"ts": "2026-04-10T04:17:12Z", "type": "TaskCompleted", "stage": "invoke", "source": "runtime_smoke", "status": "ok", "message": "fixture_host completed iterate flow."}
+{"ts": "2026-04-10T04:17:13Z", "type": "OutputWritten", "stage": "invoke", "source": "runtime_smoke", "status": "ok", "message": "Captured plugin build manifest into RUN_ROOT outputs"}
+{"ts": "2026-04-10T04:17:13Z", "type": "RunFinished", "stage": "finished", "source": "runtime_smoke", "status": "ok", "message": "Run finished with result PASS"}

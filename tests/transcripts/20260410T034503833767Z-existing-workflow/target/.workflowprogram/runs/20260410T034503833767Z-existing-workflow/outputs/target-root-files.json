@@ -1,0 +1,138 @@
+{
+  "files": [
+    ".claude/agents/demo-agent.md",
+    ".claude/commands/demo.md",
+    ".claude/rules/constraints.md",
+    ".claude/settings.json",
+    ".claude/skills/demo-skill/SKILL.md",
+    ".workflowprogram/runs/20260410T034503833767Z-existing-workflow/context.json",
+    ".workflowprogram/runs/20260410T034503833767Z-existing-workflow/events.jsonl",
+    ".workflowprogram/runs/20260410T034503833767Z-existing-workflow/outputs/mock-runtime-host.log",
+    ".workflowprogram/runs/20260410T034503833767Z-existing-workflow/outputs/progress/current-progress.json",
+    ".workflowprogram/runs/20260410T034503833767Z-existing-workflow/outputs/progress/milestones.jsonl",
+    ".workflowprogram/runs/20260410T034503833767Z-existing-workflow/outputs/progress/user-progress.md",
+    ".workflowprogram/runs/20260410T034503833767Z-existing-workflow/outputs/stages/runner-summary.json",
+    ".workflowprogram/runs/20260410T034503833767Z-existing-workflow/outputs/stages/s0-route.json",
+    ".workflowprogram/runs/20260410T034503833767Z-existing-workflow/outputs/stages/s6-lessons-delta.md",
+    ".workflowprogram/runs/20260410T034503833767Z-existing-workflow/outputs/target-claude-before.json",
+    ".workflowprogram/runs/20260410T034503833767Z-existing-workflow/outputs/target-root-before.json",
+    ".workflowprogram/runs/20260410T034503833767Z-existing-workflow/state.json",
+    ".workflowprogram/runs/20260410T034503833767Z-existing-workflow/workflow-spec.yaml",
+    "CLAUDE.md",
+    "README.md",
+    "lessons.md",
+    "validation-report.md"
+  ],
+  "entries": [
+    {
+      "path": ".claude/agents/demo-agent.md",
+      "sha256": "f244f3e22e229633a79489d31af0cd69fb551249f4f489066d769d04566f70e2",
+      "size": 65
+    },
+    {
+      "path": ".claude/commands/demo.md",
+      "sha256": "a262e81b69d9b3ea974617fc83d123af1c234eef2c2c621fa953d568c34f71dc",
+      "size": 167
+    },
+    {
+      "path": ".claude/rules/constraints.md",
+      "sha256": "f876c0a1ebc44b13502f4ecacd647007be9c5ee19128ad15bbc19e62f895533d",
+      "size": 100
+    },
+    {
+      "path": ".claude/settings.json",
+      "sha256": "bbfb67c2aedeb5db6c377636864161beae83783a96c6614f9318e66eae8e1cf2",
+      "size": 308
+    },
+    {
+      "path": ".claude/skills/demo-skill/SKILL.md",
+      "sha256": "251eeaff5088d3309a4654d8a94672ae38366f70e7de7e37880f0bcafdb185e0",
+      "size": 152
+    },
+    {
+      "path": ".workflowprogram/runs/20260410T034503833767Z-existing-workflow/context.json",
+      "sha256": "e36c7f9399f77a1983f11593c60011e9847577ac98b657f37ae13adfafd842a6",
+      "size": 979
+    },
+    {
+      "path": ".workflowprogram/runs/20260410T034503833767Z-existing-workflow/events.jsonl",
+      "sha256": "1f9c424ae278fdd543f1b7c4900fb5d64195b8ecdc438842fe74bb78c3479fcb",
+      "size": 538
+    },
+    {
+      "path": ".workflowprogram/runs/20260410T034503833767Z-existing-workflow/outputs/mock-runtime-host.log",
+      "sha256": "9b8f85db99def0002318f66947d93cb7aefd4676e8895573ad5d138ec0e03644",
+      "size": 160
+    },
+    {
+      "path": ".workflowprogram/runs/20260410T034503833767Z-existing-workflow/outputs/progress/current-progress.json",
+      "sha256": "af2efb68941f2f7d32c0c3430ae7ef44b54f8cbaa8063cad2b7be58c7aa2b5f1",
+      "size": 383
+    },
+    {
+      "path": ".workflowprogram/runs/20260410T034503833767Z-existing-workflow/outputs/progress/milestones.jsonl",
+      "sha256": "4b1600ccb49b1ab5880fdcf4084937fbe35eb4664f5b6d6bd49083d0a82b2644",
+      "size": 91
+    },
+    {
+      "path": ".workflowprogram/runs/20260410T034503833767Z-existing-workflow/outputs/progress/user-progress.md",
+      "sha256": "ae09c019e7da557f6db2f2a5e42066353b9c2d788d5010315e8edde23cbd48d3",
+      "size": 366
+    },
+    {
+      "path": ".workflowprogram/runs/20260410T034503833767Z-existing-workflow/outputs/stages/runner-summary.json",
+      "sha256": "0f7be38c1267736c459dc96f62cd02b84e643fa453412fa7f8f12ffbbbfd185d",
+      "size": 170
+    },
+    {
+      "path": ".workflowprogram/runs/20260410T034503833767Z-existing-workflow/outputs/stages/s0-route.json",
+      "sha256": "54c0137a858a91fcce374493f8af26dfc57f4877f0e81a2a8c61c82a875769c0",
+      "size": 222
+    },
+    {
+      "path": ".workflowprogram/runs/20260410T034503833767Z-existing-workflow/outputs/stages/s6-lessons-delta.md",
+      "sha256": "c9f4c3684ee80193db139ec9bf6c7814da08a35d308676f2c74a63f45e6afbd1",
+      "size": 429
+    },
+    {
+      "path": ".workflowprogram/runs/20260410T034503833767Z-existing-workflow/outputs/target-claude-before.json",
+      "sha256": "71438656e37d31df04ef0192e12934ce8db587761ab3630e1ca5059df4533c94",
+      "size": 933
+    },
+    {
+      "path": ".workflowprogram/runs/20260410T034503833767Z-existing-workflow/outputs/target-root-before.json",
+      "sha256": "36bea3da2909d0e9ff8084a0b9fda654d94e267f480cadbb1abc3bf721078e93",
+      "size": 2540
+    },
+    {
+      "path": ".workflowprogram/runs/20260410T034503833767Z-existing-workflow/state.json",
+      "sha256": "2c7eccedd5db101ac72dd090430158eabc0264992dad4a2323dcc948278fbc7c",
+      "size": 274
+    },
+    {
+      "path": ".workflowprogram/runs/20260410T034503833767Z-existing-workflow/workflow-spec.yaml",
+      "sha256": "9d6a5b3a2445318d500f074bc7b9159957ffd738a0920b92a218746612671ab3",
+      "size": 5600
+    },
+    {
+      "path": "CLAUDE.md",
+      "sha256": "ec0b0b9ae8d63f6879f79ee8173aa7f9fecc7ab2b9e281f139f49393b1fc1f60",
+      "size": 109
+    },
+    {
+      "path": "README.md",
+      "sha256": "690186784b8dad6d68236969e07e76bf8ea177445ccdf60abf1065c4b1a43d4c",
+      "size": 104
+    },
+    {
+      "path": "lessons.md",
+      "sha256": "e0deab90d69f8f5e28aef68c4682e95967968c0ecb5ab2ef666de264c1d084bc",
+      "size": 33
+    },
+    {
+      "path": "validation-report.md",
+      "sha256": "65c64a9f9b1421b2a88144d64dc5510e946e7702d8fbb8eed905b36aa38964d9",
+      "size": 151
+    }
+  ]
+}

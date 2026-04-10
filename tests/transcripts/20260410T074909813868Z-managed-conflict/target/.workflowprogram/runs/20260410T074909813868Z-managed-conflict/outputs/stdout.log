@@ -1,0 +1,20 @@
+{
+  "result": "FAIL",
+  "failure_code": "CONFLICT_FAILURE",
+  "message": "Mock host detected a managed asset conflict and kept candidate copies.",
+  "is_error": true,
+  "stage_history": [
+    "requirement",
+    "context",
+    "design",
+    "generate",
+    "validate"
+  ],
+  "stage_status": "failed",
+  "current_stage": "generate",
+  "next_action": "resolve managed conflicts and rerun generate",
+  "generated_files": [
+    ".claude/settings.json",
+    ".claude/rules/constraints.md"
+  ]
+}

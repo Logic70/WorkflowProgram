@@ -164,7 +164,25 @@ python3 ${CLAUDE_PLUGIN_ROOT}/scripts/stage-progress.py update ...
 设计阶段产出两份互补的设计文档：
 
 1. **`workflow-spec.yaml`** —— 机器可读的编排配置（源文件）
-   - 包含：阶段定义、Agent 引用、转移条件、资源限额
+   - 包含：阶段定义、Agent 引用、转移条件、资源限额、运行契约（`runtime_contract`）、基础运行测试判定契约（`test_contract`）
+   - 必须同时声明 `intent_flows`，明确 `develop / audit / iterate / validate` 的逻辑阶段流
+   - `runtime_contract` 必须显式定义：
+     - `write_boundaries`（允许写入边界）
+     - `required_evidence`（最小运行证据集）
+     - `failure_kinds`（失败类别枚举）
+     - `environment_skip`（环境 skip 条件）
+   - `test_contract` 必须显式定义：
+     - `entry`（主入口、入口类型、必需参数、缺参与非法入口 verdict）
+     - `boundary`（写入边界引用、managed 覆盖/冲突/外部写入策略）
+     - `flow`（required/skippable stages、失败回流、终止条件）
+     - `artifacts`（关键交付物、关键证据引用、可缺失非关键输出）
+     - `failure`（失败枚举引用、环境 skip 引用、`implemented_now` 覆盖度声明）
+   - `intent_flows` 必须显式定义：
+     - `develop.required_stage_slots = [S1,S2,S3,S4,S5,S6]`
+     - `audit.required_stage_slots = [S5,S6]`
+     - `iterate.required_stage_slots = [S6]`
+     - `validate.required_stage_slots = [S5]`
+   - 约束：`test_contract` 对执行字段必须使用 `runtime_contract.<field>` 固定引用语法，且不得复制或削弱 runner 语义
    - 格式：结构化 YAML，支持 `max_retries`、`max_parallel` 等约束
    - 用途：Code Agent 执行时解析，强制执行状态转移
    - 可编辑：✅ 人工可编辑，AI 可生成
@@ -190,7 +208,8 @@ workflow-view.md（只读视图，人类查阅）
 
 **编辑规则**：
 - 如需修改设计 → 编辑 `workflow-spec.yaml`
-- 重新生成视图 → 运行 `python tools/generate-view.py`
+- 重新生成视图 → 运行 `python ${CLAUDE_PLUGIN_ROOT}/scripts/generate-workflow-view.py --spec <RUN_ROOT>/workflow-spec.yaml --out <RUN_ROOT>/workflow-view.md`
+- 结构校验规格 → 运行 `python ${CLAUDE_PLUGIN_ROOT}/scripts/validate-workflow-spec.py --spec <RUN_ROOT>/workflow-spec.yaml`
 - 禁止直接编辑 `workflow-view.md`（会被覆盖）
 
 **On failure**：把设计失误写入 `lessons.md`。
@@ -218,6 +237,7 @@ workflow-view.md（只读视图，人类查阅）
   - `plan --target-root <TARGET_ROOT> --run-root <RUN_ROOT> --source-root <RUN_ROOT>/outputs/candidate/.claude`
   - 若无冲突，再执行 `apply-staged`
 - 若返回冲突，必须把候选版本保留在 `RUN_ROOT/outputs/` 并向用户报告，不能静默覆盖用户资产。
+- 确定性产品入口脚本为 `${CLAUDE_PLUGIN_ROOT}/scripts/workflow-entry.py run`；不要把 `managed-assets.py`、`workflow-runner.py`、`validate-run-state.py` 作为松散顺序提示留给模型自由发挥。
 
 **生成流程**：
 
@@ -252,6 +272,14 @@ workflow-view.md（只读视图，人类查阅）
 5. `${CLAUDE_PLUGIN_ROOT}/rules/constraints.md`（如需要，从 YAML `constraints` 提取）
 6. 生成 `workflow-view.md`（从 YAML 单向渲染，只读）
 7. 更新 `CLAUDE.md`（如需要）
+8. 候选资产生成完成后，必须调用确定性脚本入口：
+   - `python ${CLAUDE_PLUGIN_ROOT}/scripts/workflow-entry.py run --spec <RUN_ROOT>/workflow-spec.yaml --run-root <RUN_ROOT> --target-root <TARGET_ROOT> --entry-skill workflowprogram-develop --request "$ARGUMENTS" [--auto-approve|--approval-status approved]`
+   - 该脚本负责按固定顺序执行 `validate-workflow-spec.py -> generate-workflow-view.py -> managed-assets.py -> workflow-runner.py -> validate-run-state.py`
+   - 若 `managed-assets.py` 发现冲突，脚本必须停在 S4，并输出 `RUN_ROOT/outputs/stages/entry-orchestration-summary.json`
+9. 交由 `workflowprogram-validate` 形成 S5 主判定与运行态证据：
+   - `workflowprogram-validate` 是 S5 主 judge，负责消费 `test_contract`
+   - `runtime_smoke.py` 作为动态 harness，在 Claude 可用时补充 `validation-runtime-report.md`
+   - `RUN_ROOT/outputs/stages/s5-validation-summary.json` 由验证链路汇总写入，不由 runner 独占
 
 **Verify**: 设计文档中的每个文件都存在且通过 `validate-file` 检查。
 
@@ -259,70 +287,35 @@ workflow-view.md（只读视图，人类查阅）
 
 ## Stage 5: 运行时验证 (Runtime Validation)
 
-**Goal**: 验证工作流在实际执行时的行为是否符合设计。
+**Goal**: 以 `test_contract` 为判定来源，验证工作流运行态是否符合设计。
 
 **Progress hooks**：
 - Stage 开始：`S5 StageStarted`
 - 关键验证节点后：`S5 StageCheckpoint`
 - 结论写入后：`S5 StageCompleted`
 
-**Step 1: 测试场景生成**
+**Step 1: 读取判定契约**
 
-启动 `test-scenario-generator` 子代理：
-1. 读取 `workflow-spec.md` 和设计文档
-2. 为每个 Stage 生成标准覆盖测试场景：
-   - Happy Path：正常输入
-   - Edge Case：边界条件
-   - Error Case：错误注入
-3. 包含明确 Validation Points（自动判定命令 + 人工检查项）
-4. 输出 `test-scenarios.md`
+1. 读取 `workflow-spec.yaml.runtime_contract` 与 `workflow-spec.yaml.test_contract`。
+2. 以 `workflowprogram-validate` 作为 S5 主 judge，按 `entry / boundary / flow / artifacts / failure` 五类契约生成检查项。
+3. 将 `runtime_smoke.py` 视为动态 harness，仅在 Claude 可用时补充真实执行证据。
 
-**Step 2: 异步执行验证**
+**Step 2: 产出判定结果**
 
-启动 `workflow-verifier` 子代理：
-1. 读取复杂度级别（S/M/L/XL）和 **Turn Count 限额**
-2. 创建临时 worktree 作为沙盒环境
-3. 在沙盒中启动独立 Claude Code 进程
-4. 按 `test-scenarios.md` 输入命令，模拟用户执行
-5. 轮询 `status.json` 检查进度，监控：
-   - **Turn Count**: 累计交互轮数，超过限额强制终止
-   - **Circuit Breaker**: 连续 `PostToolUseFailure` 报错计数
-6. 达到限额、熔断条件或完成后终止进程
-
-**资源控制配置（设计时指定）**：
-- S (≤2 Stages): 50 turns
-- M (3-5 Stages): 100 turns
-- L (>5 Stages): 200 turns
-- XL (复杂编排): 300 turns
-
-**严格模式（可选）**：
-设置 `STRICT_MODE=true` 启用更严格的资源限制：
-- S: 20 turns / M: 50 turns / L: 100 turns / XL: 150 turns
-
-严格模式用于：
-- 强制优化 Agent 效率
-- 避免粗放设计依赖轮数堆叠
-- CI/CD 环境快速验证
-
-**熔断机制**：
-- 当同一 Agent 连续产生 **3 次 `PostToolUseFailure`** 报错，立即熔断终止
-- 熔断时输出失败上下文和已执行的测试覆盖度
-
-**Step 3: 生成验证报告**
-
-输出 `validation-runtime-report.md`：
-- 每个测试场景的详细结果（标准版 + 调试版）
-- CRITICAL/WARNING 问题分类
-- 失败时的日志片段和时间线
+1. 生成 `RUN_ROOT/outputs/stages/s5-validation-summary.json`。
+2. 生成或更新 `validation-runtime-report.md`。
+3. 如可执行真实 smoke，则补充 `transcript.md` 与额外运行证据。
 
 **反馈路径**：
 - **PASS** → 进入 Stage 6
+- **WARN** → 进入 Stage 6，但记录告警和约束候选
 - **FAIL (设计缺陷)** → 回到 Stage 3
 - **FAIL (实现缺陷)** → 回到 Stage 4
+- **ENVIRONMENT-SKIP** → 记录环境原因并进入 Stage 6
 
 **最大循环**：10轮或问题收敛为0
 
-**Verify**: 运行时验证报告无 CRITICAL 问题。
+**Verify**: `validation-runtime-report.md`、`s5-validation-summary.json` 和 `transcript.md` 的职责边界清晰，且检查项可追溯到 `test_contract`。
 
 **On failure**：记录问题到 `lessons.md`，按缺陷类型反馈到 Stage 3 或 4，重新验证。
 
@@ -330,7 +323,7 @@ workflow-view.md（只读视图，人类查阅）
 
 **Goal**: 从本次设计会话中提炼可复用规则，完成流程闭环。
 
-**前提**: Stage 5 运行时验证通过
+**前提**: Stage 5 已完成，且结果可用于闭环（PASS / WARN / ENVIRONMENT-SKIP）
 
 **Progress hooks**：
 - Stage 开始：`S6 StageStarted`

@@ -1,0 +1,111 @@
+{
+  "provider": "fixture_host",
+  "result": "PASS",
+  "failure_code": "",
+  "message": "fixture_host applied 4 managed workflow assets.",
+  "is_error": false,
+  "command": [
+    "/usr/bin/python3",
+    "/mnt/d/Code/WorkflowProgram-CN/.claude/scripts/managed-assets.py",
+    "apply-staged",
+    "--target-root",
+    "/mnt/d/Code/WorkflowProgram-CN/tests/transcripts/20260409T140140Z-external-write/target",
+    "--source-root",
+    "/mnt/d/Code/WorkflowProgram-CN/tests/transcripts/20260409T140140Z-external-write/target/.workflowprogram/runs/20260409T140140Z-external-write/outputs/candidate/.claude",
+    "--run-root",
+    "/mnt/d/Code/WorkflowProgram-CN/tests/transcripts/20260409T140140Z-external-write/target/.workflowprogram/runs/20260409T140140Z-external-write",
+    "--json"
+  ],
+  "returncode": 0,
+  "stdout": "{\n  \"generated_at\": \"2026-04-09T14:01:41Z\",\n  \"target_root\": \"/mnt/d/Code/WorkflowProgram-CN/tests/transcripts/20260409T140140Z-external-write/target\",\n  \"source_root\": \"/mnt/d/Code/WorkflowProgram-CN/tests/transcripts/20260409T140140Z-external-write/target/.workflowprogram/runs/20260409T140140Z-external-write/outputs/candidate/.claude\",\n  \"run_root\": \"/mnt/d/Code/WorkflowProgram-CN/tests/transcripts/20260409T140140Z-external-write/target/.workflowprogram/runs/20260409T140140Z-external-write\",\n  \"manifest_path\": \"/mnt/d/Code/WorkflowProgram-CN/tests/transcripts/20260409T140140Z-external-write/target/.workflowprogram/managed-files.json\",\n  \"producer_version\": \"0.1.0\",\n  \"summary\": {\n    \"candidate_files\": 4,\n    \"create\": 4,\n    \"update\": 0,\n    \"conflict\": 0\n  },\n  \"applied\": [\n    {\n      \"relative_path\": \".claude/commands/generated-smoke.md\",\n      \"action\": \"create\",\n      \"target_path\": \"/mnt/d/Code/WorkflowProgram-CN/tests/transcripts/20260409T140140Z-external-write/target/.claude/commands/generated-smoke.md\",\n      \"applied_sha256\": \"937c8a301478ccf1a57bf457e44642983c117c7f1fa79a1f5785e46c004d3fd4\",\n      \"run_id\": \"20260409T140140Z-external-write\"\n    },\n    {\n      \"relative_path\": \".claude/rules/constraints.md\",\n      \"action\": \"create\",\n      \"target_path\": \"/mnt/d/Code/WorkflowProgram-CN/tests/transcripts/20260409T140140Z-external-write/target/.claude/rules/constraints.md\",\n      \"applied_sha256\": \"6a9653e0e8754340b328589eb7a13d8374c3cf57b047ec52a1590f1d8c84c5f3\",\n      \"run_id\": \"20260409T140140Z-external-write\"\n    },\n    {\n      \"relative_path\": \".claude/settings.json\",\n      \"action\": \"create\",\n      \"target_path\": \"/mnt/d/Code/WorkflowProgram-CN/tests/transcripts/20260409T140140Z-external-write/target/.claude/settings.json\",\n      \"applied_sha256\": \"517fa393b839c915eb371b9b46cdd89cf78c401c995956e4e22765547e80f1ae\",\n      \"run_id\": \"20260409T140140Z-external-write\"\n    },\n    {\n      \"relative_path\": \".claude/skills/generated-smoke/SKILL.md\",\n      \"action\": \"create\",\n      \"target_path\": \"/mnt/d/Code/WorkflowProgram-CN/tests/transcripts/20260409T140140Z-external-write/target/.claude/skills/generated-smoke/SKILL.md\",\n      \"applied_sha256\": \"2dabedf82e310b8b1591ae2072b35b803ff467e6a5b2ab4b036751523795689c\",\n      \"run_id\": \"20260409T140140Z-external-write\"\n    }\n  ],\n  \"conflicts\": []\n}\n",
+  "stderr": "",
+  "parsed": {
+    "generated_at": "2026-04-09T14:01:41Z",
+    "target_root": "/mnt/d/Code/WorkflowProgram-CN/tests/transcripts/20260409T140140Z-external-write/target",
+    "source_root": "/mnt/d/Code/WorkflowProgram-CN/tests/transcripts/20260409T140140Z-external-write/target/.workflowprogram/runs/20260409T140140Z-external-write/outputs/candidate/.claude",
+    "run_root": "/mnt/d/Code/WorkflowProgram-CN/tests/transcripts/20260409T140140Z-external-write/target/.workflowprogram/runs/20260409T140140Z-external-write",
+    "manifest_path": "/mnt/d/Code/WorkflowProgram-CN/tests/transcripts/20260409T140140Z-external-write/target/.workflowprogram/managed-files.json",
+    "producer_version": "0.1.0",
+    "summary": {
+      "candidate_files": 4,
+      "create": 4,
+      "update": 0,
+      "conflict": 0
+    },
+    "applied": [
+      {
+        "relative_path": ".claude/commands/generated-smoke.md",
+        "action": "create",
+        "target_path": "/mnt/d/Code/WorkflowProgram-CN/tests/transcripts/20260409T140140Z-external-write/target/.claude/commands/generated-smoke.md",
+        "applied_sha256": "937c8a301478ccf1a57bf457e44642983c117c7f1fa79a1f5785e46c004d3fd4",
+        "run_id": "20260409T140140Z-external-write"
+      },
+      {
+        "relative_path": ".claude/rules/constraints.md",
+        "action": "create",
+        "target_path": "/mnt/d/Code/WorkflowProgram-CN/tests/transcripts/20260409T140140Z-external-write/target/.claude/rules/constraints.md",
+        "applied_sha256": "6a9653e0e8754340b328589eb7a13d8374c3cf57b047ec52a1590f1d8c84c5f3",
+        "run_id": "20260409T140140Z-external-write"
+      },
+      {
+        "relative_path": ".claude/settings.json",
+        "action": "create",
+        "target_path": "/mnt/d/Code/WorkflowProgram-CN/tests/transcripts/20260409T140140Z-external-write/target/.claude/settings.json",
+        "applied_sha256": "517fa393b839c915eb371b9b46cdd89cf78c401c995956e4e22765547e80f1ae",
+        "run_id": "20260409T140140Z-external-write"
+      },
+      {
+        "relative_path": ".claude/skills/generated-smoke/SKILL.md",
+        "action": "create",
+        "target_path": "/mnt/d/Code/WorkflowProgram-CN/tests/transcripts/20260409T140140Z-external-write/target/.claude/skills/generated-smoke/SKILL.md",
+        "applied_sha256": "2dabedf82e310b8b1591ae2072b35b803ff467e6a5b2ab4b036751523795689c",
+        "run_id": "20260409T140140Z-external-write"
+      }
+    ],
+    "conflicts": []
+  },
+  "subagent_evidence": false,
+  "stage_history": [
+    "requirement",
+    "context",
+    "design",
+    "generate",
+    "validate",
+    "lessons"
+  ],
+  "current_stage": "lessons",
+  "next_action": "complete",
+  "metadata": {
+    "applied": [
+      {
+        "relative_path": ".claude/commands/generated-smoke.md",
+        "action": "create",
+        "target_path": "/mnt/d/Code/WorkflowProgram-CN/tests/transcripts/20260409T140140Z-external-write/target/.claude/commands/generated-smoke.md",
+        "applied_sha256": "937c8a301478ccf1a57bf457e44642983c117c7f1fa79a1f5785e46c004d3fd4",
+        "run_id": "20260409T140140Z-external-write"
+      },
+      {
+        "relative_path": ".claude/rules/constraints.md",
+        "action": "create",
+        "target_path": "/mnt/d/Code/WorkflowProgram-CN/tests/transcripts/20260409T140140Z-external-write/target/.claude/rules/constraints.md",
+        "applied_sha256": "6a9653e0e8754340b328589eb7a13d8374c3cf57b047ec52a1590f1d8c84c5f3",
+        "run_id": "20260409T140140Z-external-write"
+      },
+      {
+        "relative_path": ".claude/settings.json",
+        "action": "create",
+        "target_path": "/mnt/d/Code/WorkflowProgram-CN/tests/transcripts/20260409T140140Z-external-write/target/.claude/settings.json",
+        "applied_sha256": "517fa393b839c915eb371b9b46cdd89cf78c401c995956e4e22765547e80f1ae",
+        "run_id": "20260409T140140Z-external-write"
+      },
+      {
+        "relative_path": ".claude/skills/generated-smoke/SKILL.md",
+        "action": "create",
+        "target_path": "/mnt/d/Code/WorkflowProgram-CN/tests/transcripts/20260409T140140Z-external-write/target/.claude/skills/generated-smoke/SKILL.md",
+        "applied_sha256": "2dabedf82e310b8b1591ae2072b35b803ff467e6a5b2ab4b036751523795689c",
+        "run_id": "20260409T140140Z-external-write"
+      }
+    ],
+    "conflicts": []
+  }
+}

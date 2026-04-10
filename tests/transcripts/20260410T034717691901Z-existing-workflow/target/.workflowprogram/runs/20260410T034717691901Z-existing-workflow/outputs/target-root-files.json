@@ -1,0 +1,114 @@
+{
+  "files": [
+    ".claude/agents/demo-agent.md",
+    ".claude/commands/demo.md",
+    ".claude/rules/constraints.md",
+    ".claude/settings.json",
+    ".claude/skills/demo-skill/SKILL.md",
+    ".workflowprogram/runs/20260410T034717691901Z-existing-workflow/context.json",
+    ".workflowprogram/runs/20260410T034717691901Z-existing-workflow/events.jsonl",
+    ".workflowprogram/runs/20260410T034717691901Z-existing-workflow/outputs/progress/current-progress.json",
+    ".workflowprogram/runs/20260410T034717691901Z-existing-workflow/outputs/progress/milestones.jsonl",
+    ".workflowprogram/runs/20260410T034717691901Z-existing-workflow/outputs/progress/user-progress.md",
+    ".workflowprogram/runs/20260410T034717691901Z-existing-workflow/outputs/stages/s6-lessons-delta.md",
+    ".workflowprogram/runs/20260410T034717691901Z-existing-workflow/outputs/target-claude-before.json",
+    ".workflowprogram/runs/20260410T034717691901Z-existing-workflow/outputs/target-root-before.json",
+    ".workflowprogram/runs/20260410T034717691901Z-existing-workflow/state.json",
+    "CLAUDE.md",
+    "README.md",
+    "lessons.md",
+    "validation-report.md"
+  ],
+  "entries": [
+    {
+      "path": ".claude/agents/demo-agent.md",
+      "sha256": "f244f3e22e229633a79489d31af0cd69fb551249f4f489066d769d04566f70e2",
+      "size": 65
+    },
+    {
+      "path": ".claude/commands/demo.md",
+      "sha256": "a262e81b69d9b3ea974617fc83d123af1c234eef2c2c621fa953d568c34f71dc",
+      "size": 167
+    },
+    {
+      "path": ".claude/rules/constraints.md",
+      "sha256": "f876c0a1ebc44b13502f4ecacd647007be9c5ee19128ad15bbc19e62f895533d",
+      "size": 100
+    },
+    {
+      "path": ".claude/settings.json",
+      "sha256": "bbfb67c2aedeb5db6c377636864161beae83783a96c6614f9318e66eae8e1cf2",
+      "size": 308
+    },
+    {
+      "path": ".claude/skills/demo-skill/SKILL.md",
+      "sha256": "251eeaff5088d3309a4654d8a94672ae38366f70e7de7e37880f0bcafdb185e0",
+      "size": 152
+    },
+    {
+      "path": ".workflowprogram/runs/20260410T034717691901Z-existing-workflow/context.json",
+      "sha256": "4c28aefad8998c512cb9bcb549dce53147ec8b461c62d30e9eb56a0eb48fb295",
+      "size": 944
+    },
+    {
+      "path": ".workflowprogram/runs/20260410T034717691901Z-existing-workflow/events.jsonl",
+      "sha256": "0ee6c7768c118e2fed52ecfeb042df785a67abc0ee992f6d7fd368b229b991e9",
+      "size": 516
+    },
+    {
+      "path": ".workflowprogram/runs/20260410T034717691901Z-existing-workflow/outputs/progress/current-progress.json",
+      "sha256": "ce000b28098c972bb2c17e9cdc8efc20a90c628d4b8f5bce66389cb84b1a6249",
+      "size": 247
+    },
+    {
+      "path": ".workflowprogram/runs/20260410T034717691901Z-existing-workflow/outputs/progress/milestones.jsonl",
+      "sha256": "36ece69fc1aeaab92729cdcbf0db1634c9b83493a92085a62e586f1adb3bd31d",
+      "size": 122
+    },
+    {
+      "path": ".workflowprogram/runs/20260410T034717691901Z-existing-workflow/outputs/progress/user-progress.md",
+      "sha256": "fb372ec3232762fdf96401386dc00b2770b49f7b02fcd847a064a0dd64e7b1ad",
+      "size": 329
+    },
+    {
+      "path": ".workflowprogram/runs/20260410T034717691901Z-existing-workflow/outputs/stages/s6-lessons-delta.md",
+      "sha256": "0312e284152249a208b8d4d566f7b2e23b1c913c5e58f328f3764d8ff2649b4d",
+      "size": 464
+    },
+    {
+      "path": ".workflowprogram/runs/20260410T034717691901Z-existing-workflow/outputs/target-claude-before.json",
+      "sha256": "71438656e37d31df04ef0192e12934ce8db587761ab3630e1ca5059df4533c94",
+      "size": 933
+    },
+    {
+      "path": ".workflowprogram/runs/20260410T034717691901Z-existing-workflow/outputs/target-root-before.json",
+      "sha256": "52b0cafc22e46a0aa3f0a5a18f5d661d8e30689555e171e933584710799aacc1",
+      "size": 2540
+    },
+    {
+      "path": ".workflowprogram/runs/20260410T034717691901Z-existing-workflow/state.json",
+      "sha256": "c335d6bd5a53928f3ef5245c9b3192e87d832a9f72d18611b6b1b41cb78c18eb",
+      "size": 274
+    },
+    {
+      "path": "CLAUDE.md",
+      "sha256": "ec0b0b9ae8d63f6879f79ee8173aa7f9fecc7ab2b9e281f139f49393b1fc1f60",
+      "size": 109
+    },
+    {
+      "path": "README.md",
+      "sha256": "690186784b8dad6d68236969e07e76bf8ea177445ccdf60abf1065c4b1a43d4c",
+      "size": 104
+    },
+    {
+      "path": "lessons.md",
+      "sha256": "e0deab90d69f8f5e28aef68c4682e95967968c0ecb5ab2ef666de264c1d084bc",
+      "size": 33
+    },
+    {
+      "path": "validation-report.md",
+      "sha256": "ccd1739cc41aceca663431ee20f4df34d6bed33bf317da7cee10bf092c1ce8d7",
+      "size": 66
+    }
+  ]
+}

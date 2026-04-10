@@ -1,0 +1,5 @@
+{"ts": "2026-04-09T14:07:57Z", "type": "RunStarted", "stage": "prepare", "source": "runtime_smoke", "status": "ok", "message": "Preparing fixture broken-workflow"}
+{"ts": "2026-04-09T14:07:57Z", "type": "TaskCreated", "stage": "invoke", "source": "runtime_smoke", "status": "ok", "message": "Invoking provider=command_adapter for /workflowprogram-validate"}
+{"ts": "2026-04-09T14:07:58Z", "type": "TaskCompleted", "stage": "invoke", "source": "runtime_smoke", "status": "ok", "message": "Mock host completed workflow execution successfully."}
+{"ts": "2026-04-09T14:07:58Z", "type": "OutputWritten", "stage": "invoke", "source": "runtime_smoke", "status": "ok", "message": "Captured plugin build manifest into RUN_ROOT outputs"}
+{"ts": "2026-04-09T14:07:59Z", "type": "RunFinished", "stage": "finished", "source": "runtime_smoke", "status": "ok", "message": "Run finished with result PASS"}

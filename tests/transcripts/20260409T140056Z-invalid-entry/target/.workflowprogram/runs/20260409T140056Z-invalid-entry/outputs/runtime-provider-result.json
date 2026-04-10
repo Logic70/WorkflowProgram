@@ -1,0 +1,17 @@
+{
+  "provider": "fixture_host",
+  "result": "FAIL",
+  "failure_code": "STRUCTURE_FAILURE",
+  "message": "Plugin entry 'missing-workflowprogram-entry' was not found in plugin root.",
+  "is_error": true,
+  "command": [],
+  "returncode": 0,
+  "stdout": "",
+  "stderr": "",
+  "parsed": null,
+  "subagent_evidence": false,
+  "stage_history": [],
+  "current_stage": "",
+  "next_action": "",
+  "metadata": {}
+}

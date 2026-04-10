@@ -1,0 +1,60 @@
+{
+  "provider": "command_adapter",
+  "result": "FAIL",
+  "failure_code": "EVIDENCE_FAILURE",
+  "message": "Mock host detected broken workflow assets and stopped validation.",
+  "is_error": true,
+  "command": [
+    "python3",
+    "/mnt/d/Code/WorkflowProgram-CN/tools/mock_runtime_host.py",
+    "invoke",
+    "--plugin-root",
+    "/mnt/d/Code/WorkflowProgram-CN/dist/plugin",
+    "--target-root",
+    "/mnt/d/Code/WorkflowProgram-CN/tests/transcripts/20260409T141549Z-broken-workflow/target",
+    "--run-root",
+    "/mnt/d/Code/WorkflowProgram-CN/tests/transcripts/20260409T141549Z-broken-workflow/target/.workflowprogram/runs/20260409T141549Z-broken-workflow",
+    "--entry-skill",
+    "workflowprogram-validate",
+    "--request",
+    "验证当前项目中的 workflow 资产，并输出失败项、影响范围和修复优先级",
+    "--fixture",
+    "broken-workflow",
+    "--timeout",
+    "90",
+    "--json"
+  ],
+  "returncode": 1,
+  "stdout": "{\n  \"result\": \"FAIL\",\n  \"failure_code\": \"EVIDENCE_FAILURE\",\n  \"message\": \"Mock host detected broken workflow assets and stopped validation.\",\n  \"is_error\": true,\n  \"stage_history\": [\n    \"requirement\",\n    \"context\",\n    \"design\",\n    \"generate\",\n    \"validate\"\n  ],\n  \"stage_status\": \"failed\",\n  \"current_stage\": \"validate\",\n  \"next_action\": \"repair broken workflow assets and rerun validate\",\n  \"generated_files\": []\n}\n",
+  "stderr": "",
+  "parsed": {
+    "result": "FAIL",
+    "failure_code": "EVIDENCE_FAILURE",
+    "message": "Mock host detected broken workflow assets and stopped validation.",
+    "is_error": true,
+    "stage_history": [
+      "requirement",
+      "context",
+      "design",
+      "generate",
+      "validate"
+    ],
+    "stage_status": "failed",
+    "current_stage": "validate",
+    "next_action": "repair broken workflow assets and rerun validate",
+    "generated_files": []
+  },
+  "subagent_evidence": false,
+  "stage_history": [
+    "requirement",
+    "context",
+    "design",
+    "generate",
+    "validate"
+  ],
+  "current_stage": "validate",
+  "stage_status": "",
+  "next_action": "repair broken workflow assets and rerun validate",
+  "next_stage_on_failure": "",
+  "metadata": {}
+}

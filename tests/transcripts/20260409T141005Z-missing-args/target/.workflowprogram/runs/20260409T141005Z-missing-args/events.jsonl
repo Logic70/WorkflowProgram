@@ -1,0 +1,6 @@
+{"ts": "2026-04-09T14:10:05Z", "type": "RunStarted", "stage": "prepare", "source": "runtime_smoke", "status": "ok", "message": "Preparing fixture missing-args"}
+{"ts": "2026-04-09T14:10:06Z", "type": "TaskCreated", "stage": "invoke", "source": "runtime_smoke", "status": "ok", "message": "Invoking provider=command_adapter for /workflowprogram-develop"}
+{"ts": "2026-04-09T14:10:06Z", "type": "RuntimeError", "stage": "invoke", "source": "runtime_smoke", "status": "error", "message": "Mock host rejected an empty request payload."}
+{"ts": "2026-04-09T14:10:06Z", "type": "TaskCompleted", "stage": "invoke", "source": "runtime_smoke", "status": "error", "message": "Mock host rejected an empty request payload."}
+{"ts": "2026-04-09T14:10:07Z", "type": "OutputWritten", "stage": "invoke", "source": "runtime_smoke", "status": "ok", "message": "Captured plugin build manifest into RUN_ROOT outputs"}
+{"ts": "2026-04-09T14:10:08Z", "type": "RunFinished", "stage": "finished", "source": "runtime_smoke", "status": "warn", "message": "Run finished with result FAIL"}

@@ -1,0 +1,19 @@
+{
+  "generated_at": "2026-04-09T14:07:58Z",
+  "target_root": "/mnt/d/Code/WorkflowProgram-CN/tests/transcripts/20260409T140757Z-broken-workflow/target",
+  "run_root": "/mnt/d/Code/WorkflowProgram-CN/tests/transcripts/20260409T140757Z-broken-workflow/target/.workflowprogram/runs/20260409T140757Z-broken-workflow",
+  "summary": {
+    "create": 0,
+    "update": 1,
+    "conflict": 0
+  },
+  "applied": [
+    {
+      "relative_path": ".claude/settings.json",
+      "action": "update",
+      "target_path": "/mnt/d/Code/WorkflowProgram-CN/tests/transcripts/20260409T140757Z-broken-workflow/target/.claude/settings.json",
+      "run_id": "20260409T140757Z-broken-workflow"
+    }
+  ],
+  "conflicts": []
+}

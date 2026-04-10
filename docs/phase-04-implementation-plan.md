@@ -1,5 +1,10 @@
 # Phase 4 实施计划
 
+> Historical Note
+>
+> 本文档保留为 Phase 4 的迁移计划记录，不再作为当前结构真源。
+> 当前真源和已关闭决策见 [workflowprogram-design-status.md](/mnt/d/Code/WorkflowProgram-CN/docs/workflowprogram-design-status.md)。
+
 ## 1. Phase 目标
 
 Phase 4 只解决一个问题：**结束迁移期兼容层，把仓库收口为 `.claude/` 源码层 + `dist/plugin/` 安装产物的双层结构。**

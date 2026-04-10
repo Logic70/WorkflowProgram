@@ -1,0 +1,42 @@
+{
+  "files": [
+    ".workflowprogram/runs/20260409T140056Z-missing-args/context.json",
+    ".workflowprogram/runs/20260409T140056Z-missing-args/events.jsonl",
+    ".workflowprogram/runs/20260409T140056Z-missing-args/outputs/target-claude-before.json",
+    ".workflowprogram/runs/20260409T140056Z-missing-args/outputs/target-root-before.json",
+    ".workflowprogram/runs/20260409T140056Z-missing-args/state.json",
+    "README.md"
+  ],
+  "entries": [
+    {
+      "path": ".workflowprogram/runs/20260409T140056Z-missing-args/context.json",
+      "sha256": "b62d6e7d3f276f63b3747e48a09a63e55db1e7127aa09928cffee07ef4f951a5",
+      "size": 789
+    },
+    {
+      "path": ".workflowprogram/runs/20260409T140056Z-missing-args/events.jsonl",
+      "sha256": "69634fda35f854bcbafea6e3f8f76b1c4acf9ec1778df9a25fe80dde3c15a7f0",
+      "size": 712
+    },
+    {
+      "path": ".workflowprogram/runs/20260409T140056Z-missing-args/outputs/target-claude-before.json",
+      "sha256": "7c945ff589fa3bd7fb359be79fd57d389823e42527de5d1f2ca7cab44f192f4f",
+      "size": 35
+    },
+    {
+      "path": ".workflowprogram/runs/20260409T140056Z-missing-args/outputs/target-root-before.json",
+      "sha256": "f414df1c4545f23e001645404be67d10d8b15f7313c6877ff1da4f09af7e6fee",
+      "size": 1000
+    },
+    {
+      "path": ".workflowprogram/runs/20260409T140056Z-missing-args/state.json",
+      "sha256": "9c93c110af3238f18a3a18253b6893e0dd548b356c6ef1c5fafc821695e8a546",
+      "size": 263
+    },
+    {
+      "path": "README.md",
+      "sha256": "b3a389139b841c66ea3ee695ea55256b8bd4de4e4b80bf52e47551f650e25be0",
+      "size": 77
+    }
+  ]
+}

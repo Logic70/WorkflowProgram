@@ -1,0 +1,24 @@
+{
+  "provider": "claude_cli",
+  "result": "ENVIRONMENT-SKIP",
+  "failure_code": "RUNTIME_HOST_NOT_READY",
+  "message": "{\n  \"loggedIn\": false,\n  \"authMethod\": \"none\",\n  \"apiProvider\": \"firstParty\"\n}",
+  "is_error": false,
+  "command": [],
+  "returncode": 0,
+  "stdout": "",
+  "stderr": "",
+  "parsed": {
+    "provider": "claude_cli",
+    "probe_available": true,
+    "probe_ready": false,
+    "probe_message": "{\n  \"loggedIn\": false,\n  \"authMethod\": \"none\",\n  \"apiProvider\": \"firstParty\"\n}"
+  },
+  "subagent_evidence": false,
+  "stage_history": [],
+  "current_stage": "",
+  "stage_status": "",
+  "next_action": "",
+  "next_stage_on_failure": "",
+  "metadata": {}
+}
