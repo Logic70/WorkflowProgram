@@ -202,8 +202,10 @@ Artifact 使用固定结构：
 - `RUN_ROOT/outputs/stages/s2-context-report.md`
 - `RUN_ROOT/workflow-spec.yaml`
 - `RUN_ROOT/workflow-view.md`
+- `RUN_ROOT/workflow-lowlevel.md`
 - `RUN_ROOT/outputs/stages/s3-design-summary.json`
 - `RUN_ROOT/outputs/candidate/.claude/`
+- `RUN_ROOT/outputs/candidate/.workflowprogram/design/`
 - `RUN_ROOT/outputs/managed-change-plan.json`
 - `RUN_ROOT/outputs/managed-change-result.json`
 - `RUN_ROOT/outputs/stages/s5-validation-summary.json`
@@ -511,13 +513,15 @@ python3 ${CLAUDE_PLUGIN_ROOT}/scripts/stage-progress.py update ...
 ### 执行过程（封装级）
 
 1. `clarify_requirement`（skill_node）
-   - `workflowprogram-develop` 提最小必要澄清问题并归档答案。
+   - `workflowprogram-develop` 必须与用户进行多轮澄清。
+   - 每轮只提出当前最关键的 1-3 个未决问题；若回答后仍存在会影响设计的歧义，则继续下一轮。
+   - 只有当“用户诉求、最终目的、成功标准、触发方式、输入输出、质量门禁”均已明确时，才允许进入草案写入。
 2. `draft_spec`（agent_node）
-   - `requirement_analyst` 生成规格草案内容。
+   - `requirement_analyst` 生成规格草案内容，必须把多轮对话收敛结果整理为 `User Intent` 与 `Clarification Summary`。
 3. `persist_spec`（script_node）
    - 套用 `spec-template.md`，写入 `RUN_ROOT/workflow-spec.md`。
 4. `spec_quality_check`（script_node）
-   - 检查是否包含 `TBD/待补`，失败则回到步骤 1。
+   - 检查是否包含 `TBD/待补`、`User Intent`、`Clarification Summary` 与有效 `澄清轮次`；失败则回到步骤 1。
 5. `emit_stage_progress`（script_node）
    - 更新 S1 进展与里程碑，刷新 `user-progress.md`。
 
@@ -526,7 +530,9 @@ python3 ${CLAUDE_PLUGIN_ROOT}/scripts/stage-progress.py update ...
 1. `RUN_ROOT/workflow-spec.md` 文件存在。
 2. 文件不包含 `TBD` 或 `待补`。
 3. 文件包含输入、输出、触发方式、质量门禁四个段落。
-4. `milestones.jsonl` 至少包含 `clarify_requirement` 和 `persist_spec` 两个节点结果。
+4. 文件必须包含 `User Intent` 与 `Clarification Summary` 两个段落。
+5. `Clarification Summary.澄清轮次` 必须是整数，且 `>= 2`。
+6. `milestones.jsonl` 至少包含 `clarify_requirement` 和 `persist_spec` 两个节点结果。
 
 ### 实现方案
 
@@ -601,6 +607,7 @@ python3 ${CLAUDE_PLUGIN_ROOT}/scripts/stage-progress.py update ...
 
 - `RUN_ROOT/workflow-spec.yaml`（机器可读）
 - `RUN_ROOT/workflow-view.md`（只读视图）
+- `RUN_ROOT/workflow-lowlevel.md`（维护指导）
 - 资产生成清单
 - `RUN_ROOT/outputs/stages/s3-design-summary.json`
 
@@ -618,6 +625,7 @@ python3 ${CLAUDE_PLUGIN_ROOT}/scripts/stage-progress.py update ...
 2. `render_yaml_and_view`（script_node）
    - 先产出 `RUN_ROOT/workflow-spec.yaml`。
    - 再调用 `python ${CLAUDE_PLUGIN_ROOT}/scripts/generate-workflow-view.py --spec <RUN_ROOT>/workflow-spec.yaml --out <RUN_ROOT>/workflow-view.md` 生成只读视图。
+   - 再调用 `python ${CLAUDE_PLUGIN_ROOT}/scripts/generate-workflow-lowlevel.py --spec <RUN_ROOT>/workflow-spec.yaml --out <RUN_ROOT>/workflow-lowlevel.md` 生成维护指导文档。
 3. `validate_yaml_contract`（script_node）
    - 调用 `${CLAUDE_PLUGIN_ROOT}/scripts/validate-workflow-spec.py --spec <RUN_ROOT>/workflow-spec.yaml`，同时校验 `runtime_contract` 与 `test_contract`；失败则回退到设计步骤。
 4. `persist_design_summary`（script_node）
@@ -637,15 +645,18 @@ python3 ${CLAUDE_PLUGIN_ROOT}/scripts/stage-progress.py update ...
 6. `test_contract.failure.implemented_now` 必须是 `runtime_contract.failure_kinds` 的子集。
 7. `s3-design-summary.json` 必须记录 `approval_status` 与 `complexity`。
 8. `workflow-view.md` 必须存在且标注来源 `workflow-spec.yaml`。
-9. `approval_status` 必须写入 `current-progress.json`。
-10. `validate-workflow-spec.py` 必须返回 `PASS`。
-11. 若存在 `user_approval` gate，则未经批准不得进入 S4。
+9. `workflow-lowlevel.md` 必须存在，并通过 `${CLAUDE_PLUGIN_ROOT}/scripts/validate-workflow-lowlevel.py --spec <workflow-spec.yaml> --lowlevel <workflow-lowlevel.md>` 的确定性校验。
+10. `approval_status` 必须写入 `current-progress.json`。
+11. `validate-workflow-spec.py` 必须返回 `PASS`。
+12. 若存在 `user_approval` gate，则未经批准不得进入 S4。
 
 ### 实现方案
 
 - 主承载：`/develop` Stage 3
 - YAML 模板来源：`yaml-spec-template.md`
 - 视图渲染脚本：`generate-workflow-view.py`（确定性渲染，不依赖自由文本）
+- 维护指导渲染脚本：`generate-workflow-lowlevel.py`
+- 维护指导校验脚本：`${CLAUDE_PLUGIN_ROOT}/scripts/validate-workflow-lowlevel.py`
 - 规格校验脚本：`${CLAUDE_PLUGIN_ROOT}/scripts/validate-workflow-spec.py`
 
 ### 承载文件
@@ -653,6 +664,8 @@ python3 ${CLAUDE_PLUGIN_ROOT}/scripts/stage-progress.py update ...
 - [develop.md](/mnt/d/Code/WorkflowProgram-CN/.claude/commands/develop.md)
 - [yaml-spec-template.md](/mnt/d/Code/WorkflowProgram-CN/.claude/skills/develop/yaml-spec-template.md)
 - [generate-workflow-view.py](/mnt/d/Code/WorkflowProgram-CN/.claude/scripts/generate-workflow-view.py)
+- [generate-workflow-lowlevel.py](/mnt/d/Code/WorkflowProgram-CN/.claude/scripts/generate-workflow-lowlevel.py)
+- [validate-workflow-lowlevel.py](/mnt/d/Code/WorkflowProgram-CN/.claude/scripts/validate-workflow-lowlevel.py)
 - [validate-workflow-spec.py](/mnt/d/Code/WorkflowProgram-CN/.claude/scripts/validate-workflow-spec.py)
 
 ## S4 生成与受控写入（Generate + Managed Apply）
@@ -666,10 +679,12 @@ python3 ${CLAUDE_PLUGIN_ROOT}/scripts/stage-progress.py update ...
 ### 输出
 
 - `RUN_ROOT/outputs/candidate/.claude/*`
+- `RUN_ROOT/outputs/candidate/.workflowprogram/design/*`
 - `managed-change-plan.json`
 - `managed-change-result.json`
 - `managed-change-summary.md`
 - 应用后的 `TARGET_ROOT/.claude/*`（无冲突时）
+- 应用后的 `TARGET_ROOT/.workflowprogram/design/*`（无冲突时）
 
 ### 准出目标
 
@@ -681,7 +696,7 @@ python3 ${CLAUDE_PLUGIN_ROOT}/scripts/stage-progress.py update ...
 ### 执行过程（封装级）
 
 1. `generate_candidates`（script_node）
-   - 按 `workflow-spec.yaml` 生成 `RUN_ROOT/outputs/candidate/.claude/*`。
+   - 按 `workflow-spec.yaml` 生成 `RUN_ROOT/outputs/candidate/.claude/*`，并同步准备 `RUN_ROOT/outputs/candidate/.workflowprogram/design/*`。
 2. `validate_generated_files`（skill_node）
    - 调 `validate-file` 检查关键候选文件格式与约束。
 3. `plan_apply_managed_assets`（script_node）
@@ -690,7 +705,7 @@ python3 ${CLAUDE_PLUGIN_ROOT}/scripts/stage-progress.py update ...
    - 无冲突执行 `apply-staged`；有冲突写入 `outputs/conflicts/` 并标记失败分类。
 5. `product_entry_finalize`（script_node）
    - develop 主链必须通过 `${CLAUDE_PLUGIN_ROOT}/scripts/workflow-entry.py run --spec <RUN_ROOT>/workflow-spec.yaml --run-root <RUN_ROOT> --target-root <TARGET_ROOT> --entry-skill workflowprogram-develop --request "<原始需求>"` 驱动，而不是只在 skill 中罗列口头顺序。
-   - 该脚本必须顺序调用 `validate-workflow-spec.py`、`generate-workflow-view.py`、`managed-assets.py`、`workflow-runner.py`、`validate-run-state.py`，并写入 `outputs/stages/entry-orchestration-summary.json`。
+   - 该脚本必须顺序调用 `validate-workflow-spec.py`、`generate-workflow-view.py`、`generate-workflow-lowlevel.py`、`managed-assets.py`、`workflow-runner.py`、`validate-run-state.py`，并写入 `outputs/stages/entry-orchestration-summary.json`。
 6. `run_transition_control_plane`（script_node）
    - 调 `${CLAUDE_PLUGIN_ROOT}/scripts/workflow-runner.py run --spec <RUN_ROOT>/workflow-spec.yaml --run-root <RUN_ROOT> --target-root <TARGET_ROOT>`，由程序执行状态转移并产出 `state.json` / `events.jsonl`。
 7. `validate_state_artifacts`（script_node）
@@ -702,7 +717,7 @@ python3 ${CLAUDE_PLUGIN_ROOT}/scripts/stage-progress.py update ...
 
 ### 可验证检查
 
-1. `RUN_ROOT/outputs/candidate/.claude/` 必须存在。
+1. `RUN_ROOT/outputs/candidate/.claude/` 与 `RUN_ROOT/outputs/candidate/.workflowprogram/design/` 必须存在。
 2. `managed-change-plan.json` 与 `managed-change-result.json` 必须存在。
 3. 若存在冲突，`RUN_ROOT/outputs/conflicts/` 必须存在且包含冲突文件副本。
 4. `TARGET_ROOT/.workflowprogram/managed-files.json` 必须更新 `updated_at`。

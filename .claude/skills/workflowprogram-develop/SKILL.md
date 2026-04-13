@@ -24,10 +24,13 @@ disable-model-invocation: true
 - 对已应用文件，应维护 `TARGET_ROOT/.workflowprogram/managed-files.json`。
 - 执行过程中必须通过 `${CLAUDE_PLUGIN_ROOT}/scripts/stage-progress.py` 写入进展与关键节点结果。
 - `workflow-spec.md` 草案在进入 YAML 设计前必须通过 `${CLAUDE_PLUGIN_ROOT}/scripts/validate-workflow-draft.py` 的确定性质量门槛。
+- S1 必须通过多轮用户对话澄清“用户诉求、最终目的、成功标准”；若这些信息仍不清楚，不得提前结束需求阶段。
 - `workflow-spec.yaml` 产出后必须调用 `${CLAUDE_PLUGIN_ROOT}/scripts/validate-workflow-spec.py` 进行结构校验。
 - `workflow-spec.yaml` 必须包含 `intent_flows`，明确 `develop / audit / iterate / validate` 的逻辑阶段流。
 - `workflow-spec.yaml` 必须包含 `runtime_contract`，且至少声明：`write_boundaries`、`required_evidence`、`failure_kinds`、`environment_skip`。
 - `workflow-spec.yaml` 必须包含 `test_contract`，且至少声明：`entry`、`boundary`、`flow`、`artifacts`、`failure`。
+- develop 成功后，必须把 `workflow-spec.yaml`、`workflow-view.md`、`workflow-lowlevel.md` 持久化到 `TARGET_ROOT/.workflowprogram/design/`。
+- `workflow-lowlevel.md` 仅用于维护与迭代指导，不得覆盖 `workflow-spec.yaml` 语义。
 - `test_contract` 对执行字段必须使用 `runtime_contract.<field>` 固定引用语法，且不得复制 `runtime_contract` 同名字段。
 - `test_contract.failure.implemented_now` 必须是 `runtime_contract.failure_kinds` 的子集，且不得反向改变 runner 的 verdict/failure_kind 语义。
 - 生成链路完成后必须调用 `${CLAUDE_PLUGIN_ROOT}/scripts/workflow-runner.py` 进行程序化 stage 转移和状态落盘；runner 只负责控制面，不负责 S5 主判定。
@@ -45,19 +48,21 @@ disable-model-invocation: true
 ## Step 2: Produce Workflow Spec
 
 1. 用统一规格模板整理需求。
-2. 若关键信息缺失，只提出最小必要问题。
-3. 形成工作流规格、模式选择和文件清单。
+2. 每轮只提出当前最关键的 1-3 个未决问题，并根据用户回答继续追问，直到诉求、目的和成功标准清楚为止。
+3. 在 `workflow-spec.md` 中显式整理 `User Intent` 与 `Clarification Summary`。
+4. 形成工作流规格、模式选择和文件清单。
 4. 写入进展事件：`S1 StageCheckpoint` 与 `S1 StageCompleted`。
 
 ## Step 3: Design Assets
 
-先在 `RUN_ROOT/outputs/candidate/.claude/` 规划或生成候选资产，再决定是否应用到 `TARGET_ROOT/.claude/`：
+先在 `RUN_ROOT/outputs/candidate/` 规划或生成候选资产，再决定是否应用到目标项目：
 
 - `settings.json`
 - `skills/`
 - `agents/`
 - `rules/`
 - 必要时的 `commands/` 兼容层
+- `.workflowprogram/design/{workflow-spec.yaml,workflow-view.md,workflow-lowlevel.md}`
 
 生成候选资产后，使用以下流程：
 
@@ -65,6 +70,7 @@ disable-model-invocation: true
 2. `workflow-entry.py` 必须按固定顺序调用：
    - `validate-workflow-spec.py`
    - `generate-workflow-view.py`
+   - `generate-workflow-lowlevel.py`
    - `managed-assets.py plan`
    - `managed-assets.py apply-staged`
    - `workflow-runner.py run`

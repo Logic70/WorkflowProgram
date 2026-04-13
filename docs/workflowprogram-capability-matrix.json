@@ -6,11 +6,11 @@
       "checks": [
         {
           "file": "docs/workflowprogram-stage-highlevel-design.md",
-          "markers": ["intent_flows", "approved", "auto-approved", "workflow-entry.py"]
+          "markers": ["intent_flows", "approved", "auto-approved", "workflow-entry.py", "workflow-lowlevel.md"]
         },
         {
           "file": "docs/workflowprogram-stage-lowlevel-design.md",
-          "markers": ["intent_flows", "workflow-entry.py", "state.json", "events.jsonl"]
+          "markers": ["intent_flows", "workflow-entry.py", "state.json", "events.jsonl", ".workflowprogram/design"]
         },
         {
           "file": "docs/workflowprogram-stage-consistency-check.md",
@@ -40,15 +40,15 @@
       "checks": [
         {
           "file": "docs/workflowprogram-stage-highlevel-design.md",
-          "markers": ["workflow-spec.md", "TBD/待补", "触发方式/输入/输出/质量门禁四段"]
+          "markers": ["workflow-spec.md", "TBD/待补", "触发方式/输入/输出/质量门禁四段", "User Intent", "Clarification Summary"]
         },
         {
           "file": ".claude/scripts/validate-workflow-draft.py",
-          "markers": ["Trigger Model", "Inputs", "Outputs", "Quality Gates"]
+          "markers": ["User Intent", "Clarification Summary", "Trigger Model", "澄清轮次"]
         },
         {
           "file": ".claude/skills/workflowprogram-develop/SKILL.md",
-          "markers": ["validate-workflow-draft.py", "workflow-entry.py"]
+          "markers": ["validate-workflow-draft.py", "workflow-entry.py", "多轮用户对话"]
         }
       ]
     },
@@ -57,15 +57,15 @@
       "checks": [
         {
           "file": ".claude/scripts/workflow-entry.py",
-          "markers": ["managed-assets.py", "workflow-runner.py", "validate-run-state.py", "entry-orchestration-summary.json"]
+          "markers": ["managed-assets.py", "generate-workflow-lowlevel.py", "workflow-runner.py", "validate-run-state.py", "entry-orchestration-summary.json"]
         },
         {
           "file": ".claude/commands/develop.md",
-          "markers": ["workflow-entry.py run", "managed-assets.py", "workflow-runner.py"]
+          "markers": ["workflow-entry.py run", "generate-workflow-lowlevel.py", "managed-assets.py", "workflow-runner.py"]
         },
         {
           "file": ".claude/skills/workflowprogram-develop/SKILL.md",
-          "markers": ["workflow-entry.py run", "managed-assets.py", "workflow-runner.py", "validate-run-state.py"]
+          "markers": ["workflow-entry.py run", ".workflowprogram/design/", "managed-assets.py", "workflow-runner.py", "validate-run-state.py"]
         }
       ]
     },

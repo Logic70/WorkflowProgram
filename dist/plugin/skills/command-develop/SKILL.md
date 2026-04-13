@@ -71,22 +71,24 @@ python3 ${CLAUDE_PLUGIN_ROOT}/scripts/stage-progress.py update ...
 
 ## Stage 1: 理解需求 (Explore)
 
-**Goal**: 生成一个没有歧义的 `workflow-spec.md`。
+**Goal**: 通过多轮用户对话生成一个没有歧义的 `workflow-spec.md`。
 
 **Progress hooks**：
 - Stage 开始：`S1 StageStarted`
 - 规格草案写入后：`S1 StageCheckpoint`
 - Stage 完成：`S1 StageCompleted`
 
-1. 将 `$ARGUMENTS` 解析为工作流需求。
-2. 识别歧义点，并围绕以下维度向用户提出 3-5 个澄清问题：
+1. 将 `$ARGUMENTS` 解析为初始工作流需求。
+2. 识别当前仍会影响设计的歧义点，围绕以下维度分轮向用户追问：
+   - 用户真正想解决的问题和最终目的是什么？
    - 需要自动化的流程是什么？（触发 -> 步骤 -> 输出）
    - 输入和输出分别是什么？
-   - 有哪些质量门禁或停止条件？
+   - 有哪些质量门禁、停止条件或成功标准？
    - 涉及多少种角色或专家维度？
    - 应由手动命令触发，还是由 hook 自动触发？
-3. 用户回答后，使用 `${CLAUDE_PLUGIN_ROOT}/skills/develop/spec-template.md` 在仓库根目录生成 `workflow-spec.md`。
-4. **Verify**: 规格中的每个字段都有明确值，且不再包含 `TBD`。
+3. 每轮只提 1-3 个最高优先级问题；若用户回答后仍存在设计歧义，则继续下一轮，不得只做单轮问答后直接结束。
+4. 当“用户诉求 / 最终目的 / 成功标准 / 触发方式 / 输入输出 / 质量门禁”都已明确后，使用 `${CLAUDE_PLUGIN_ROOT}/skills/develop/spec-template.md` 生成 `workflow-spec.md`。
+5. **Verify**: 规格中的每个字段都有明确值，包含 `User Intent` 与 `Clarification Summary`，`澄清轮次 >= 2`，且不再包含 `TBD`。
 
 **On failure**：把歧义点和所需补充信息记录到 `lessons.md`。
 
@@ -162,9 +164,9 @@ python3 ${CLAUDE_PLUGIN_ROOT}/scripts/stage-progress.py update ...
 - 文件清单：要创建或修改的每个文件
 - 每一阶段的 TDD 目标和验证条件
 
-**双轨设计输出（Dual-Track Output）**：
+**三层设计输出（Design Package）**：
 
-设计阶段产出两份互补的设计文档：
+设计阶段产出三份互补的设计文档：
 
 1. **`workflow-spec.yaml`** —— 机器可读的编排配置（源文件）
    - 包含：阶段定义、Agent 引用、转移条件、资源限额、运行契约（`runtime_contract`）、基础运行测试判定契约（`test_contract`）
@@ -196,6 +198,12 @@ python3 ${CLAUDE_PLUGIN_ROOT}/scripts/stage-progress.py update ...
    - 用途：人工审查、快速浏览、设计讨论
    - 可编辑：❌ 禁止直接编辑，从 YAML 单向生成
 
+3. **`workflow-lowlevel.md`** —— 维护与迭代指导（生成文件）
+   - 包含：真源层级、阶段契约、证据归属、持久化设计资产规则、维护方法
+   - 格式：自然语言 Markdown
+   - 用途：后续 audit / iterate / 人工维护时快速理解当前工作流
+   - 可编辑：❌ 禁止直接编辑；它只能解释 YAML，不能覆盖 YAML 语义
+
 **单向瀑布生成原则**：
 ```
 workflow-design.md（设计决策，人工审查）
@@ -203,17 +211,19 @@ workflow-design.md（设计决策，人工审查）
    提取转换
          ↓
 workflow-spec.yaml（机器编排，单点真实）
-         ↓
-    生成渲染
-         ↓
-workflow-view.md（只读视图，人类查阅）
+         ├───────────────┐
+         ↓               ↓
+workflow-view.md     workflow-lowlevel.md
+（只读视图）           （维护指导）
 ```
 
 **编辑规则**：
 - 如需修改设计 → 编辑 `workflow-spec.yaml`
 - 重新生成视图 → 运行 `python ${CLAUDE_PLUGIN_ROOT}/scripts/generate-workflow-view.py --spec <RUN_ROOT>/workflow-spec.yaml --out <RUN_ROOT>/workflow-view.md`
+- 重新生成维护指导 → 运行 `python ${CLAUDE_PLUGIN_ROOT}/scripts/generate-workflow-lowlevel.py --spec <RUN_ROOT>/workflow-spec.yaml --out <RUN_ROOT>/workflow-lowlevel.md`
 - 结构校验规格 → 运行 `python ${CLAUDE_PLUGIN_ROOT}/scripts/validate-workflow-spec.py --spec <RUN_ROOT>/workflow-spec.yaml`
-- 禁止直接编辑 `workflow-view.md`（会被覆盖）
+- 禁止直接编辑 `workflow-view.md` 与 `workflow-lowlevel.md`（会被覆盖）
+- develop 成功后，`workflow-spec.yaml`、`workflow-view.md`、`workflow-lowlevel.md` 必须持久化到 `TARGET_ROOT/.workflowprogram/design/`
 
 **On failure**：把设计失误写入 `lessons.md`。
 
@@ -274,12 +284,14 @@ workflow-view.md（只读视图，人类查阅）
 
 5. `${CLAUDE_PLUGIN_ROOT}/rules/constraints.md`（如需要，从 YAML `constraints` 提取）
 6. 生成 `workflow-view.md`（从 YAML 单向渲染，只读）
-7. 更新 `CLAUDE.md`（如需要）
-8. 候选资产生成完成后，必须调用确定性脚本入口：
+7. 生成 `workflow-lowlevel.md`（从 YAML 单向渲染，只作维护指导）
+8. 更新 `CLAUDE.md`（如需要）
+9. 候选资产生成完成后，必须调用确定性脚本入口：
    - `python ${CLAUDE_PLUGIN_ROOT}/scripts/workflow-entry.py run --spec <RUN_ROOT>/workflow-spec.yaml --run-root <RUN_ROOT> --target-root <TARGET_ROOT> --entry-skill workflowprogram-develop --request "$ARGUMENTS" [--auto-approve|--approval-status approved]`
-   - 该脚本负责按固定顺序执行 `validate-workflow-spec.py -> generate-workflow-view.py -> managed-assets.py -> workflow-runner.py -> validate-run-state.py`
+   - 该脚本负责按固定顺序执行 `validate-workflow-spec.py -> generate-workflow-view.py -> generate-workflow-lowlevel.py -> managed-assets.py -> workflow-runner.py -> validate-run-state.py`
+   - 它会把 `RUN_ROOT/workflow-spec.yaml`、`RUN_ROOT/workflow-view.md`、`RUN_ROOT/workflow-lowlevel.md` 复制到 `RUN_ROOT/outputs/candidate/.workflowprogram/design/`，再与 `.claude/*` 一起走 managed apply
    - 若 `managed-assets.py` 发现冲突，脚本必须停在 S4，并输出 `RUN_ROOT/outputs/stages/entry-orchestration-summary.json`
-9. 交由 `workflowprogram-validate` 形成 S5 主判定与运行态证据：
+10. 交由 `workflowprogram-validate` 形成 S5 主判定与运行态证据：
    - `workflowprogram-validate` 是 S5 主 judge，负责消费 `test_contract`
    - `runtime_smoke.py` 作为动态 harness，在 Claude 可用时补充 `validation-runtime-report.md`
    - `RUN_ROOT/outputs/stages/s5-validation-summary.json` 由验证链路汇总写入，不由 runner 独占

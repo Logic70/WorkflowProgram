@@ -15,6 +15,8 @@ from typing import Dict, List
 
 PLACEHOLDER_RE = re.compile(r"\bTBD\b|待补", re.IGNORECASE)
 REQUIRED_SECTIONS: Dict[str, List[str]] = {
+    "User Intent": ["用户诉求", "最终目的", "成功标准"],
+    "Clarification Summary": ["澄清轮次", "已确认事项", "已消解歧义"],
     "Trigger Model": ["调用方式", "触发细节"],
     "Inputs": ["必需输入", "可选输入", "所需外部上下文"],
     "Outputs": ["主交付物", "次级产物", "输出格式"],
@@ -86,6 +88,17 @@ def validate_draft(path: Path) -> Dict[str, object]:
                 continue
             if PLACEHOLDER_RE.search(value):
                 errors.append(f"section '{section_name}' field '{label}' contains unresolved placeholders")
+
+    clarification_block = sections.get("Clarification Summary", "")
+    if clarification_block:
+        rounds_text = section_value(clarification_block, "澄清轮次")
+        try:
+            rounds = int(rounds_text)
+        except ValueError:
+            errors.append("section 'Clarification Summary' field '澄清轮次' must be an integer")
+        else:
+            if rounds < 2:
+                errors.append("section 'Clarification Summary' field '澄清轮次' must be >= 2")
 
     return {
         "status": "PASS" if not errors else "FAIL",

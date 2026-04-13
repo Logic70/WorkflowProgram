@@ -22,6 +22,8 @@ Legend:
 | `workflow-distribution-contract` | Satisfied | `dist/plugin`, build-manifest, and repository validators materially implement the canonical payload contract. |
 | `workflow-stage-contracts` | Satisfied | Stage-by-stage contract exists, HighLevel/LowLevel agree on S0 creation semantics, approval semantics, S4/S5 evidence ownership, S1/S6 quality gates, and the develop product entry now drives the deterministic script chain through one wrapper. |
 | `workflow-intent-flows` | Satisfied | HighLevel, LowLevel, template, spec validator, runner, smoke harness, and S5 judge now share one machine-checkable `intent_flows` contract. |
+| `workflow-host-capability-bootstrap` | Missing | Current design can declare workflow assets and some logical skill references, but it does not discover domain-specific professional dependencies, probe host readiness, or bootstrap missing skills / MCP / tools through an auditable contract. |
+| `workflow-agent-team-orchestration` | Missing | The current system has agent and subagent concepts, but it does not provide a first-class machine-readable team topology, join policy, or runtime evidence model for validating team-style orchestration. |
 
 ## Key Evidence
 
@@ -127,6 +129,14 @@ The main pattern is now:
 
 - `scripts and validators` are ahead
 - `HighLevel and LowLevel truth sources` are much closer to the implementation
-- `request-to-intent inference quality` is still the main partial area; product-level entry orchestration and historical-doc governance are now closed
+- the remaining gaps are no longer in the core `S0..S6` control plane alone; they now concentrate in three areas:
+  - `request-to-intent inference quality`
+  - `host capability bootstrap for domain-specific professional tooling`
+  - `machine-checkable agent-team orchestration`
 
-That means the repo is already useful for constrained development and validation work, the intent-flow plus S1/S6 quality contracts are materially landed, and the remaining gaps are now mostly about future route-intent semantic hardening rather than missing execution or validation machinery.
+That means the repo is already useful for constrained development and validation work, the intent-flow plus S1/S6 quality contracts are materially landed, and the most important remaining work is now about expanding readiness and orchestration capability rather than rescuing the existing execution chain.
+
+Two newly added pending requirement families remain unimplemented by design:
+
+- `workflow-host-capability-bootstrap`: missing as a product capability; specialized dependencies such as reverse-engineering skills, MCP servers, or external toolchains are not yet discovered or bootstrapped automatically.
+- `workflow-agent-team-orchestration`: missing as a machine-checkable capability; agent-team support is not yet modeled as an explicit workflow contract.

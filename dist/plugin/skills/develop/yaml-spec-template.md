@@ -43,6 +43,7 @@ stages:
       workflow-design.md
       workflow-spec.yaml
       workflow-view.md
+      workflow-lowlevel.md
     gate: user_approval
     auto_approve_cond: "--auto-approve or CI=true"
     max_retries: 3
@@ -64,12 +65,16 @@ stages:
         from_yaml: registry
     output: |
       outputs/candidate/.claude
+      outputs/candidate/.workflowprogram/design
       outputs/managed-change-plan.json
       outputs/managed-change-result.json
       .claude/agents/*.md
       .claude/skills/*/SKILL.md
       .claude/commands/*.md
       .claude/settings.json
+      .workflowprogram/design/workflow-spec.yaml
+      .workflowprogram/design/workflow-view.md
+      .workflowprogram/design/workflow-lowlevel.md
 
   - id: validate
     stage_slot: S5
@@ -266,6 +271,9 @@ test_contract:
     deliverables:
       - .claude/settings.json
       - .claude/rules/constraints.md
+      - .workflowprogram/design/workflow-spec.yaml
+      - .workflowprogram/design/workflow-view.md
+      - .workflowprogram/design/workflow-lowlevel.md
       - .workflowprogram/managed-files.json
     evidence_ref: runtime_contract.required_evidence
     optional_outputs:

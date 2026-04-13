@@ -112,6 +112,10 @@ def validate_managed_manifest(path: Path) -> List[str]:
     return errors
 
 
+def is_managed_target_path(path: str) -> bool:
+    return path.startswith(".claude/") or path.startswith(".workflowprogram/design/")
+
+
 def snapshot_index(entries: List[Dict[str, Any]]) -> Dict[str, Dict[str, Any]]:
     """按相对路径为快照条目建立索引，便于快速 diff 查询。"""
 
@@ -479,7 +483,7 @@ def build_checks(
         managed_conflicts = managed_result.get("conflicts", []) if isinstance(managed_result.get("conflicts"), list) else []
         managed_policy = str(boundary.get("managed_overwrite_policy", "")).strip()
         changed_managed_paths = [
-            item for item in changed_target_paths if item.startswith(".claude/") and item in before_target_index
+            item for item in changed_target_paths if is_managed_target_path(item) and item in before_target_index
         ]
         unexpected_managed_changes = [item for item in changed_managed_paths if item not in managed_rel_paths]
         if managed_entries:
@@ -641,7 +645,7 @@ def build_checks(
                     f"{required_stage_source}+{skippable_stage_source}",
                 )
         terminal_conditions = flow.get("terminal_conditions", {})
-        provider_stage_status = str(parsed_provider.get("stage_status", "")).strip()
+        provider_stage_status = str(parsed_provider.get("stage_status", "")).strip() or str(provider_result.get("stage_status", "")).strip()
         if isinstance(terminal_conditions, dict) and result in terminal_conditions:
             if result in {"PASS", "WARN"}:
                 add_check(
@@ -679,7 +683,7 @@ def build_checks(
                 skippable_stage_source,
             )
         failure_recovery = flow.get("failure_recovery", {})
-        provider_recovery = str(parsed_provider.get("next_stage_on_failure", "")).strip()
+        provider_recovery = str(parsed_provider.get("next_stage_on_failure", "")).strip() or str(provider_result.get("next_stage_on_failure", "")).strip()
         if result == "FAIL" and isinstance(failure_recovery, dict) and failure_recovery:
             expected_recovery = str(failure_recovery.get(derived_failure_kind, "")).strip()
             if expected_recovery and provider_recovery:
@@ -852,6 +856,57 @@ def build_checks(
                         "PASS" if manifest_ref == str(manifest_path) else "FAIL",
                         f"managed-change-result manifest_path={manifest_ref or '<missing>'}; expected={manifest_path}",
                         "outputs/managed-change-result.json",
+                    )
+                if text == ".workflowprogram/design/workflow-spec.yaml":
+                    target_spec_path = target_root / ".workflowprogram" / "design" / "workflow-spec.yaml"
+                    target_spec = load_yaml(target_spec_path)
+                    run_spec = load_yaml(run_root / "workflow-spec.yaml")
+                    add_check(
+                        checks["artifacts"],
+                        "persistent_workflow_spec_valid",
+                        "PASS" if target_spec else "FAIL",
+                        f"Persistent workflow-spec.yaml {'parsed successfully' if target_spec else 'is missing or invalid'} at {target_spec_path}",
+                        "TARGET_ROOT/.workflowprogram/design/workflow-spec.yaml",
+                    )
+                    if target_spec and run_spec:
+                        add_check(
+                            checks["artifacts"],
+                            "persistent_workflow_spec_matches_run_spec",
+                            "PASS" if target_spec == run_spec else "FAIL",
+                            "Persistent workflow-spec.yaml should match RUN_ROOT/workflow-spec.yaml for this develop run.",
+                            "TARGET_ROOT/.workflowprogram/design/workflow-spec.yaml",
+                        )
+                if text == ".workflowprogram/design/workflow-view.md":
+                    target_view_path = target_root / ".workflowprogram" / "design" / "workflow-view.md"
+                    view_exists = target_view_path.exists()
+                    view_content = target_view_path.read_text(encoding="utf-8") if view_exists else ""
+                    add_check(
+                        checks["artifacts"],
+                        "persistent_workflow_view_valid",
+                        "PASS" if view_exists and "Generated at" in view_content and "workflow-spec.yaml" in view_content else "FAIL",
+                        f"Persistent workflow-view.md {'exists and points back to workflow-spec.yaml' if view_exists else 'is missing'} at {target_view_path}",
+                        "TARGET_ROOT/.workflowprogram/design/workflow-view.md",
+                    )
+                if text == ".workflowprogram/design/workflow-lowlevel.md":
+                    target_spec_path = target_root / ".workflowprogram" / "design" / "workflow-spec.yaml"
+                    target_lowlevel_path = target_root / ".workflowprogram" / "design" / "workflow-lowlevel.md"
+                    lowlevel_validation = run_validator(
+                        "validate-workflow-lowlevel.py",
+                        "--spec",
+                        str(target_spec_path),
+                        "--lowlevel",
+                        str(target_lowlevel_path),
+                    )
+                    lowlevel_errors = [str(item) for item in lowlevel_validation.get("errors", [])]
+                    lowlevel_warnings = [str(item) for item in lowlevel_validation.get("warnings", [])]
+                    add_check(
+                        checks["artifacts"],
+                        "persistent_workflow_lowlevel_valid",
+                        "PASS" if not lowlevel_errors else "FAIL",
+                        "workflow-lowlevel.md passed deterministic validation."
+                        if not lowlevel_errors
+                        else "; ".join([*lowlevel_errors, *lowlevel_warnings[:3]]),
+                        "TARGET_ROOT/.workflowprogram/design/workflow-lowlevel.md",
                     )
     elif "artifacts" in contract.get("contract_categories", []):
         add_check(checks["artifacts"], "contract_source_fallback", "INFO", "Artifact checks derived from fixture preset.", "fixture_preset")

@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import shutil
 import subprocess
 import sys
 from datetime import datetime, timezone
@@ -243,6 +244,59 @@ def generate_view(spec_path: Path, out_path: Path) -> Dict[str, Any]:
     return payload
 
 
+def generate_lowlevel(spec_path: Path, out_path: Path) -> Dict[str, Any]:
+    """根据 workflow-spec.yaml 生成维护级 lowlevel 指南。"""
+
+    payload = run_required_json_command(
+        "generate-workflow-lowlevel.py",
+        [
+            sys.executable,
+            str(script_dir() / "generate-workflow-lowlevel.py"),
+            "--spec",
+            str(spec_path),
+            "--out",
+            str(out_path),
+            "--json",
+        ],
+    )
+    if payload.get("status") != "PASS":
+        raise RuntimeError(f"workflow lowlevel generation failed: {payload}")
+    return payload
+
+
+def resolve_candidate_layout(candidate_root: Path) -> Tuple[Path, Path]:
+    """兼容旧的 `candidate/.claude` 和新的 `candidate/` 传参形式。"""
+
+    if candidate_root.name == ".claude":
+        return candidate_root.parent, candidate_root
+    return candidate_root, candidate_root / ".claude"
+
+
+def stage_persistent_design_assets(
+    *,
+    candidate_stage_root: Path,
+    spec_path: Path,
+    view_path: Path,
+    lowlevel_path: Path,
+) -> Dict[str, str]:
+    """把本轮设计资产复制到 candidate/.workflowprogram/design/，供 managed apply 持久化。"""
+
+    design_root = candidate_stage_root / ".workflowprogram" / "design"
+    design_root.mkdir(parents=True, exist_ok=True)
+    target_spec = design_root / "workflow-spec.yaml"
+    target_view = design_root / "workflow-view.md"
+    target_lowlevel = design_root / "workflow-lowlevel.md"
+    shutil.copy2(spec_path, target_spec)
+    shutil.copy2(view_path, target_view)
+    shutil.copy2(lowlevel_path, target_lowlevel)
+    return {
+        "design_root": str(design_root),
+        "workflow_spec": str(target_spec),
+        "workflow_view": str(target_view),
+        "workflow_lowlevel": str(target_lowlevel),
+    }
+
+
 def run_managed_apply(target_root: Path, run_root: Path, candidate_root: Path) -> Tuple[Dict[str, Any], Dict[str, Any], bool]:
     """为 develop 流程执行候选资产的规划与应用。
 
@@ -375,7 +429,7 @@ def command_run(args: argparse.Namespace) -> int:
     run_root = Path(args.run_root).resolve()
     target_root = Path(args.target_root).resolve()
     plugin_root = resolve_plugin_root(args.plugin_root)
-    candidate_root = Path(args.candidate_root).resolve() if args.candidate_root else (run_root / "outputs" / "candidate" / ".claude")
+    candidate_root = Path(args.candidate_root).resolve() if args.candidate_root else (run_root / "outputs" / "candidate")
     run_root.mkdir(parents=True, exist_ok=True)
 
     # 在碰 spec 之前先固化路由证据，保证每次运行都能回答“为什么执行了这个入口”。
@@ -391,6 +445,8 @@ def command_run(args: argparse.Namespace) -> int:
     spec_validation = validate_spec(spec_path)
     view_path = run_root / "workflow-view.md"
     view_generation = generate_view(spec_path, view_path)
+    lowlevel_path = run_root / "workflow-lowlevel.md"
+    lowlevel_generation = generate_lowlevel(spec_path, lowlevel_path)
 
     managed_plan: Dict[str, Any] | None = None
     managed_result: Dict[str, Any] | None = None
@@ -399,15 +455,25 @@ def command_run(args: argparse.Namespace) -> int:
     state_validation: Dict[str, Any] | None = None
     stopped_before_runner = False
     final_status = "PASS"
+    design_assets: Dict[str, str] | None = None
 
     # 只有 develop 流程允许修改 TARGET_ROOT。
     # audit/iterate/validate 流程会直接进入控制面 runner。
     if intent == "develop":
-        if not candidate_root.exists():
-            raise RuntimeError(f"develop flow requires candidate root before orchestration: {candidate_root}")
-        if not candidate_root.is_dir():
-            raise RuntimeError(f"candidate root must be a directory: {candidate_root}")
-        managed_plan, managed_result, conflicts = run_managed_apply(target_root, run_root, candidate_root)
+        candidate_stage_root, candidate_claude_root = resolve_candidate_layout(candidate_root)
+        if not candidate_stage_root.exists():
+            raise RuntimeError(f"develop flow requires candidate root before orchestration: {candidate_stage_root}")
+        if not candidate_stage_root.is_dir():
+            raise RuntimeError(f"candidate root must be a directory: {candidate_stage_root}")
+        if not candidate_claude_root.exists() or not candidate_claude_root.is_dir():
+            raise RuntimeError(f"develop flow requires candidate .claude root before orchestration: {candidate_claude_root}")
+        design_assets = stage_persistent_design_assets(
+            candidate_stage_root=candidate_stage_root,
+            spec_path=spec_path,
+            view_path=view_path,
+            lowlevel_path=lowlevel_path,
+        )
+        managed_plan, managed_result, conflicts = run_managed_apply(target_root, run_root, candidate_stage_root)
         # managed apply 冲突要在 runner 之前中止。
         # 这样既能保持 S4 归属清晰，也避免在写入门禁未打开时假装控制面已经执行。
         if conflicts:
@@ -465,13 +531,16 @@ def command_run(args: argparse.Namespace) -> int:
         "route_mismatch": resolved["route_mismatch"],
         "route_payload": resolved["route_payload"],
         "view_path": str(view_path),
-        "candidate_root": str(candidate_root) if intent == "develop" else None,
+        "lowlevel_path": str(lowlevel_path),
+        "candidate_root": str(resolve_candidate_layout(candidate_root)[0]) if intent == "develop" else None,
+        "persistent_design_assets": design_assets,
         "spec_validation": {
             "status": spec_validation.get("status"),
             "error_count": len(spec_validation.get("errors", [])),
             "warning_count": len(spec_validation.get("warnings", [])),
         },
         "view_generation": view_generation,
+        "lowlevel_generation": lowlevel_generation,
         "managed_plan_path": str(run_root / "outputs" / "managed-change-plan.json") if managed_plan else None,
         "managed_result_path": str(run_root / "outputs" / "managed-change-result.json") if managed_result else None,
         "managed_conflict_count": len(managed_result.get("conflicts", [])) if managed_result else 0,

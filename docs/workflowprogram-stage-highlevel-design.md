@@ -123,9 +123,13 @@ TARGET_ROOT/
 
 ### S1 需求澄清阶段（Explore Requirement）
 
-- 目标：把自然语言需求收敛为无歧义规格。
+- 目标：通过持续多轮对话把自然语言需求收敛为无歧义规格，明确用户诉求、最终目的与成功标准。
 - 输出：`workflow-spec.md`（人类可读规格草案）。
 - 适用范围：仅适用于 `develop` 主链；`audit / iterate / validate` 不进入 S1，除非后续设计显式扩展。
+- 规范要求：
+  - S1 不得只做单轮问答后立即结束；只要仍存在会影响设计的歧义，就必须继续向用户追问。
+  - 每轮只聚焦当前最高优先级的未决问题，直到“用户诉求 / 最终目的 / 成功标准 / 触发方式 / 输入输出 / 质量门禁”全部明确。
+  - `workflow-spec.md` 必须包含 `User Intent` 与 `Clarification Summary`，用于记录澄清收敛结果。
 
 ### S2 领域研究阶段（Explore Context）
 
@@ -141,6 +145,7 @@ TARGET_ROOT/
 - `test_contract`（内嵌于 `workflow-spec.yaml`，定义入口/边界/流程/产物/失败五类基础测试判定）
   - 其中 `test_contract.flow` 默认表达 `develop` 主链；非 `develop` 流转由 `intent_flows` 约束
   - `workflow-view.md`（只读视图）
+  - `workflow-lowlevel.md`（维护与迭代指导；不得覆盖 YAML 语义）
 - 规范要求：
   - `develop` 主链必须在 S3 完成后经过审批 gate，方可进入 S4。
   - 审批记录必须区分 `approved`（人工批准）与 `auto-approved`（CI 或参数自动放行）。
@@ -150,9 +155,11 @@ TARGET_ROOT/
 - 目标：先生成候选，再受控应用到目标项目。
 - 输出：
   - `RUN_ROOT/outputs/candidate/.claude/*`
+  - `RUN_ROOT/outputs/candidate/.workflowprogram/design/*`
   - `managed-change-plan/result/summary`
   - `TARGET_ROOT/.workflowprogram/managed-files.json`
   - 应用后的 `TARGET_ROOT/.claude/*`（无冲突场景）
+  - 应用后的 `TARGET_ROOT/.workflowprogram/design/{workflow-spec.yaml,workflow-view.md,workflow-lowlevel.md}`（无冲突场景）
 
 ### S5 验证阶段（Validate）
 
@@ -176,10 +183,10 @@ TARGET_ROOT/
 | Stage | 可验证准出条件 | 最小证据 |
 |---|---|---|
 | S0 | `intent` 属于 4 个枚举，`target_root` 为绝对路径且目录已存在（不存在时已创建） | `RUN_ROOT/outputs/stages/s0-route.json` |
-| S1 | `workflow-spec.md` 存在、不含 `TBD/待补`，且包含触发方式/输入/输出/质量门禁四段 | `RUN_ROOT/workflow-spec.md` |
+| S1 | `workflow-spec.md` 存在、不含 `TBD/待补`，包含 `User Intent` 与 `Clarification Summary`，且保留触发方式/输入/输出/质量门禁四段；`澄清轮次 >= 2` | `RUN_ROOT/workflow-spec.md` |
 | S2 | 上下文报告包含“可复用资产/缺口/命名建议”三段 | `RUN_ROOT/outputs/stages/s2-context-report.md` |
-| S3 | `workflow-spec.yaml` 可解析且关键键存在（含 `runtime_contract` 与 `test_contract`）；`workflow-view.md` 已生成；审批状态已记录且未绕过 gate | `RUN_ROOT/workflow-spec.yaml`、`RUN_ROOT/workflow-view.md`、`outputs/stages/s3-design-summary.json` |
-| S4 | candidate 目录存在；managed plan/result 存在；`TARGET_ROOT/.workflowprogram/managed-files.json` 已写入且带 `updated_at`；冲突不覆盖目标文件 | `RUN_ROOT/outputs/candidate/.claude/`、`managed-change-plan/result`、`TARGET_ROOT/.workflowprogram/managed-files.json` |
+| S3 | `workflow-spec.yaml` 可解析且关键键存在（含 `runtime_contract` 与 `test_contract`）；`workflow-view.md` 与 `workflow-lowlevel.md` 已生成，且 `workflow-lowlevel.md` 可由 `workflow-spec.yaml` 确定性重算；审批状态已记录且未绕过 gate | `RUN_ROOT/workflow-spec.yaml`、`RUN_ROOT/workflow-view.md`、`RUN_ROOT/workflow-lowlevel.md`、`outputs/stages/s3-design-summary.json` |
+| S4 | candidate 目录存在；managed plan/result 存在；`TARGET_ROOT/.workflowprogram/managed-files.json` 已写入且带 `updated_at`；目标侧设计包已持久化；冲突不覆盖目标文件 | `RUN_ROOT/outputs/candidate/.claude/`、`RUN_ROOT/outputs/candidate/.workflowprogram/design/`、`managed-change-plan/result`、`TARGET_ROOT/.workflowprogram/managed-files.json` |
 | S5 | 产生 workflow 级结论，且证据链文件齐全 | `validation-runtime-report.md`、`outputs/stages/s5-validation-summary.json` |
 | S6 | 输出 lessons 增量与约束候选，关联本次 `run-id` 与 `failure_kind`，且 `user-progress.md` 含“历史关键节点结果” | `RUN_ROOT/outputs/stages/s6-lessons-delta.md` |
 
@@ -207,6 +214,7 @@ TARGET_ROOT/
 - `workflow-entry.py` 必须按固定顺序执行：
   - `validate-workflow-spec.py`
   - `generate-workflow-view.py`
+  - `generate-workflow-lowlevel.py`
   - `managed-assets.py plan/apply-staged`
   - `workflow-runner.py run`
   - `validate-run-state.py`

@@ -87,6 +87,7 @@ ACTIVE_ENTRY_DOCS = {
         "workflowprogram-validate",
         "runtime_smoke.py",
         "s5-validation-summary.json",
+        ".workflowprogram/design/",
     ],
 }
 
@@ -96,6 +97,7 @@ ACTIVE_TEMPLATE_DOC = {
         "workflowprogram-validate",
         "validation-runtime-report.md",
         "test_contract",
+        ".workflowprogram/design/workflow-lowlevel.md",
     ],
 }
 
@@ -251,6 +253,8 @@ def validate_required_paths(root: Path, result: ValidationResult) -> None:
         ".claude/scripts/route-intent.py",
         ".claude/scripts/runtime_host.py",
         ".claude/scripts/generate-workflow-view.py",
+        ".claude/scripts/generate-workflow-lowlevel.py",
+        ".claude/scripts/validate-workflow-lowlevel.py",
         ".claude/scripts/validate-lessons-delta.py",
         ".claude/scripts/validate-run-state.py",
         ".claude/scripts/validate-workflow-draft.py",
@@ -678,8 +682,10 @@ def validate_dist_plugin(root: Path, plugin_meta: Optional[Dict[str, Any]], resu
         dist_root / "scripts" / "route-intent.py",
         dist_root / "scripts" / "runtime_host.py",
         dist_root / "scripts" / "generate-workflow-view.py",
+        dist_root / "scripts" / "generate-workflow-lowlevel.py",
         dist_root / "scripts" / "stage-progress.py",
         dist_root / "scripts" / "validate-lessons-delta.py",
+        dist_root / "scripts" / "validate-workflow-lowlevel.py",
         dist_root / "scripts" / "validate-run-state.py",
         dist_root / "scripts" / "validate-workflow-draft.py",
         dist_root / "scripts" / "validate-workflow-spec.py",

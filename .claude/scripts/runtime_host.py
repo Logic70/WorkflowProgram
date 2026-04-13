@@ -12,12 +12,21 @@ import shutil
 import subprocess
 import sys
 from dataclasses import asdict, dataclass, field
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+
+import yaml
 
 
 AUTH_STATUS_TIMEOUT_SECONDS = 5
 VALID_RUNTIME_PROVIDERS = {"claude_cli", "fixture_host", "command_adapter"}
+
+
+def iso_now() -> str:
+    """返回稳定的 UTC 时间戳。"""
+
+    return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 
 @dataclass
@@ -417,6 +426,18 @@ def _write_workflow_spec_draft(run_root: Path, entry_skill: str, request: str) -
             f"- 触发命令：/{entry_skill}",
             "- 简要描述：由 fixture_host 生成的确定性规格草案。",
             "",
+            "## User Intent",
+            "",
+            f"- 用户诉求：希望围绕 `{request.strip() or 'default request'}` 形成可复用 workflow。",
+            "- 最终目的：让目标项目获得可持续运行和验证的 Claude Code workflow 资产。",
+            "- 成功标准：用户需求、交付物和验证门槛都已明确，并可进入 YAML 设计阶段。",
+            "",
+            "## Clarification Summary",
+            "",
+            "- 澄清轮次：2",
+            "- 已确认事项：目标项目、触发方式、核心输入输出、质量门禁。",
+            "- 已消解歧义：用户诉求、最终目的与成功标准已明确，可继续设计。",
+            "",
             "## Trigger Model",
             "",
             "- 调用方式：手动命令",
@@ -443,6 +464,55 @@ def _write_workflow_spec_draft(run_root: Path, entry_skill: str, request: str) -
         ]
     )
     _write_text(run_root / "workflow-spec.md", content + "\n")
+
+
+def _copy_runtime_spec(repo_root: Path, run_root: Path, entry_skill: str) -> Path:
+    """为 fixture_host 准备可供 view/lowlevel 生成器消费的 workflow-spec.yaml。"""
+
+    spec_path = repo_root / "tests" / "spec-fixtures" / "valid-minimal.yaml"
+    payload = yaml.safe_load(spec_path.read_text(encoding="utf-8"))
+    if not isinstance(payload, dict):
+        raise RuntimeError(f"fixture spec is invalid: {spec_path}")
+    test_contract = payload.get("test_contract", {})
+    if isinstance(test_contract, dict):
+        entry = test_contract.get("entry", {})
+        if isinstance(entry, dict):
+            entry["main_entry"] = entry_skill
+    target = run_root / "workflow-spec.yaml"
+    _write_text(target, yaml.safe_dump(payload, allow_unicode=True, sort_keys=False))
+    return target
+
+
+def _generate_design_docs(spec_path: Path, run_root: Path) -> Dict[str, Path]:
+    """基于真实生成器产出 run_root 下的 view / lowlevel。"""
+
+    script_root = _repo_root() / ".claude" / "scripts"
+    outputs = {
+        "workflow_spec": spec_path,
+        "workflow_view": run_root / "workflow-view.md",
+        "workflow_lowlevel": run_root / "workflow-lowlevel.md",
+    }
+    for script_name, out_path in (
+        ("generate-workflow-view.py", outputs["workflow_view"]),
+        ("generate-workflow-lowlevel.py", outputs["workflow_lowlevel"]),
+    ):
+        completed = subprocess.run(
+            [
+                sys.executable,
+                str(script_root / script_name),
+                "--spec",
+                str(spec_path),
+                "--out",
+                str(out_path),
+                "--json",
+            ],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if completed.returncode != 0:
+            raise RuntimeError(completed.stderr.strip() or completed.stdout.strip() or f"{script_name} failed")
+    return outputs
 
 
 def _write_lessons_delta(run_root: Path, entry_skill: str, request: str, failure_kind: str) -> None:
@@ -534,6 +604,38 @@ def _write_progress_artifacts(
     )
 
 
+def _write_runner_evidence(
+    run_root: Path,
+    target_root: Path,
+    entry_skill: str,
+    stage_history: List[str],
+    result: str,
+    failure_code: str,
+) -> None:
+    """补齐 develop fixture 路径所需的最小 runner 证据。"""
+
+    outputs = run_root / "outputs"
+    _write_json(
+        outputs / "stages" / "s0-route.json",
+        {
+            "intent": "develop",
+            "entry_skill": entry_skill,
+            "target_root": str(target_root),
+            "routed_at": iso_now(),
+        },
+    )
+    _write_json(
+        outputs / "stages" / "runner-summary.json",
+        {
+            "run_id": run_root.name,
+            "status": result,
+            "entry_skill": entry_skill,
+            "transition_count": len(stage_history),
+            "failure_code": failure_code or None,
+        },
+    )
+
+
 def _invoke_fixture_host(
     config: RuntimeHostConfig,
     plugin_root: Path,
@@ -585,9 +687,12 @@ def _invoke_fixture_host(
         # develop fixture 路径会写出与真实运行同类的产物：
         # spec draft、candidate assets、managed apply 输出和 S6 产物。
         _write_workflow_spec_draft(run_root, entry_skill, request)
-        candidate_root = run_root / "outputs" / "candidate" / ".claude"
+        spec_path = _copy_runtime_spec(_repo_root(), run_root, entry_skill)
+        design_docs = _generate_design_docs(spec_path, run_root)
+        candidate_root = run_root / "outputs" / "candidate"
+        candidate_claude_root = candidate_root / ".claude"
         _write_json(
-            candidate_root / "settings.json",
+            candidate_claude_root / "settings.json",
             {
                 "skills": {
                     "generated-smoke": {
@@ -598,7 +703,7 @@ def _invoke_fixture_host(
             },
         )
         _write_text(
-            candidate_root / "rules" / "constraints.md",
+            candidate_claude_root / "rules" / "constraints.md",
             "\n".join(
                 [
                     "# Runtime Smoke Constraints",
@@ -611,7 +716,7 @@ def _invoke_fixture_host(
             ),
         )
         _write_text(
-            candidate_root / "skills" / "generated-smoke" / "SKILL.md",
+            candidate_claude_root / "skills" / "generated-smoke" / "SKILL.md",
             "\n".join(
                 [
                     "---",
@@ -626,7 +731,7 @@ def _invoke_fixture_host(
             ),
         )
         _write_text(
-            candidate_root / "commands" / "generated-smoke.md",
+            candidate_claude_root / "commands" / "generated-smoke.md",
             "\n".join(
                 [
                     "## Usage",
@@ -640,6 +745,14 @@ def _invoke_fixture_host(
                 ]
             ),
         )
+        candidate_design_root = candidate_root / ".workflowprogram" / "design"
+        candidate_design_root.mkdir(parents=True, exist_ok=True)
+        for source_name, target_name in (
+            ("workflow_spec", "workflow-spec.yaml"),
+            ("workflow_view", "workflow-view.md"),
+            ("workflow_lowlevel", "workflow-lowlevel.md"),
+        ):
+            shutil.copy2(design_docs[source_name], candidate_design_root / target_name)
 
         cmd = [
             sys.executable,
@@ -670,6 +783,14 @@ def _invoke_fixture_host(
             if fixture == "external-write":
                 external_path = target_root / "external-write.txt"
                 _write_text(external_path, "external write\n")
+            _write_runner_evidence(
+                run_root,
+                target_root,
+                entry_skill,
+                ["requirement", "context", "design", "generate"],
+                "FAIL",
+                "CONFLICT_FAILURE",
+            )
             _write_progress_artifacts(
                 run_root,
                 ["requirement", "context", "design", "generate"],
@@ -696,6 +817,14 @@ def _invoke_fixture_host(
                 metadata={"applied": applied, "conflicts": conflicts},
             )
         if completed.returncode != 0:
+            _write_runner_evidence(
+                run_root,
+                target_root,
+                entry_skill,
+                ["requirement", "context", "design", "generate"],
+                "FAIL",
+                "RUNTIME_FAILURE",
+            )
             _write_progress_artifacts(
                 run_root,
                 ["requirement", "context", "design", "generate"],
@@ -718,6 +847,14 @@ def _invoke_fixture_host(
         if fixture == "external-write":
             external_path = target_root / "external-write.txt"
             _write_text(external_path, "external write\n")
+        _write_runner_evidence(
+            run_root,
+            target_root,
+            entry_skill,
+            ["requirement", "context", "design", "generate", "validate", "lessons"],
+            "PASS",
+            "",
+        )
         _write_lessons_delta(run_root, entry_skill, request, _failure_kind_from_code(""))
         _write_progress_artifacts(
             run_root,

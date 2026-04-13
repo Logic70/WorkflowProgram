@@ -487,7 +487,7 @@ def infer_kind(path: str) -> str:
         return "event_log"
     if cleaned.endswith("state.json"):
         return "state_snapshot"
-    if "outputs/candidate/.claude" in cleaned:
+    if "outputs/candidate/" in cleaned:
         return "candidate_asset"
     if cleaned.endswith("managed-files.json"):
         return "managed_manifest"
@@ -572,7 +572,9 @@ def build_artifact_entries(
         fmt = infer_format(output)
         kind = infer_kind(output)
         lifecycle = "deliverable" if root == "TARGET_ROOT" else "evidence"
-        managed = root == "TARGET_ROOT" and output.strip().startswith(".claude/")
+        managed = root == "TARGET_ROOT" and (
+            output.strip().startswith(".claude/") or output.strip().startswith(".workflowprogram/design/")
+        )
         rel_path = artifact_path_relative(output, root)
         base_id = f"{producer}.{re.sub(r'[^A-Za-z0-9_]', '_', rel_path)}"
         artifact_id = base_id

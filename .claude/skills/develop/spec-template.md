@@ -10,6 +10,18 @@
 - 触发命令：
 - 简要描述：
 
+## User Intent
+
+- 用户诉求：
+- 最终目的：
+- 成功标准：
+
+## Clarification Summary
+
+- 澄清轮次：
+- 已确认事项：
+- 已消解歧义：
+
 ## Problem Statement
 
 - 需要自动化的流程是什么？

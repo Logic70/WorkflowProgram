@@ -13,6 +13,8 @@ The HighLevel and LowLevel stage documents are broadly compatible, but several n
 - whether `S1` applies to non-`develop` intents
 - whether `S3` approval is mandatory and how auto approval differs from manual approval
 - whether `audit`, `iterate`, and `validate` stage flows belong in the HighLevel contract
+- how domain-specific professional capabilities should be discovered, checked, and bootstrapped
+- whether advanced multi-agent team orchestration is a first-class workflow contract or only prompt advice
 
 Current implementation already encodes part of the intended behavior:
 
@@ -36,6 +38,7 @@ This change turns those decisions into a verifiable requirement contract that ca
   - manual approval and auto approval remain distinguishable
   - `audit`, `iterate`, and `validate` stage chains appear in HighLevel
 - Produce implementation tasks that are small, ordered, and testable.
+- Turn host capability discovery/bootstrap and agent-team support into verifiable requirement families, even if implementation follows later.
 
 **Non-Goals:**
 
@@ -43,6 +46,7 @@ This change turns those decisions into a verifiable requirement contract that ca
 - Replace the runner, S5 judge, or runtime host architecture.
 - Introduce a new runtime outside the current `workflowprogram-*` and script stack.
 - Resolve unrelated historical design debt outside the clarified decisions above.
+- Automatically install arbitrary host tools without an explicit bootstrap boundary.
 
 ## Decisions
 
@@ -133,12 +137,43 @@ Rationale:
 - A document-only fix would drift again.
 - Current implementation already has a validator/runner/judge structure suitable for enforcing part of the contract.
 
+### 7. Domain-specific professional capability dependencies are host contracts, not hidden prompt hints
+
+If a generated workflow depends on specialized tooling or integrations, WorkflowProgram SHALL model that dependency explicitly as a host capability requirement. This includes Codex skills, MCP servers, external binaries, or licensed tools that are required for the workflow to be genuinely usable.
+
+Rationale:
+
+- Today the implementation can declare `agent_refs` and `skills`, but it cannot prove the host actually has the professional capability needed for a domain workflow.
+- Your reverse-engineering example is exactly this gap: a workflow that references reverse-engineering steps is not actually usable if the host lacks the expected skill or MCP integration.
+- Host setup should not be smuggled into `TARGET_ROOT` asset generation.
+
+Alternative considered:
+
+- Keep specialized dependencies as free-form design notes or prompt text.
+- Rejected because that makes “workflow ready” unverifiable and hides a major usability gap.
+
+### 8. Agent-team orchestration is an optional advanced contract, not a default execution model
+
+WorkflowProgram SHALL support agent-team orchestration only as an explicit opt-in capability with a machine-readable contract for team roles, limits, and join behavior. It SHALL not be inferred from prose alone.
+
+Rationale:
+
+- The current system already benefits from deterministic stage contracts and clear evidence ownership; implicit team behavior would weaken that.
+- Team support is valuable for certain domains, but only if the topology and validation rules are explicit enough to audit.
+
+Alternative considered:
+
+- Allow team support only as prompt discipline without a contract.
+- Rejected because it would be impossible to validate whether the declared team behavior actually occurred.
+
 ## Risks / Trade-offs
 
 - [Doc-first alignment can drift from code] → Follow up with validator and runner tasks that enforce the new rules where possible.
 - [Creating `target_root` during `S0` may hide accidental path typos] → Require the creation result to be recorded in route/progress evidence so it is visible and reviewable.
 - [Approval semantics may be partially encoded across docs and state] → Reuse `approval_status` and explicitly test `approved` vs `auto-approved`.
 - [Making HighLevel more normative reduces flexibility] → Limit promotion to rules you explicitly approved, and keep LowLevel free to add detail that does not contradict HighLevel.
+- [Host bootstrap can mutate the developer environment] → Model it as a separate, approval-gated contract and evidence trail rather than a hidden side effect of `develop`.
+- [Agent-team support can add validation complexity] → Keep it opt-in and require explicit topology plus runtime evidence before calling it supported.
 
 ## Migration Plan
 
@@ -147,7 +182,8 @@ Rationale:
 3. Update validators, templates, and runner/judge behavior for rules that can be enforced automatically.
 4. Add regression coverage for the clarified semantics.
 5. Re-run repository and workflow validations after alignment.
+6. Add pending requirement families for host capability bootstrap and agent-team orchestration, then audit the current implementation against them.
 
 ## Open Questions
 
-- None for this change. The previously ambiguous points were resolved by user decisions and the runtime evidence spec.
+- The new host-capability and agent-team requirement families are intentionally added as pending implementation targets; detailed schema and runtime evidence formats remain future design work.

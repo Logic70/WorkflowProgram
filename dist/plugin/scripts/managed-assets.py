@@ -5,7 +5,8 @@ WorkflowProgram 目标写入的 managed asset 守卫。
 
 该工具落实一条核心设计规则：
 WorkflowProgram 必须先在 RUN_ROOT 下生成候选 workflow 资产，
-再判断它们能否安全回写到 TARGET_ROOT/.claude/，
+再判断它们能否安全回写到 TARGET_ROOT 的托管路径
+（`.claude/**` 与 `.workflowprogram/design/**`），
 而不能静默覆盖用户修改。
 """
 
@@ -21,6 +22,9 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional
+
+
+ALLOWED_MANAGED_PREFIXES = (".claude/", ".workflowprogram/design/")
 
 
 def iso_now() -> str:
@@ -141,6 +145,20 @@ def iter_candidate_files(source_root: Path) -> Iterable[Path]:
             yield path
 
 
+def candidate_relative_path(source_root: Path, source_file: Path) -> str:
+    """把 candidate 文件归一化为目标根下的相对路径，并限制在托管前缀内。"""
+
+    relative_path = source_file.relative_to(source_root).as_posix()
+    if not relative_path.startswith(ALLOWED_MANAGED_PREFIXES):
+        raise RuntimeError(
+            "candidate file must live under one of the managed prefixes "
+            f"{ALLOWED_MANAGED_PREFIXES}, got: {relative_path}"
+        )
+    if relative_path == ".workflowprogram/managed-files.json":
+        raise RuntimeError("candidate root must not stage .workflowprogram/managed-files.json directly")
+    return relative_path
+
+
 def entry_index(manifest: Dict[str, Any]) -> Dict[str, Dict[str, Any]]:
     """按相对路径给 manifest 条目建立索引，便于做所有权查询。"""
 
@@ -195,8 +213,7 @@ def decide_candidates(target_root: Path, source_root: Path, manifest: Dict[str, 
     manifest_entries = entry_index(manifest)
 
     for source_file in iter_candidate_files(source_root):
-        relative = source_file.relative_to(source_root).as_posix()
-        relative_path = f".claude/{relative}"
+        relative_path = candidate_relative_path(source_root, source_file)
         target_path = target_root / relative_path
         source_sha = sha256_file(source_file)
         manifest_entry = manifest_entries.get(relative_path)
@@ -484,13 +501,13 @@ def command_apply_staged(args: argparse.Namespace) -> int:
 def build_parser() -> argparse.ArgumentParser:
     """为两个 managed-asset 子命令构建 CLI 解析器。"""
 
-    parser = argparse.ArgumentParser(description="Manage WorkflowProgram writes into TARGET_ROOT/.claude")
+    parser = argparse.ArgumentParser(description="Manage WorkflowProgram writes into TARGET_ROOT managed asset roots")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     for name in ("plan", "apply-staged"):
         sub = subparsers.add_parser(name)
-        sub.add_argument("--target-root", required=True, help="Target project root that owns .claude/")
-        sub.add_argument("--source-root", required=True, help="Candidate .claude/ root staged under RUN_ROOT")
+        sub.add_argument("--target-root", required=True, help="Target project root that owns managed workflow assets")
+        sub.add_argument("--source-root", required=True, help="Candidate root staged under RUN_ROOT; must contain .claude/ or .workflowprogram/design/")
         sub.add_argument("--run-root", help="Explicit RUN_ROOT; falls back to WORKFLOWPROGRAM_RUN_ROOT or an auto-created run")
         sub.add_argument("--producer-version", help="Override producer version stored in managed-files.json")
         sub.add_argument("--json", action="store_true", help="Print structured JSON output")

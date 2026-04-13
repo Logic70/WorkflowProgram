@@ -14,6 +14,8 @@ The current stage design is close to aligned, but the full WorkflowProgram desig
   - runtime evidence and progress
   - validation and feedback loops
   - lessons, iteration, and intent flows
+  - host capability discovery and bootstrap
+  - optional agent-team orchestration
   - installation and distribution contracts
 - Normalize stage-level evidence ownership using the runtime evidence model as the source for `state.json` and `events.jsonl`.
 - Promote explicit normative decisions for:
@@ -22,6 +24,11 @@ The current stage design is close to aligned, but the full WorkflowProgram desig
   - mandatory approval at S3, with distinct records for manual vs auto approval
   - intent-to-stage mappings for `audit`, `iterate`, and `validate`
 - Produce an implementation-conformance audit so the current repo can be judged against these requirements as `satisfied / partial / missing`.
+- Add pending requirement families for:
+  - identifying domain-specific professional capabilities required by a generated workflow
+  - checking whether required skills, MCP servers, or external tools already exist on the host
+  - installing or configuring missing host capabilities only through explicit, reviewable bootstrap steps
+  - expressing optional agent-team topology and verification rules as a machine-checkable contract
 
 ## Capabilities
 
@@ -36,6 +43,8 @@ The current stage design is close to aligned, but the full WorkflowProgram desig
 - `workflow-distribution-contract`: Defines source/dist/release installation and canonical plugin payload expectations.
 - `workflow-stage-contracts`: Defines normative, stage-by-stage requirements for `S0..S6`, including evidence ownership, approval gates, stage entry and exit conditions, and required outputs.
 - `workflow-intent-flows`: Defines normative intent-to-stage mappings and stage applicability rules, including `develop`, `audit`, `iterate`, and `validate`.
+- `workflow-host-capability-bootstrap`: Defines how WorkflowProgram discovers domain-specific professional capability needs, checks host readiness, and boots missing skills / MCP / tools through explicit approval and auditable evidence.
+- `workflow-agent-team-orchestration`: Defines the optional contract for team-style agent orchestration, including role declarations, fan-out limits, join policy, ownership, and runtime evidence.
 
 ### Modified Capabilities
 

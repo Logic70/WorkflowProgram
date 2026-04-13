@@ -9,6 +9,8 @@ from __future__ import annotations
 
 import argparse
 import json
+import subprocess
+import sys
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List
@@ -142,6 +144,18 @@ def write_workflow_spec_draft(run_root: Path, entry_skill: str, request: str) ->
             f"- 触发命令：/{entry_skill}",
             "- 简要描述：由 mock_runtime_host 生成的确定性工作流草案。",
             "",
+            "## User Intent",
+            "",
+            f"- 用户诉求：围绕 `{request.strip() or 'default request'}` 建立清晰的 workflow 方案。",
+            "- 最终目的：把用户要解决的问题转成可交付、可验证、可迭代的目标工作流。",
+            "- 成功标准：需求、目的、成功标准与质量门禁都已确认，可进入设计阶段。",
+            "",
+            "## Clarification Summary",
+            "",
+            "- 澄清轮次：2",
+            "- 已确认事项：触发方式、核心输入输出、质量门禁、目标交付物。",
+            "- 已消解歧义：用户诉求、最终目的和成功标准已经明确。",
+            "",
             "## Trigger Model",
             "",
             "- 调用方式：手动命令",
@@ -193,6 +207,39 @@ def write_lessons_delta(run_root: Path, intent: str, failure_kind: str, request:
         ]
     )
     write_text(run_root / "outputs" / "stages" / "s6-lessons-delta.md", body + "\n")
+
+
+def generate_design_docs(repo_root: Path, run_root: Path) -> Dict[str, Path]:
+    """基于真实生成器产出 workflow-view.md 与 workflow-lowlevel.md。"""
+
+    spec_path = run_root / "workflow-spec.yaml"
+    script_root = repo_root / ".claude" / "scripts"
+    outputs = {
+        "workflow_spec": spec_path,
+        "workflow_view": run_root / "workflow-view.md",
+        "workflow_lowlevel": run_root / "workflow-lowlevel.md",
+    }
+    for script_name, out_path in (
+        ("generate-workflow-view.py", outputs["workflow_view"]),
+        ("generate-workflow-lowlevel.py", outputs["workflow_lowlevel"]),
+    ):
+        completed = subprocess.run(
+            [
+                sys.executable,
+                str(script_root / script_name),
+                "--spec",
+                str(spec_path),
+                "--out",
+                str(out_path),
+                "--json",
+            ],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if completed.returncode != 0:
+            raise RuntimeError(completed.stderr.strip() or completed.stdout.strip() or f"{script_name} failed")
+    return outputs
 
 
 def write_progress_outputs(
@@ -290,19 +337,65 @@ def write_managed_outputs(run_root: Path, target_root: Path, conflict: bool) -> 
     manifest_path = manifest_path_for(target_root)
     candidate_source = run_root / "outputs" / "candidate" / ".claude" / "settings.json"
     write_text(candidate_source, '{\n  "commands": ["example"],\n  "managed": true\n}\n')
-    plan_entry = {
-        "relative_path": ".claude/settings.json",
-        "source_path": str(candidate_source),
-        "target_path": str(settings_path),
-        "decision": "conflict-managed-drift" if conflict else "update",
-    }
+    rules_source = run_root / "outputs" / "candidate" / ".claude" / "rules" / "constraints.md"
+    command_source = run_root / "outputs" / "candidate" / ".claude" / "commands" / "example.md"
+    design_spec_source = run_root / "outputs" / "candidate" / ".workflowprogram" / "design" / "workflow-spec.yaml"
+    design_view_source = run_root / "outputs" / "candidate" / ".workflowprogram" / "design" / "workflow-view.md"
+    design_lowlevel_source = run_root / "outputs" / "candidate" / ".workflowprogram" / "design" / "workflow-lowlevel.md"
+    write_text(rules_source, "# Constraints\n\n- Keep workflow assets managed.\n")
+    write_text(command_source, "## Usage\n\n1. Goal\n2. Verify\n")
+    design_spec_source.parent.mkdir(parents=True, exist_ok=True)
+    for source_path, run_path in (
+        (design_spec_source, run_root / "workflow-spec.yaml"),
+        (design_view_source, run_root / "workflow-view.md"),
+        (design_lowlevel_source, run_root / "workflow-lowlevel.md"),
+    ):
+        source_path.write_text(run_path.read_text(encoding="utf-8"), encoding="utf-8", newline="\n")
+    plan_entries = [
+        {
+            "relative_path": ".claude/settings.json",
+            "source_path": str(candidate_source),
+            "target_path": str(settings_path),
+            "decision": "conflict-managed-drift" if conflict else "update",
+        },
+        {
+            "relative_path": ".claude/rules/constraints.md",
+            "source_path": str(rules_source),
+            "target_path": str(target_root / ".claude" / "rules" / "constraints.md"),
+            "decision": "create",
+        },
+        {
+            "relative_path": ".claude/commands/example.md",
+            "source_path": str(command_source),
+            "target_path": str(target_root / ".claude" / "commands" / "example.md"),
+            "decision": "create",
+        },
+        {
+            "relative_path": ".workflowprogram/design/workflow-spec.yaml",
+            "source_path": str(design_spec_source),
+            "target_path": str(target_root / ".workflowprogram" / "design" / "workflow-spec.yaml"),
+            "decision": "create",
+        },
+        {
+            "relative_path": ".workflowprogram/design/workflow-view.md",
+            "source_path": str(design_view_source),
+            "target_path": str(target_root / ".workflowprogram" / "design" / "workflow-view.md"),
+            "decision": "create",
+        },
+        {
+            "relative_path": ".workflowprogram/design/workflow-lowlevel.md",
+            "source_path": str(design_lowlevel_source),
+            "target_path": str(target_root / ".workflowprogram" / "design" / "workflow-lowlevel.md"),
+            "decision": "create",
+        },
+    ]
     write_json(
         outputs / "managed-change-plan.json",
         {
             "generated_at": iso_now(),
-            "entries": [plan_entry],
+            "entries": plan_entries,
             "summary": {
-                "create": 0,
+                "create": 5,
                 "update": 0 if conflict else 1,
                 "conflict": 1 if conflict else 0,
             },
@@ -311,14 +404,14 @@ def write_managed_outputs(run_root: Path, target_root: Path, conflict: bool) -> 
     result_payload: Dict[str, Any] = {
         "generated_at": iso_now(),
         "target_root": str(target_root),
-        "run_root": str(run_root),
-        "manifest_path": str(manifest_path),
-        "summary": {
-            "create": 0,
-            "update": 0 if conflict else 1,
-            "conflict": 1 if conflict else 0,
-        },
-        "applied": [],
+            "run_root": str(run_root),
+            "manifest_path": str(manifest_path),
+            "summary": {
+                "create": 5,
+                "update": 0 if conflict else 1,
+                "conflict": 1 if conflict else 0,
+            },
+            "applied": [],
         "conflicts": [],
     }
     if conflict:
@@ -335,14 +428,15 @@ def write_managed_outputs(run_root: Path, target_root: Path, conflict: bool) -> 
             }
         )
     else:
-        result_payload["applied"].append(
-            {
-                "relative_path": ".claude/settings.json",
-                "action": "update",
-                "target_path": str(settings_path),
-                "run_id": run_root.name,
-            }
-        )
+        for entry in plan_entries:
+            result_payload["applied"].append(
+                {
+                    "relative_path": entry["relative_path"],
+                    "action": entry["decision"],
+                    "target_path": entry["target_path"],
+                    "run_id": run_root.name,
+                }
+            )
     write_json(
         manifest_path,
         {
@@ -353,8 +447,43 @@ def write_managed_outputs(run_root: Path, target_root: Path, conflict: bool) -> 
                 if conflict
                 else [
                     {
+                        "relative_path": ".claude/commands/example.md",
+                        "last_applied_hash": "mock-managed-hash-command",
+                        "ownership": "workflowprogram",
+                        "producer_version": "mock-runtime-host",
+                        "updated_at": iso_now(),
+                    },
+                    {
+                        "relative_path": ".claude/rules/constraints.md",
+                        "last_applied_hash": "mock-managed-hash-rules",
+                        "ownership": "workflowprogram",
+                        "producer_version": "mock-runtime-host",
+                        "updated_at": iso_now(),
+                    },
+                    {
                         "relative_path": ".claude/settings.json",
                         "last_applied_hash": "mock-managed-hash",
+                        "ownership": "workflowprogram",
+                        "producer_version": "mock-runtime-host",
+                        "updated_at": iso_now(),
+                    },
+                    {
+                        "relative_path": ".workflowprogram/design/workflow-lowlevel.md",
+                        "last_applied_hash": "mock-managed-hash-lowlevel",
+                        "ownership": "workflowprogram",
+                        "producer_version": "mock-runtime-host",
+                        "updated_at": iso_now(),
+                    },
+                    {
+                        "relative_path": ".workflowprogram/design/workflow-spec.yaml",
+                        "last_applied_hash": "mock-managed-hash-spec",
+                        "ownership": "workflowprogram",
+                        "producer_version": "mock-runtime-host",
+                        "updated_at": iso_now(),
+                    },
+                    {
+                        "relative_path": ".workflowprogram/design/workflow-view.md",
+                        "last_applied_hash": "mock-managed-hash-view",
                         "ownership": "workflowprogram",
                         "producer_version": "mock-runtime-host",
                         "updated_at": iso_now(),
@@ -366,7 +495,7 @@ def write_managed_outputs(run_root: Path, target_root: Path, conflict: bool) -> 
     write_json(outputs / "managed-change-result.json", result_payload)
 
 
-def create_target_outputs(target_root: Path) -> List[str]:
+def create_target_outputs(run_root: Path, target_root: Path) -> List[str]:
     """为 PASS 路径 smoke 测试创建一个最小可用的 managed 目标树。"""
     files: List[str] = []
     settings_path = target_root / ".claude" / "settings.json"
@@ -378,6 +507,13 @@ def create_target_outputs(target_root: Path) -> List[str]:
     command_path = target_root / ".claude" / "commands" / "example.md"
     write_text(command_path, "## Usage\n\n1. Goal\n2. Verify\n")
     files.append(".claude/commands/example.md")
+    design_root = target_root / ".workflowprogram" / "design"
+    design_root.mkdir(parents=True, exist_ok=True)
+    for name in ("workflow-spec.yaml", "workflow-view.md", "workflow-lowlevel.md"):
+        source_path = run_root / name
+        target_path = design_root / name
+        target_path.write_text(source_path.read_text(encoding="utf-8"), encoding="utf-8", newline="\n")
+        files.append(f".workflowprogram/design/{name}")
     return files
 
 
@@ -545,6 +681,7 @@ def main() -> int:
                 "valid-minimal.yaml",
                 entry_skill=args.entry_skill,
             )
+            generate_design_docs(repo_root, run_root)
             generated_files = [
                 ".claude/settings.json",
                 ".claude/rules/constraints.md",
@@ -626,7 +763,19 @@ def main() -> int:
                 "valid-minimal.yaml",
                 entry_skill=args.entry_skill,
             )
-            generated_files = create_target_outputs(target_root)
+            design_docs = generate_design_docs(repo_root, run_root)
+            candidate_root = run_root / "outputs" / "candidate"
+            write_text(candidate_root / ".claude" / "rules" / "constraints.md", "# Constraints\n\n- Keep workflow assets managed.\n")
+            write_text(candidate_root / ".claude" / "commands" / "example.md", "## Usage\n\n1. Goal\n2. Verify\n")
+            for source_name, target_name in (
+                ("workflow_spec", "workflow-spec.yaml"),
+                ("workflow_view", "workflow-view.md"),
+                ("workflow_lowlevel", "workflow-lowlevel.md"),
+            ):
+                destination = candidate_root / ".workflowprogram" / "design" / target_name
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                destination.write_text(design_docs[source_name].read_text(encoding="utf-8"), encoding="utf-8", newline="\n")
+            generated_files = create_target_outputs(run_root, target_root)
             if "requirement" in stage_history:
                 write_workflow_spec_draft(run_root, args.entry_skill, args.request)
             if "lessons" in stage_history:
