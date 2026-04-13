@@ -17,7 +17,7 @@ import sys
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 SCRIPT_ROOT = Path(__file__).resolve().parents[1] / ".claude" / "scripts"
 if str(SCRIPT_ROOT) not in sys.path:
@@ -100,6 +100,73 @@ class RuntimeSmokeError(Exception):
     """表示在 provider 结果进入 judge 之前，harness 自身发生了失败。"""
 
     pass
+
+
+def load_expectation(repo_root: Path, fixture: str) -> Tuple[Optional[Path], Optional[Dict[str, Any]]]:
+    """加载某个 smoke fixture 对应的结构化 expectation。"""
+
+    path = repo_root / "tests" / "expectations" / f"{fixture}.json"
+    if not path.exists():
+        return None, None
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        raise RuntimeSmokeError(f"invalid expectation file {path}: {exc}") from exc
+    if not isinstance(payload, dict):
+        raise RuntimeSmokeError(f"expectation file must be a JSON object: {path}")
+    return path, payload
+
+
+def evaluate_expectation(
+    expectation: Dict[str, Any],
+    *,
+    entry_skill: str,
+    final_result: str,
+    final_category: Optional[str],
+    run_root: Path,
+    transcript_text: str,
+    report_text: str,
+    stdout_text: str,
+    stderr_text: str,
+) -> List[str]:
+    """根据结构化 expectation 校验一次 smoke 结果。"""
+
+    mismatches: List[str] = []
+
+    allowed_entry_skills = expectation.get("allowed_entry_skills", [])
+    if isinstance(allowed_entry_skills, list) and allowed_entry_skills:
+        allowed = [str(item).strip() for item in allowed_entry_skills if str(item).strip()]
+        if entry_skill not in allowed:
+            mismatches.append(f"entry_skill '{entry_skill}' not in allowed_entry_skills {allowed}")
+
+    acceptable_results = expectation.get("acceptable_results", [])
+    if isinstance(acceptable_results, list) and acceptable_results:
+        allowed_results = [str(item).strip() for item in acceptable_results if str(item).strip()]
+        if final_result not in allowed_results:
+            mismatches.append(f"result '{final_result}' not in acceptable_results {allowed_results}")
+
+    if "expected_category" in expectation:
+        expected_category = expectation.get("expected_category")
+        expected_text = None if expected_category is None else str(expected_category).strip() or None
+        if final_category != expected_text:
+            mismatches.append(f"category '{final_category}' does not match expected_category '{expected_text}'")
+
+    required_files = expectation.get("required_files", [])
+    if isinstance(required_files, list):
+        for item in required_files:
+            rel_path = str(item).strip()
+            if rel_path and not (run_root / rel_path).exists():
+                mismatches.append(f"required file missing: {rel_path}")
+
+    forbidden_patterns = expectation.get("forbidden_patterns", [])
+    if isinstance(forbidden_patterns, list):
+        combined_text = "\n".join([transcript_text, report_text, stdout_text, stderr_text])
+        for item in forbidden_patterns:
+            pattern = str(item)
+            if pattern and pattern in combined_text:
+                mismatches.append(f"forbidden pattern found: {pattern}")
+
+    return mismatches
 
 
 def make_run_id(fixture: str) -> str:
@@ -516,6 +583,7 @@ def main() -> int:
     args = parser.parse_args()
 
     repo_root = Path(__file__).resolve().parents[1]
+    expectation_path, expectation = load_expectation(repo_root, args.fixture)
     plugin_root = Path(args.plugin_root).resolve() if args.plugin_root else (repo_root / "dist" / "plugin").resolve()
     plugin_build_manifest = plugin_root / "build-manifest.json"
     fixture_meta = FIXTURE_PRESETS[args.fixture]
@@ -750,6 +818,29 @@ def main() -> int:
         }
         final_result = str(judge_payload.get("verdict", verdict.result))
         final_failure_code = str(judge_payload.get("failure_code", verdict.category or "none"))
+        transcript_text = (run_root / "transcript.md").read_text(encoding="utf-8") if (run_root / "transcript.md").exists() else ""
+        report_text = (
+            (run_root / "validation-runtime-report.md").read_text(encoding="utf-8")
+            if (run_root / "validation-runtime-report.md").exists()
+            else ""
+        )
+        expectation_mismatches: List[str] = []
+        if expectation is not None:
+            expectation_mismatches = evaluate_expectation(
+                expectation,
+                entry_skill=entry_skill,
+                final_result=final_result,
+                final_category=final_failure_code if final_failure_code != "none" else None,
+                run_root=run_root,
+                transcript_text=transcript_text,
+                report_text=report_text,
+                stdout_text=invocation.stdout,
+                stderr_text=invocation.stderr,
+            )
+            if expectation_mismatches:
+                final_result = "FAIL"
+                final_failure_code = "EXPECTATION_MISMATCH"
+                emit("ExpectationMismatch", "finished", "error", "; ".join(expectation_mismatches))
         update_state(
             run_root / "state.json",
             status="completed" if final_result != "ENVIRONMENT-SKIP" else "skipped",
@@ -775,6 +866,8 @@ def main() -> int:
             "contract_categories": context["contract_summary"].get("contract_categories", []),
             "run_root": str(run_root),
             "target_root": str(target_root),
+            "expectation_file": str(expectation_path) if expectation_path else None,
+            "expectation_mismatches": expectation_mismatches,
         }
         if args.json:
             print(json.dumps(summary, ensure_ascii=False, indent=2))
@@ -833,6 +926,29 @@ def main() -> int:
         }
         final_result = str(judge_payload.get("verdict", verdict.result))
         final_failure_code = str(judge_payload.get("failure_code", verdict.category or "STRUCTURE_FAILURE"))
+        transcript_text = (run_root / "transcript.md").read_text(encoding="utf-8") if (run_root / "transcript.md").exists() else ""
+        report_text = (
+            (run_root / "validation-runtime-report.md").read_text(encoding="utf-8")
+            if (run_root / "validation-runtime-report.md").exists()
+            else ""
+        )
+        expectation_mismatches: List[str] = []
+        if expectation is not None:
+            expectation_mismatches = evaluate_expectation(
+                expectation,
+                entry_skill=entry_skill,
+                final_result=final_result,
+                final_category=final_failure_code if final_failure_code != "none" else None,
+                run_root=run_root,
+                transcript_text=transcript_text,
+                report_text=report_text,
+                stdout_text="",
+                stderr_text=str(exc),
+            )
+            if expectation_mismatches:
+                final_result = "FAIL"
+                final_failure_code = "EXPECTATION_MISMATCH"
+                emit("ExpectationMismatch", "finished", "error", "; ".join(expectation_mismatches))
         update_state(
             run_root / "state.json",
             status="completed" if final_result != "ENVIRONMENT-SKIP" else "skipped",
@@ -857,6 +973,8 @@ def main() -> int:
             "contract_categories": context["contract_summary"].get("contract_categories", []),
             "run_root": str(run_root),
             "target_root": str(target_root),
+            "expectation_file": str(expectation_path) if expectation_path else None,
+            "expectation_mismatches": expectation_mismatches,
         }
         if args.json:
             print(json.dumps(summary, ensure_ascii=False, indent=2))
