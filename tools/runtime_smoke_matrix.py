@@ -61,6 +61,14 @@ def base_cases(provider_command: str) -> List[Dict[str, Any]]:
             "expected_category": "S5_BOUNDARY_TARGET_ROOT_BOUNDARY_CHANGES",
         },
         {
+            "name": "adapter-managed-conflict-fail",
+            "fixture": "managed-conflict",
+            "provider": "command_adapter",
+            "provider_command": provider_command,
+            "expected_result": "FAIL",
+            "expected_category": "S5_FLOW_REQUIRED_STAGES_EXECUTED",
+        },
+        {
             "name": "fixture-develop-pass",
             "fixture": "empty-project",
             "provider": "fixture_host",
