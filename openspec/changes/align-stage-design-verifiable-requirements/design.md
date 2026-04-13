@@ -13,6 +13,7 @@ The HighLevel and LowLevel stage documents are broadly compatible, but several n
 - whether `S1` applies to non-`develop` intents
 - whether `S3` approval is mandatory and how auto approval differs from manual approval
 - whether `audit`, `iterate`, and `validate` stage flows belong in the HighLevel contract
+- whether generated target workflows must ship their own deterministic runtime entry and state/control-plane mechanism instead of stopping at design assets
 - how domain-specific professional capabilities should be discovered, checked, and bootstrapped
 - whether advanced multi-agent team orchestration is a first-class workflow contract or only prompt advice
 
@@ -38,12 +39,14 @@ This change turns those decisions into a verifiable requirement contract that ca
   - manual approval and auto approval remain distinguishable
   - `audit`, `iterate`, and `validate` stage chains appear in HighLevel
 - Produce implementation tasks that are small, ordered, and testable.
+- Make generated target workflows inherit the same deterministic runtime-control-plane discipline that WorkflowProgram now uses for itself.
 - Turn host capability discovery/bootstrap and agent-team support into verifiable requirement families, even if implementation follows later.
 
 **Non-Goals:**
 
 - Redesign the `S0..S6` model.
 - Replace the runner, S5 judge, or runtime host architecture.
+- Force generated workflows to reuse the exact same script filenames if an equivalent deterministic runtime contract is cleaner for the target workflow.
 - Introduce a new runtime outside the current `workflowprogram-*` and script stack.
 - Resolve unrelated historical design debt outside the clarified decisions above.
 - Automatically install arbitrary host tools without an explicit bootstrap boundary.
@@ -152,7 +155,22 @@ Alternative considered:
 - Keep specialized dependencies as free-form design notes or prompt text.
 - Rejected because that makes “workflow ready” unverifiable and hides a major usability gap.
 
-### 8. Agent-team orchestration is an optional advanced contract, not a default execution model
+### 8. Generated target workflows SHALL ship deterministic runtime orchestration as a first-class product capability
+
+WorkflowProgram SHALL not stop at generating declarative design assets for target workflows. If a generated workflow claims staged execution, approval gates, runtime evidence, or testable control-plane behavior, the delivered target workflow SHALL also include its own deterministic runtime entry path and machine-enforced state/control-plane transition mechanism, or an explicitly equivalent mechanism with the same guarantees.
+
+Rationale:
+
+- WorkflowProgram itself now uses a deterministic entry wrapper plus runner-backed control plane; generated workflows should not regress to prompt-only execution if they are meant to be equally auditable and repeatable.
+- A target workflow that only ships commands/skills plus design docs is still missing the most important execution guarantee: fixed invocation order and persisted state transitions.
+- This is now the highest-priority pending requirement because it directly determines whether generated workflows are truly usable as products rather than only as design bundles.
+
+Alternative considered:
+
+- Keep generated workflows declarative only and treat deterministic runtime control as a future optional enhancement.
+- Rejected because it leaves a major product gap between WorkflowProgram's own execution model and the workflows it generates.
+
+### 9. Agent-team orchestration is an optional advanced contract, not a default execution model
 
 WorkflowProgram SHALL support agent-team orchestration only as an explicit opt-in capability with a machine-readable contract for team roles, limits, and join behavior. It SHALL not be inferred from prose alone.
 
@@ -182,8 +200,9 @@ Alternative considered:
 3. Update validators, templates, and runner/judge behavior for rules that can be enforced automatically.
 4. Add regression coverage for the clarified semantics.
 5. Re-run repository and workflow validations after alignment.
-6. Add pending requirement families for host capability bootstrap and agent-team orchestration, then audit the current implementation against them.
+6. Add the highest-priority pending requirement family for deterministic target-workflow runtime orchestration, then audit the current implementation against it before the lower-priority expansion families.
+7. Add pending requirement families for host capability bootstrap and agent-team orchestration, then audit the current implementation against them.
 
 ## Open Questions
 
-- The new host-capability and agent-team requirement families are intentionally added as pending implementation targets; detailed schema and runtime evidence formats remain future design work.
+- The new target-runtime, host-capability, and agent-team requirement families are intentionally added as pending implementation targets; detailed schema and runtime evidence formats remain future design work.

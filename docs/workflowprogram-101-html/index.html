@@ -1,0 +1,704 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>WorkflowProgram 101 — 把 Workflow 当成产品来设计</title>
+    <meta
+      name="description"
+      content="WorkflowProgram 101：一份循序渐进的教程，帮你理解为什么 workflow 不只是 prompt 集合，以及如何用真源、控制面、验证层和迭代闭环把它做成可交付的产品。"
+    />
+    <link rel="stylesheet" href="./assets/styles.css" />
+  </head>
+  <body>
+    <div class="page-shell">
+      <aside class="sidebar">
+        <div class="brand-block">
+          <div class="brand-kicker">WorkflowProgram 101</div>
+          <h1>把 Workflow 当成产品来设计</h1>
+          <p>
+            一份循序渐进的教程。从"为什么 workflow 会失控"开始，
+            到"如何在你自己的项目里落地"结束。
+          </p>
+        </div>
+
+        <nav class="toc" aria-label="章节导航">
+          <a href="#hero">开始</a>
+          <a href="#problem-matrix">编排的 8 个失控点</a>
+          <a href="#philosophy">四层设计哲学</a>
+          <a href="#three-roots">三根目录</a>
+          <a href="#stage-model">阶段模型 S0..S6</a>
+          <a href="#orchestration">编排主链</a>
+          <a href="#routing">入口路由与 skill/脚本关系</a>
+          <a href="#managed-apply">受控写入</a>
+          <a href="#validation">验证闭环</a>
+          <a href="#testing">测试怎么证明它真的按约束执行</a>
+          <a href="#lessons">经验积累</a>
+          <a href="#files">仓库结构</a>
+          <a href="#apply">迁移到你的项目</a>
+          <a href="#quickstart">快速上手</a>
+          <a href="#chapters">章节原文</a>
+        </nav>
+
+        <div class="source-links">
+          <div class="source-title">更多资源</div>
+          <a href="../../README.md">README</a>
+          <a href="../workflowprogram-101/index.md">章节版 Markdown 教程</a>
+          <a href="../workflowprogram-101.md">单页版 Markdown 教程</a>
+          <a href="../workflowprogram-design-status.md">文档状态索引</a>
+        </div>
+      </aside>
+
+      <main class="content">
+
+        <!-- ==================== 开始 ==================== -->
+        <section class="hero panel" id="hero">
+          <div class="hero-copy">
+            <p class="eyebrow">写给每一个用 Claude Code 做 workflow 的人</p>
+            <h2>能跑起来只是起点，能持续跑下去才是产品。</h2>
+            <p class="hero-lead">
+              很多 workflow 在最初几天表现很好。然后你会发现：文件被覆盖、步骤被跳过、失败无法复盘、同样的坑反复踩。
+              这些不是"用法不对"，而是缺少一套系统性的治理结构。WorkflowProgram 就是为了解这类问题而存在的。
+            </p>
+            <p class="hero-lead">
+              这份教程会从最常见的问题出发，一步步带你理解 WorkflowProgram 的每一层设计为什么存在、怎么协作、以及你能从中借鉴什么。
+            </p>
+            <div class="hero-actions">
+              <a class="button primary" href="#problem-matrix">从问题开始读</a>
+              <a class="button secondary" href="#quickstart">直接看快速上手</a>
+            </div>
+          </div>
+
+          <div class="hero-visual">
+            <div class="visual-card">
+              <span class="visual-label">一次完整运行的主链</span>
+              <div class="chip-flow">
+                <span>需求</span>
+                <span>规格</span>
+                <span>候选</span>
+                <span>受控写入</span>
+                <span>运行</span>
+                <span>判定</span>
+                <span>回流</span>
+              </div>
+            </div>
+            <div class="visual-card accent">
+              <span class="visual-label">四句话概括设计信念</span>
+              <ul>
+                <li><code>workflow-spec.yaml</code> 才是执行语义的真源</li>
+                <li>生成、验证、经验回流，三件事必须拆开</li>
+                <li>目标项目写入必须受控，绝不直接覆盖</li>
+                <li>每次运行必须留下结构化证据</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <!-- ==================== 常见问题 ==================== -->
+        <section class="panel" id="problem-matrix">
+          <div class="section-heading">
+            <p class="eyebrow">第一步：看见问题</p>
+            <h2>工作流编排最常见的 8 个失控点</h2>
+          </div>
+
+          <p style="color:var(--muted);max-width:70ch;margin:8px 0 0">
+            如果你做过 Claude Code workflow，下面这些场景你大概率遇到过至少三个。
+            WorkflowProgram 不是凭空发明概念，它的每一层设计都是为了回应某个具体的失控场景。
+          </p>
+
+          <div class="matrix-grid">
+            <article class="matrix-card">
+              <h3>1. 没有统一真源</h3>
+              <p>语义散在 <code>SKILL.md</code>、聊天记录和人工约定里。改了文档不等于改了行为，改了行为不等于更新了文档。</p>
+              <div class="answer">回应：把执行语义收口到一份机器可读的 <code>workflow-spec.yaml</code>。文档只能从它派生，不能反向改语义。</div>
+            </article>
+            <article class="matrix-card">
+              <h3>2. 编排顺序靠模型记忆</h3>
+              <p>这一轮先做设计再写文件，下一轮可能直接跳到写文件。步骤漏掉、重复或者乱序，全靠运气。</p>
+              <div class="answer">回应：用 <code>workflow-entry.py</code> 固定脚本链，用 <code>workflow-runner.py</code> 固定状态流转。顺序不再是"建议"，而是程序。</div>
+            </article>
+            <article class="matrix-card">
+              <h3>3. 目标项目被直接写坏</h3>
+              <p>模型一旦直接覆盖目标文件，用户手工维护的内容可能丢失，冲突和回退都变得很难处理。</p>
+              <div class="answer">回应：先把候选资产写到隔离目录，再做 managed apply。冲突时保留证据，不静默覆盖。</div>
+            </article>
+            <article class="matrix-card">
+              <h3>4. 失败后无法分层定位</h3>
+              <p>最后只知道"失败了"，但不知道问题出在设计层、执行层、环境层还是判定层。</p>
+              <div class="answer">回应：把 spec / runner / judge / smoke 拆成独立层，每层有自己的证据和结论。</div>
+            </article>
+            <article class="matrix-card">
+              <h3>5. 运行证据不足</h3>
+              <p>只有最终产物，没有状态快照、事件流、运行 transcript。出了问题只能猜。</p>
+              <div class="answer">回应：在 <code>RUN_ROOT</code> 固化 <code>context.json</code>、<code>state.json</code>、<code>events.jsonl</code>、<code>transcript.md</code>、<code>validation-runtime-report.md</code>。</div>
+            </article>
+            <article class="matrix-card">
+              <h3>6. 验证只看退出码</h3>
+              <p>"脚本跑完了"不等于"按约束执行成功了"。退出码 0 只能说明没有 crash，不能说明满足了业务约束。</p>
+              <div class="answer">回应：用 <code>runtime_contract</code> + <code>test_contract</code> + S5 judge 给出有依据的 verdict。</div>
+            </article>
+            <article class="matrix-card">
+              <h3>7. 经验不会回流</h3>
+              <p>这次踩的坑、总结的教训留在聊天记录里，下一轮还是从零开始。</p>
+              <div class="answer">回应：用 S6 生成 lessons 增量，定期提炼为长期约束规则。</div>
+            </article>
+            <article class="matrix-card">
+              <h3>8. 自然语言入口漂移</h3>
+              <p>同一句话这次落到 develop，下次落到 validate。入口不稳定，后面的行为就不可预期。</p>
+              <div class="answer">回应：用 <code>workflowprogram-orchestrate</code> + <code>route-intent.py</code> 做确定性路由。</div>
+            </article>
+          </div>
+        </section>
+
+        <!-- ==================== 设计哲学 ==================== -->
+        <section class="panel" id="philosophy">
+          <div class="section-heading">
+            <p class="eyebrow">第二步：理解设计哲学</p>
+            <h2>Workflow 不是一段大 prompt，而是四层职责</h2>
+          </div>
+
+          <p style="color:var(--muted);max-width:70ch;margin:8px 0 0">
+            很多 workflow 一开始就是"写一个 SKILL.md，再补几个 agent，最后改一下 settings.json"。
+            这种做法能快速启动，但很难持续维护。原因是它把四件本质不同的事情混在了一起。
+          </p>
+
+          <div class="stack-grid">
+            <article class="stack-card">
+              <span class="stack-index">01</span>
+              <h3>真源</h3>
+              <p>
+                <code>workflow-spec.yaml</code> 是机器可读的执行语义真源。
+                从它派生出 <code>workflow-view.md</code>（人类可读视图）和 <code>workflow-lowlevel.md</code>（维护指南），
+                但派生物不能反向修改语义。想改行为？改 spec。
+              </p>
+            </article>
+            <article class="stack-card">
+              <span class="stack-index">02</span>
+              <h3>控制面</h3>
+              <p>
+                <code>workflow-entry.py</code> 把脚本链串成固定顺序。
+                <code>workflow-runner.py</code> 负责状态转移、边界检查和证据落盘。
+                AI 在每个节点内理解和生成，但节点之间的跳转由程序决定。
+              </p>
+            </article>
+            <article class="stack-card">
+              <span class="stack-index">03</span>
+              <h3>验证层</h3>
+              <p>
+                生成者不能同时做裁判。<code>workflowprogram-validate</code> 和 <code>workflow-s5-judge.py</code>
+                消费 <code>test_contract</code>，独立给出 verdict。生成成功不等于验证通过。
+              </p>
+            </article>
+            <article class="stack-card">
+              <span class="stack-index">04</span>
+              <h3>闭环层</h3>
+              <p>
+                S6 把本轮的失败经验和约束候选写进 <code>lessons.md</code>，
+                稳定经验定期提炼为 <code>constraints.md</code> 中的 ALWAYS/NEVER 规则。
+                workflow 因此拥有长期记忆。
+              </p>
+            </article>
+          </div>
+
+          <div class="note-strip">
+            <strong>为什么是四层而不是更多？</strong>
+            <span>因为"能跑 &rarr; 可维护"之间恰好隔着这四件事：有真源、有控制面、有独立验证、有经验闭环。少一层就不完整，多一层就过度设计。</span>
+          </div>
+        </section>
+
+        <!-- ==================== 三根目录 ==================== -->
+        <section class="panel" id="three-roots">
+          <div class="section-heading">
+            <p class="eyebrow">第三步：划清边界</p>
+            <h2>为什么必须区分 <code>PLUGIN_ROOT</code>、<code>TARGET_ROOT</code>、<code>RUN_ROOT</code></h2>
+          </div>
+
+          <p style="color:var(--muted);max-width:70ch;margin:8px 0 0">
+            如果输入、输出、证据全混在一个目录里，你很快就会分不清"谁是参考、谁是交付、谁是中间态"。
+            三根目录是 WorkflowProgram 最基础的边界契约。
+          </p>
+
+          <div class="roots-layout">
+            <div class="root-card">
+              <h3>PLUGIN_ROOT</h3>
+              <p>WorkflowProgram 自身的能力仓：skills、agents、脚本、模板。它只被读取，永远不被修改。</p>
+              <p style="color:var(--muted);font-size:0.9em">实际路径：<code>dist/plugin/</code></p>
+            </div>
+            <div class="root-card">
+              <h3>TARGET_ROOT</h3>
+              <p>用户的目标项目。最终交付的 <code>.claude/</code> 资产在这里。只能通过 managed apply 写入，不能直接覆盖。</p>
+              <p style="color:var(--muted);font-size:0.9em">实际路径：用户项目根目录</p>
+            </div>
+            <div class="root-card">
+              <h3>RUN_ROOT</h3>
+              <p>单次运行的隔离空间。spec、候选资产、状态、事件、报告全在这里，运行结束后可完整回溯。</p>
+              <p style="color:var(--muted);font-size:0.9em">实际路径：<code>TARGET_ROOT/.workflowprogram/runs/&lt;run-id&gt;/</code></p>
+            </div>
+          </div>
+
+          <div class="diagram-card">
+            <svg viewBox="0 0 980 260" role="img" aria-label="三根目录关系图">
+              <defs>
+                <linearGradient id="panelFillA" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stop-color="#fbf6ec" />
+                  <stop offset="100%" stop-color="#f5dfb8" />
+                </linearGradient>
+                <linearGradient id="panelFillB" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stop-color="#eef7f5" />
+                  <stop offset="100%" stop-color="#c9e3dd" />
+                </linearGradient>
+                <linearGradient id="panelFillC" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stop-color="#f7f0f3" />
+                  <stop offset="100%" stop-color="#e6ced9" />
+                </linearGradient>
+              </defs>
+              <rect x="40" y="40" width="240" height="160" rx="20" fill="url(#panelFillA)"></rect>
+              <rect x="370" y="40" width="240" height="160" rx="20" fill="url(#panelFillB)"></rect>
+              <rect x="700" y="40" width="240" height="160" rx="20" fill="url(#panelFillC)"></rect>
+              <text x="80" y="88" class="svg-title">PLUGIN_ROOT</text>
+              <text x="80" y="115" class="svg-line">skills, scripts, templates</text>
+              <text x="80" y="140" class="svg-line">只读 &middot; 能力来源</text>
+              <text x="410" y="88" class="svg-title">TARGET_ROOT</text>
+              <text x="410" y="115" class="svg-line">.claude/ 最终交付</text>
+              <text x="410" y="140" class="svg-line">受控写入 &middot; 不直接覆盖</text>
+              <text x="740" y="88" class="svg-title">RUN_ROOT</text>
+              <text x="740" y="115" class="svg-line">state, events, report</text>
+              <text x="740" y="140" class="svg-line">隔离空间 &middot; 完整证据</text>
+              <path d="M280 115 H355" class="svg-arrow"></path>
+              <path d="M610 115 H685" class="svg-arrow"></path>
+              <text x="294" y="100" class="svg-note">读模板</text>
+              <text x="620" y="100" class="svg-note">落证据</text>
+            </svg>
+          </div>
+        </section>
+
+        <!-- ==================== 阶段模型 ==================== -->
+        <section class="panel" id="stage-model">
+          <div class="section-heading">
+            <p class="eyebrow">第四步：理解生命周期</p>
+            <h2>为什么是 <code>S0</code> 到 <code>S6</code></h2>
+          </div>
+
+          <p style="color:var(--muted);max-width:70ch;margin:8px 0 0">
+            阶段不是为了多几个数字好看，而是为了让每一段职责都能被独立验证、回退和复盘。
+            设计和执行混在一起，最后出了问题只能从头来过；拆开之后，你可以精确定位到"在哪一步、因为什么"出了问题。
+          </p>
+
+          <div class="timeline">
+            <div class="stage-pill"><strong>S0</strong><span>路由与目标准备</span></div>
+            <div class="stage-pill"><strong>S1</strong><span>需求澄清</span></div>
+            <div class="stage-pill"><strong>S2</strong><span>上下文研究</span></div>
+            <div class="stage-pill"><strong>S3</strong><span>设计与审批</span></div>
+            <div class="stage-pill"><strong>S4</strong><span>受控写入</span></div>
+            <div class="stage-pill"><strong>S5</strong><span>验证判定</span></div>
+            <div class="stage-pill"><strong>S6</strong><span>经验回流</span></div>
+          </div>
+
+          <p style="color:var(--muted);margin:18px 0 6px">
+            不同意图不需要走完所有阶段。四种核心意图各有自己的阶段路径：
+          </p>
+
+          <div class="intent-boxes">
+            <div class="intent-card"><span>develop</span><code>S1 &rarr; S2 &rarr; S3 &rarr; S4 &rarr; S5 &rarr; S6</code><p style="color:var(--muted);font-size:0.88em;margin:8px 0 0">从需求到交付的完整链路</p></div>
+            <div class="intent-card"><span>audit</span><code>S5 &rarr; S6</code><p style="color:var(--muted);font-size:0.88em;margin:8px 0 0">对已有 workflow 做结构审计</p></div>
+            <div class="intent-card"><span>validate</span><code>S5</code><p style="color:var(--muted);font-size:0.88em;margin:8px 0 0">只做一次验证判定</p></div>
+            <div class="intent-card"><span>iterate</span><code>S6</code><p style="color:var(--muted);font-size:0.88em;margin:8px 0 0">从 lessons 中提炼改进</p></div>
+          </div>
+
+          <div class="note-strip">
+            <strong>关键判断：</strong>
+            <span>生成成功不等于验证通过（S4 ok &ne; S5 ok）；验证失败不等于这次运行没价值（S5 fail 但 S6 可以回流 lessons）。</span>
+          </div>
+        </section>
+
+        <!-- ==================== 编排主链 ==================== -->
+        <section class="panel" id="orchestration">
+          <div class="section-heading">
+            <p class="eyebrow">第五步：看懂运行机制</p>
+            <h2>AI 负责理解和生成，Python 负责控制面</h2>
+          </div>
+
+          <div class="chain-grid">
+            <div class="chain-text">
+              <p>
+                WorkflowProgram 做了一个关键判断：<strong>需要稳定执行、稳定落盘、稳定复验的部分，不能留在 prompt 里</strong>。
+              </p>
+              <p>所以两个角色各有分工：</p>
+              <ul class="plain-list">
+                <li><strong>AI</strong>：理解需求、补充设计、在每个节点内生成候选资产。</li>
+                <li><strong>Python</strong>：路由意图、校验 spec、managed apply、状态转移、证据落盘、S5 判定。</li>
+              </ul>
+              <p style="color:var(--muted);margin-top:12px">
+                具体地说，<code>workflow-entry.py</code> 把下面这条脚本链串成固定顺序，不依赖模型"记得下一步该做什么"：
+              </p>
+            </div>
+            <div class="diagram-card">
+              <svg viewBox="0 0 980 340" role="img" aria-label="编排主链">
+                <rect x="30" y="40" width="130" height="70" rx="18" class="box-a"></rect>
+                <rect x="200" y="40" width="150" height="70" rx="18" class="box-b"></rect>
+                <rect x="390" y="40" width="170" height="70" rx="18" class="box-c"></rect>
+                <rect x="600" y="40" width="160" height="70" rx="18" class="box-d"></rect>
+                <rect x="800" y="40" width="150" height="70" rx="18" class="box-e"></rect>
+                <text x="62" y="82" class="svg-title">用户请求</text>
+                <text x="225" y="82" class="svg-title">orchestrate</text>
+                <text x="425" y="82" class="svg-title">develop / audit</text>
+                <text x="636" y="82" class="svg-title">workflow-entry</text>
+                <text x="840" y="82" class="svg-title">runner / judge</text>
+                <path d="M160 76 H195" class="svg-arrow"></path>
+                <path d="M350 76 H385" class="svg-arrow"></path>
+                <path d="M560 76 H595" class="svg-arrow"></path>
+                <path d="M760 76 H795" class="svg-arrow"></path>
+                <rect x="60" y="170" width="860" height="130" rx="24" class="strip-box"></rect>
+                <text x="90" y="206" class="svg-title">workflow-entry.py 固定脚本链</text>
+                <text x="90" y="240" class="svg-line">1. validate-workflow-spec.py &mdash; 校验 spec 结构</text>
+                <text x="90" y="262" class="svg-line">2. generate-workflow-view.py &mdash; 生成人类可读视图</text>
+                <text x="550" y="240" class="svg-line">3. managed-assets.py &mdash; 候选写入</text>
+                <text x="550" y="262" class="svg-line">4. workflow-runner.py &mdash; 控制面执行</text>
+                <text x="90" y="284" class="svg-line">5. validate-run-state.py &mdash; 运行后状态校验</text>
+              </svg>
+            </div>
+          </div>
+        </section>
+
+        <!-- ==================== 入口路由与 skill / 脚本关系 ==================== -->
+        <section class="panel" id="routing">
+          <div class="section-heading">
+            <p class="eyebrow">第六步：分清入口关系</p>
+            <h2>自然语言、orchestrate、develop、entry、runner 之间到底怎么接力</h2>
+          </div>
+
+          <p style="color:var(--muted);max-width:74ch;margin:8px 0 0">
+            这是很多人第一次读源码时最容易混淆的地方。要点只有两个：
+            <strong>自然语言默认先走 orchestrate</strong>；
+            <strong>显式 /develop 或 workflowprogram-develop 不会再跳回 orchestrate</strong>。
+          </p>
+
+          <div class="compare-grid">
+            <div class="compare-card safe">
+              <h3>路径 A：自然语言请求</h3>
+              <ul class="plain-list">
+                <li>用户说："为当前项目设计一个 workflow"</li>
+                <li><code>workflowprogram-orchestrate</code> 先接住请求</li>
+                <li><code>route-intent.py</code> 判断 intent 是 develop / audit / validate / iterate</li>
+                <li>再把请求分发给对应叶子入口</li>
+              </ul>
+            </div>
+            <div class="compare-card safe">
+              <h3>路径 B：显式叶子入口</h3>
+              <ul class="plain-list">
+                <li>用户直接执行 <code>/develop</code> 或 <code>workflowprogram-develop</code></li>
+                <li>不会再回到 orchestrate skill</li>
+                <li>但 <code>workflow-entry.py</code> 仍会再跑一次 <code>route-intent.py</code></li>
+                <li>目的不是重新路由 skill，而是保留路由证据、检查入口和请求是否冲突</li>
+              </ul>
+            </div>
+          </div>
+
+          <div class="diagram-card">
+            <svg viewBox="0 0 980 300" role="img" aria-label="入口路由关系图">
+              <rect x="40" y="34" width="220" height="76" rx="18" class="box-a"></rect>
+              <rect x="310" y="34" width="220" height="76" rx="18" class="box-b"></rect>
+              <rect x="580" y="34" width="180" height="76" rx="18" class="box-c"></rect>
+              <rect x="790" y="34" width="150" height="76" rx="18" class="box-d"></rect>
+              <text x="78" y="80" class="svg-title">自然语言请求</text>
+              <text x="332" y="80" class="svg-title">workflowprogram-</text>
+              <text x="356" y="103" class="svg-line">orchestrate</text>
+              <text x="620" y="80" class="svg-title">叶子入口</text>
+              <text x="813" y="80" class="svg-title">entry</text>
+              <path d="M260 72 H305" class="svg-arrow"></path>
+              <path d="M530 72 H575" class="svg-arrow"></path>
+              <path d="M760 72 H785" class="svg-arrow"></path>
+
+              <rect x="120" y="180" width="220" height="76" rx="18" class="box-e"></rect>
+              <rect x="390" y="180" width="180" height="76" rx="18" class="box-c"></rect>
+              <rect x="620" y="180" width="300" height="76" rx="18" class="strip-box"></rect>
+              <text x="160" y="225" class="svg-title">显式 /develop</text>
+              <text x="432" y="225" class="svg-title">叶子入口</text>
+              <text x="650" y="214" class="svg-title">workflow-entry.py 内部再跑</text>
+              <text x="650" y="238" class="svg-line">route-intent.py 用来留证据，不是回跳 orchestrate</text>
+              <path d="M340 218 H385" class="svg-arrow"></path>
+              <path d="M570 218 H615" class="svg-arrow"></path>
+            </svg>
+          </div>
+        </section>
+
+        <!-- ==================== 受控写入 ==================== -->
+        <section class="panel" id="managed-apply">
+          <div class="section-heading">
+            <p class="eyebrow">第七步：理解写入安全</p>
+            <h2>为什么不是"直接改 <code>TARGET_ROOT/.claude/</code>"</h2>
+          </div>
+
+          <p style="color:var(--muted);max-width:70ch;margin:8px 0 0">
+            这是很多人第一次听到会觉得"多此一举"的设计。但只要你经历过一次"模型把你手工维护的 settings.json 覆盖了"，
+            你就会明白：写入安全是 workflow 工程化的硬分水岭。
+          </p>
+
+          <div class="compare-grid">
+            <div class="compare-card danger">
+              <h3>直接覆盖（常见做法）</h3>
+              <ul class="plain-list">
+                <li>用户手工维护的文件容易被误改或丢失。</li>
+                <li>冲突发生时没有中间态证据，无法恢复。</li>
+                <li>事后无法区分哪些文件是工具写的、哪些是人写的。</li>
+              </ul>
+            </div>
+            <div class="compare-card safe">
+              <h3>candidate &rarr; managed apply</h3>
+              <ul class="plain-list">
+                <li>AI 先把候选资产写到 <code>RUN_ROOT/outputs/candidate/</code>。</li>
+                <li><code>managed-assets.py plan</code> 生成变更计划，标注每个文件的决策（create/update/conflict）。</li>
+                <li><code>managed-assets.py apply-staged</code> 执行受控写入。冲突时保留副本，不静默覆盖。</li>
+                <li><code>managed-files.json</code> 持续记录哪些文件是工具托管的。</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <!-- ==================== 验证闭环 ==================== -->
+        <section class="panel" id="validation">
+          <div class="section-heading">
+            <p class="eyebrow">第八步：分清三层验证</p>
+            <h2>生成者不能同时做自己的裁判</h2>
+          </div>
+
+          <p style="color:var(--muted);max-width:70ch;margin:8px 0 0">
+            如果"生成"和"验证"是同一个角色负责，生成成功就容易被误当成验证通过。
+            WorkflowProgram 把验证拆成三层，每层有明确的职责边界：
+          </p>
+
+          <div class="stack-grid validation-grid">
+            <article class="stack-card">
+              <span class="stack-index">A</span>
+              <h3>Runner（控制面硬约束）</h3>
+              <p>检查写入边界、最小证据、状态值域、失败枚举。这些是"必须满足"的前提条件，不是"建议"。</p>
+            </article>
+            <article class="stack-card">
+              <span class="stack-index">B</span>
+              <h3>S5 Judge（workflow 级判定）</h3>
+              <p>消费 <code>runtime_contract</code> 和 <code>test_contract</code>，跨 entry/boundary/flow/artifacts/failure 五个维度给出 verdict。始终产出完整 check matrix，即使部分证据缺失。</p>
+            </article>
+            <article class="stack-card">
+              <span class="stack-index">C</span>
+              <h3>Runtime Smoke（动态 harness）</h3>
+              <p>跨 provider（fixture_host / command_adapter / claude_cli）运行端到端场景，补充动态运行态证据。它辅助主 judge，不替代主 judge。</p>
+            </article>
+          </div>
+
+          <p style="color:var(--muted);margin:18px 0 6px">
+            验证产出的关键文件：
+          </p>
+          <div class="file-map">
+            <div class="file-item"><code>RUN_ROOT/state.json</code><span>控制面状态快照</span></div>
+            <div class="file-item"><code>RUN_ROOT/events.jsonl</code><span>事件流（可重放）</span></div>
+            <div class="file-item"><code>RUN_ROOT/transcript.md</code><span>运行过程 transcript</span></div>
+            <div class="file-item"><code>validation-runtime-report.md</code><span>S5 判定报告（人类可读）</span></div>
+            <div class="file-item"><code>s5-validation-summary.json</code><span>S5 判定摘要（机器可读）</span></div>
+          </div>
+        </section>
+
+        <!-- ==================== 测试验证 ==================== -->
+        <section class="panel" id="testing">
+          <div class="section-heading">
+            <p class="eyebrow">第九步：理解测试</p>
+            <h2>测试环节是怎么证明“工作流真的按定义和约束执行”的</h2>
+          </div>
+
+          <p style="color:var(--muted);max-width:74ch;margin:8px 0 0">
+            WorkflowProgram 的测试不是只看命令退出码，而是分层证明：
+            spec 合法、控制面落盘正确、S5 判定正确、端到端 smoke 能补到运行证据。
+          </p>
+
+          <div class="stack-grid validation-grid">
+            <article class="stack-card">
+              <span class="stack-index">1</span>
+              <h3>静态设计校验</h3>
+              <p><code>validate-workflow.py</code>、<code>validate-workflow-spec.py</code>、<code>validate-workflow-lowlevel.py</code> 保证仓库、spec、lowlevel 结构一致。</p>
+            </article>
+            <article class="stack-card">
+              <span class="stack-index">2</span>
+              <h3>控制面校验</h3>
+              <p><code>workflow-runner.py</code> 和 <code>validate-run-state.py</code> 保证状态转移、边界、最小证据、失败类型都落在定义范围内。</p>
+            </article>
+            <article class="stack-card">
+              <span class="stack-index">3</span>
+              <h3>S5 主判定</h3>
+              <p><code>workflow-s5-judge.py</code> 用 <code>runtime_contract + test_contract</code> 跨入口、边界、流程、产物、失败映射做最终 workflow verdict。</p>
+            </article>
+          </div>
+
+          <div class="compare-grid">
+            <div class="compare-card safe">
+              <h3>静态/半动态验证命令</h3>
+              <pre style="background:rgba(0,0,0,.04);padding:12px;border-radius:12px;overflow-x:auto;font-family:var(--mono);font-size:.88em"><code>python3 .claude/scripts/validate-workflow.py
+python3 .claude/scripts/validate-workflow-spec.py --spec &lt;workflow-spec.yaml&gt;
+python3 .claude/scripts/validate-workflow-lowlevel.py \
+  --spec &lt;workflow-spec.yaml&gt; \
+  --lowlevel &lt;workflow-lowlevel.md&gt;
+python3 .claude/scripts/validate-run-state.py --state &lt;RUN_ROOT&gt;/state.json</code></pre>
+            </div>
+            <div class="compare-card safe">
+              <h3>运行期验证命令</h3>
+              <pre style="background:rgba(0,0,0,.04);padding:12px;border-radius:12px;overflow-x:auto;font-family:var(--mono);font-size:.88em"><code>python3 tools/runtime_smoke.py --fixture empty-project
+python3 tools/runtime_smoke_matrix.py --json</code></pre>
+            </div>
+          </div>
+
+          <div class="note-strip">
+            <strong>当前验证能证明什么？</strong>
+            <span>它已经能严格证明控制面约束和最终证据是否满足定义；它不是宿主内部每一步 tool call 的全程探针，但已经不是“只看成功失败”的浅层测试。</span>
+          </div>
+        </section>
+
+        <!-- ==================== 经验积累 ==================== -->
+        <section class="panel" id="lessons">
+          <div class="section-heading">
+            <p class="eyebrow">第十步：建立长期记忆</p>
+            <h2>S6 不是附录，它让 workflow 真正能进化</h2>
+          </div>
+
+          <p style="color:var(--muted);max-width:70ch;margin:8px 0 0">
+            不会学习的 workflow 只有执行，没有演进。
+            S6 的核心价值是：把一次运行中积累的经验，变成下一轮运行的输入。
+          </p>
+
+          <div class="loop-layout">
+            <div class="loop-card">
+              <h3>短期记录</h3>
+              <p><code>lessons.md</code> 是追加式日志。每次运行的失败经验、冲突和待提炼约束都写在这里，只追加不读取（或只读最新几条）。超过 10 条就归档。</p>
+            </div>
+            <div class="loop-card">
+              <h3>单次运行增量</h3>
+              <p><code>s6-lessons-delta.md</code> 把这次运行的 <code>run_id</code>、<code>failure_kind</code> 和约束候选收成独立增量。它由 <code>validate-lessons-delta.py</code> 校验。</p>
+            </div>
+            <div class="loop-card">
+              <h3>长期规则</h3>
+              <p><code>.claude/rules/constraints.md</code> 用 <code>ALWAYS/NEVER</code> 固化稳定经验。新会话只加载这个文件，不加载完整 lessons 日志，避免上下文膨胀。</p>
+            </div>
+          </div>
+
+          <div class="note-strip">
+            <strong>WorkflowProgram 自己也在用这套模型：</strong>
+            <span>维护自己的 <code>lessons.md</code> 和 <code>constraints.md</code>，用设计真源和能力矩阵避免实现漂移。它不是"只要求别人做闭环"。</span>
+          </div>
+        </section>
+
+        <!-- ==================== 仓库结构 ==================== -->
+        <section class="panel" id="files">
+          <div class="section-heading">
+            <p class="eyebrow">第十一步：认清仓库结构</p>
+            <h2>你应该把哪些目录当真源，哪些目录当派生产物</h2>
+          </div>
+
+          <div class="file-map" style="grid-template-columns: repeat(3, minmax(0, 1fr)); margin-top: 20px">
+            <div class="file-item"><code>.claude/commands/</code><span>源码层命令入口</span></div>
+            <div class="file-item"><code>.claude/skills/</code><span>源码层 skills 与模板</span></div>
+            <div class="file-item"><code>.claude/scripts/</code><span>确定性脚本链与校验器</span></div>
+            <div class="file-item"><code>dist/plugin/</code><span>构建后的运行时载荷</span></div>
+            <div class="file-item"><code>tests/</code><span>fixtures、expectations、transcripts</span></div>
+            <div class="file-item"><code>docs/</code><span>HighLevel、LowLevel、教程和状态索引</span></div>
+          </div>
+
+          <div class="note-strip">
+            <strong>维护原则：</strong>
+            <span>优先修改真源文件，例如 <code>.claude/scripts/</code>、<code>.claude/skills/</code>、设计文档；<code>dist/plugin/</code>、PPT、报告和 view/lowlevel 都应从真源重建，不建议长期手工维护。</span>
+          </div>
+        </section>
+
+        <!-- ==================== 迁移到你的项目 ==================== -->
+        <section class="panel" id="apply">
+          <div class="section-heading">
+            <p class="eyebrow">第十二步：落地到你的项目</p>
+            <h2>想为自己的项目设计 workflow？先回答这 6 个问题</h2>
+          </div>
+
+          <p style="color:var(--muted);max-width:70ch;margin:8px 0 0">
+            不要先写 SKILL.md。先把产品边界想清楚。下面这 6 个问题，
+            每一个都对应着 WorkflowProgram 四层设计中的某一层。
+          </p>
+
+          <div class="checklist-grid">
+            <div class="check-card">1. 最终要交付哪些 <code>.claude/</code> 文件？</div>
+            <div class="check-card">2. 机器可读真源是什么？（相当于你的 <code>workflow-spec.yaml</code>）</div>
+            <div class="check-card">3. 哪些步骤必须沉到确定性脚本？（不能只靠 prompt）</div>
+            <div class="check-card">4. 写入边界和冲突处理怎么定义？（怎么做 managed apply）</div>
+            <div class="check-card">5. 最终 verdict 由谁给出？（runner 还是独立 judge）</div>
+            <div class="check-card">6. 失败经验如何进入下一轮约束？（lessons &rarr; constraints）</div>
+          </div>
+
+          <div class="note-strip">
+            <strong>最小可行版本：</strong>
+            <span>一个机器可读 spec + 一个最小 entry wrapper + 一个边界明确的写入流程 + 一个独立 verdict 产物 + 一个 lessons 文件。这已经比大多数"纯 prompt workflow"稳很多了。</span>
+          </div>
+        </section>
+
+        <!-- ==================== 快速上手 ==================== -->
+        <section class="panel" id="quickstart">
+          <div class="section-heading">
+            <p class="eyebrow">快速上手</p>
+            <h2>5 分钟从安装到第一次运行</h2>
+          </div>
+
+          <div class="stack-grid" style="grid-template-columns: repeat(2, minmax(0, 1fr))">
+            <article class="stack-card">
+              <span class="stack-index">1</span>
+              <h3>安装</h3>
+              <p>需要 Python 3.10+ 和 <code>pyyaml</code>。</p>
+              <pre style="background:rgba(0,0,0,.04);padding:12px;border-radius:12px;overflow-x:auto;font-family:var(--mono);font-size:.88em"><code>git clone https://github.com/Logic-70/WorkflowProgram-CN
+cd WorkflowProgram-CN
+pip install pyyaml
+python tools/build_plugin.py</code></pre>
+            </article>
+            <article class="stack-card">
+              <span class="stack-index">2</span>
+              <h3>启动</h3>
+              <p>在你的目标项目目录中：</p>
+              <pre style="background:rgba(0,0,0,.04);padding:12px;border-radius:12px;overflow-x:auto;font-family:var(--mono);font-size:.88em"><code>cd your-project
+claude --plugin-dir /path/to/WorkflowProgram-CN/dist/plugin</code></pre>
+            </article>
+            <article class="stack-card">
+              <span class="stack-index">3</span>
+              <h3>用自然语言描述需求</h3>
+              <p><code>workflowprogram-orchestrate</code> 会自动路由到正确的入口：</p>
+              <pre style="background:rgba(0,0,0,.04);padding:12px;border-radius:12px;overflow-x:auto;font-family:var(--mono);font-size:.88em"><code>"为当前项目设计一个 code review workflow"
+"审计当前项目的 workflow 结构"
+"验证当前项目的 workflow 资产"</code></pre>
+            </article>
+            <article class="stack-card">
+              <span class="stack-index">4</span>
+              <h3>查看运行结果</h3>
+              <p>运行结束后，在你的项目中查看：</p>
+              <pre style="background:rgba(0,0,0,.04);padding:12px;border-radius:12px;overflow-x:auto;font-family:var(--mono);font-size:.88em"><code>.workflowprogram/runs/&lt;run-id&gt;/
+  state.json          # 控制面状态
+  events.jsonl        # 事件流
+  validation-runtime-report.md</code></pre>
+            </article>
+          </div>
+        </section>
+
+        <!-- ==================== 章节原文入口 ==================== -->
+        <section class="panel" id="chapters">
+          <div class="section-heading">
+            <p class="eyebrow">深入阅读</p>
+            <h2>想看完整版？直接跳到 Markdown 章节</h2>
+          </div>
+
+          <div class="chapter-grid">
+            <a class="chapter-card" href="../workflowprogram-101/00_overview.md"><span>Ch0</span><strong>全景</strong><em>WorkflowProgram 到底在解决什么问题</em></a>
+            <a class="chapter-card" href="../workflowprogram-101/01_product_thinking.md"><span>Ch1</span><strong>设计哲学</strong><em>为什么 workflow 不是 prompt 集合</em></a>
+            <a class="chapter-card" href="../workflowprogram-101/02_three_roots.md"><span>Ch2</span><strong>三层目录模型</strong><em>PLUGIN_ROOT / TARGET_ROOT / RUN_ROOT</em></a>
+            <a class="chapter-card" href="../workflowprogram-101/03_stage_model.md"><span>Ch3</span><strong>阶段模型</strong><em>S0..S6 的职责和证据</em></a>
+            <a class="chapter-card" href="../workflowprogram-101/04_entry_and_runner.md"><span>Ch4</span><strong>编排主链</strong><em>entry 和 runner 如何协作</em></a>
+            <a class="chapter-card" href="../workflowprogram-101/05_managed_apply.md"><span>Ch5</span><strong>受控写入</strong><em>candidate、managed apply、冲突处理</em></a>
+            <a class="chapter-card" href="../workflowprogram-101/06_validation.md"><span>Ch6</span><strong>验证优先</strong><em>runner、S5 judge、runtime smoke</em></a>
+            <a class="chapter-card" href="../workflowprogram-101/07_lessons_and_constraints.md"><span>Ch7</span><strong>经验积累</strong><em>lessons &rarr; constraints 的闭环</em></a>
+            <a class="chapter-card" href="../workflowprogram-101/08_apply_to_your_project.md"><span>Ch8</span><strong>迁移到你的项目</strong><em>设计清单和最小可行版本</em></a>
+          </div>
+        </section>
+
+      </main>
+    </div>
+
+    <script src="./assets/app.js"></script>
+  </body>
+</html>

@@ -45,6 +45,23 @@
 - 想把 `.claude/` 资产做成团队可复用交付物的人
 - 想理解“为什么 WorkflowProgram 要有 runner、S5 judge、RUN_ROOT、lessons”这些看起来比较重的设计的人
 
+## 工作流编排里常见的问题，WorkflowProgram 在补什么
+
+如果把这套设计抽象掉具体文件名，`WorkflowProgram` 主要在解决下面这些常见问题：
+
+| 常见问题 | 没解决时会怎样 | WorkflowProgram 的设计回答 |
+|----------|----------------|----------------------------|
+| 没有统一真源 | 文档、prompt、实现相互漂移 | 用 `workflow-spec.yaml` 作为执行语义真源 |
+| 编排顺序靠模型记忆 | 容易漏步骤、跳步骤、重复步骤 | 用 `workflow-entry.py` 和 `workflow-runner.py` 固定主链 |
+| 目标仓被直接写坏 | 一旦出错很难回退和追责 | 先 candidate，再 managed apply，再落地到 `TARGET_ROOT` |
+| 失败后无法定位问题层 | 不知道是 spec、执行还是验证出了错 | 把 `spec / runner / judge / smoke` 分层 |
+| 没有结构化证据 | 只能看聊天记录，无法自动复盘 | 在 `RUN_ROOT` 固化 `state/events/transcript/report` |
+| 验证只看命令退出码 | “执行成功”不等于“按约束执行成功” | 用 `runtime_contract + test_contract + S5` 复核 |
+| 经验不会回流 | 下一轮继续重复踩坑 | 用 `S6 lessons + constraints` 做长期沉淀 |
+| 自然语言入口不稳定 | 同类请求路由到不同 skill，行为漂移 | 用 `workflowprogram-orchestrate + route-intent.py` 收口入口 |
+
+所以 `WorkflowProgram` 的思路不是“多写几个 skill”，而是把工作流编排里最常见的失控点逐个变成设计对象、控制面对象和验证对象。
+
 ## 先看全景：WorkflowProgram 里几个最重要的概念
 
 | 概念 | 解决什么问题 | 当前实现对应物 |

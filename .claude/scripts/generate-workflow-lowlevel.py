@@ -31,6 +31,7 @@ REQUIRED_TOP_KEYS = [
     "constraints",
     "resource_limits",
     "runtime_contract",
+    "generated_runtime_contract",
     "test_contract",
 ]
 
@@ -153,6 +154,7 @@ def render_stage_guidance(stages: List[Dict[str, Any]]) -> List[str]:
 
 def render_contract_guide(spec: Dict[str, Any]) -> List[str]:
     runtime_contract = spec.get("runtime_contract", {})
+    generated_runtime_contract = spec.get("generated_runtime_contract", {})
     test_contract = spec.get("test_contract", {})
     write_boundaries = runtime_contract.get("write_boundaries", {}) if isinstance(runtime_contract, dict) else {}
     required_evidence = runtime_contract.get("required_evidence", []) if isinstance(runtime_contract, dict) else []
@@ -168,6 +170,17 @@ def render_contract_guide(spec: Dict[str, Any]) -> List[str]:
         "",
         "维护规则：任何会改变 verdict、边界、证据或失败分类的调整，都必须更新 `workflow-spec.yaml.runtime_contract` 或 `workflow-spec.yaml.test_contract`，而不是只更新解释文字。",
         "",
+        "## Generated Runtime Contract",
+        "",
+        f"- runtime_root: `{format_value(generated_runtime_contract.get('runtime_root', '-'))}`",
+        f"- entry_script: `{format_value(generated_runtime_contract.get('entry_script', '-'))}`",
+        f"- runner_script: `{format_value(generated_runtime_contract.get('runner_script', '-'))}`",
+        f"- state_validator_script: `{format_value(generated_runtime_contract.get('state_validator_script', '-'))}`",
+        f"- runtime_manifest: `{format_value(generated_runtime_contract.get('runtime_manifest', '-'))}`",
+        f"- run_root_dir: `{format_value(generated_runtime_contract.get('run_root_dir', '-'))}`",
+        "",
+        "维护规则：若目标工作流声明了阶段流与 test_contract，则必须同时交付 `.workflowprogram/runtime/` 下的 deterministic runtime 资产，不得只保留命令和设计文档。",
+        "",
     ]
 
 
@@ -176,6 +189,7 @@ def render_delivery_rules() -> List[str]:
         "## Persistent Design Assets",
         "",
         "- develop 成功后，应把 `workflow-spec.yaml`、`workflow-view.md`、`workflow-lowlevel.md` 持久化到 `TARGET_ROOT/.workflowprogram/design/`。",
+        "- develop 成功后，应把 `workflow-entry.py`、`workflow-runner.py`、`validate-run-state.py`、`runtime-manifest.json` 持久化到 `TARGET_ROOT/.workflowprogram/runtime/`。",
         "- 持久化副本属于 WorkflowProgram 托管资产，必须走 managed apply / manifest，而不是直接裸写目标目录。",
         "- 目标侧副本用于后续 audit / iterate / 人工维护理解当前工作流；当前运行的控制面输入仍以 `RUN_ROOT/workflow-spec.yaml` 为准。",
         "",

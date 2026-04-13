@@ -252,6 +252,26 @@ def generate_lowlevel(spec_path: Path, out_path: Path) -> Dict[str, Any]:
     return payload
 
 
+def generate_target_runtime(spec_path: Path, out_root: Path) -> Dict[str, Any]:
+    """根据 workflow-spec.yaml 生成目标侧 deterministic runtime 资产。"""
+
+    payload = run_required_json_command(
+        "generate-target-runtime.py",
+        [
+            sys.executable,
+            str(script_dir() / "generate-target-runtime.py"),
+            "--spec",
+            str(spec_path),
+            "--out-root",
+            str(out_root),
+            "--json",
+        ],
+    )
+    if payload.get("status") != "PASS":
+        raise RuntimeError(f"target runtime generation failed: {payload}")
+    return payload
+
+
 def resolve_candidate_layout(candidate_root: Path) -> Tuple[Path, Path]:
     """兼容旧的 `candidate/.claude` 和新的 `candidate/` 传参形式。"""
 
@@ -282,6 +302,21 @@ def stage_persistent_design_assets(
         "workflow_spec": str(target_spec),
         "workflow_view": str(target_view),
         "workflow_lowlevel": str(target_lowlevel),
+    }
+
+
+def stage_target_runtime_assets(
+    *,
+    candidate_stage_root: Path,
+    spec_path: Path,
+) -> Dict[str, Any]:
+    """把目标工作流自己的 deterministic runtime 资产落到 candidate/.workflowprogram/runtime/。"""
+
+    runtime_root = candidate_stage_root / ".workflowprogram" / "runtime"
+    generated = generate_target_runtime(spec_path, runtime_root)
+    return {
+        "runtime_root": str(runtime_root),
+        "files": generated.get("files", {}),
     }
 
 
@@ -336,6 +371,7 @@ def run_runner(
     plugin_root: Path,
     request: str,
     intent: str,
+    entry_skill: str,
     auto_approve: bool,
     approval_status: str,
     strict_route: bool,
@@ -361,6 +397,8 @@ def run_runner(
         request,
         "--intent",
         intent,
+        "--entry-skill",
+        entry_skill,
         "--runtime-provider",
         runtime_provider,
         "--provider-command",
@@ -444,6 +482,7 @@ def command_run(args: argparse.Namespace) -> int:
     stopped_before_runner = False
     final_status = "PASS"
     design_assets: Dict[str, str] | None = None
+    target_runtime_assets: Dict[str, Any] | None = None
 
     # 只有 develop 流程允许修改 TARGET_ROOT。
     # audit/iterate/validate 流程会直接进入控制面 runner。
@@ -461,6 +500,10 @@ def command_run(args: argparse.Namespace) -> int:
             view_path=view_path,
             lowlevel_path=lowlevel_path,
         )
+        target_runtime_assets = stage_target_runtime_assets(
+            candidate_stage_root=candidate_stage_root,
+            spec_path=spec_path,
+        )
         managed_plan, managed_result, conflicts = run_managed_apply(target_root, run_root, candidate_stage_root)
         # managed apply 冲突要在 runner 之前中止。
         # 这样既能保持 S4 归属清晰，也避免在写入门禁未打开时假装控制面已经执行。
@@ -475,6 +518,7 @@ def command_run(args: argparse.Namespace) -> int:
                 plugin_root=plugin_root,
                 request=args.request,
                 intent=intent,
+                entry_skill=entry_skill,
                 auto_approve=bool(args.auto_approve),
                 approval_status=args.approval_status,
                 strict_route=bool(args.strict_route),
@@ -491,6 +535,7 @@ def command_run(args: argparse.Namespace) -> int:
             plugin_root=plugin_root,
             request=args.request,
             intent=intent,
+            entry_skill=entry_skill,
             auto_approve=bool(args.auto_approve),
             approval_status=args.approval_status,
             strict_route=bool(args.strict_route),
@@ -522,6 +567,7 @@ def command_run(args: argparse.Namespace) -> int:
         "lowlevel_path": str(lowlevel_path),
         "candidate_root": str(resolve_candidate_layout(candidate_root)[0]) if intent == "develop" else None,
         "persistent_design_assets": design_assets,
+        "target_runtime_assets": target_runtime_assets,
         "spec_validation": {
             "status": spec_validation.get("status"),
             "error_count": len(spec_validation.get("errors", [])),

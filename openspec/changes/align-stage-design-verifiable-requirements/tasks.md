@@ -27,10 +27,17 @@
 - [x] 5.2 Re-run validation and smoke commands against the updated implementation and record each capability as `Satisfied`, `Partial`, or `Missing`.
 - [x] 5.3 Update the implementation audit so the repo has a living conformance view against the OpenSpec requirement set.
 
-## 6. Add Pending Host-Capability And Team-Orchestration Requirements
+## 6. Highest-Priority Pending Requirement: Generated Workflow Runtime Control Plane
 
-- [ ] 6.1 Define a machine-readable host capability contract for domain-specific professional dependencies such as Codex skills, MCP servers, external binaries, and approval-gated bootstrap actions.
-- [ ] 6.2 Extend design truth sources, templates, and validators so generated workflows can declare required host capabilities separately from `TARGET_ROOT` assets.
-- [ ] 6.3 Add host-readiness detection and bootstrap evidence requirements so WorkflowProgram can distinguish “workflow files generated” from “workflow truly usable on this host”.
-- [ ] 6.4 Define an opt-in agent-team orchestration contract covering role declarations, ownership, fan-out limit, join policy, and runtime evidence expectations.
-- [ ] 6.5 Extend the conformance audit to mark current host-capability bootstrap and agent-team support as implemented, partial, or missing based on machine-checkable evidence rather than prompt text.
+- [ ] 6.1 Define a machine-readable target-workflow runtime contract so generated workflows declare a deterministic entry path plus machine-enforced stage/control-plane transitions, not only commands, skills, and design docs.
+- [ ] 6.2 Extend design truth sources, templates, and generated assets so successful `develop` runs deliver the target-side runtime entry wrapper and runner-equivalent control-plane assets as managed outputs.
+- [ ] 6.3 Extend validators, judge logic, and smoke coverage so generated workflows fail conformance when they claim stage/test contracts without shipping the target-side deterministic runtime mechanism that enforces them.
+- [ ] 6.4 Update the implementation audit to track target-workflow runtime orchestration as its own top-priority capability with `Satisfied / Partial / Missing` status based on machine-checkable evidence.
+
+## 7. Add Pending Host-Capability And Team-Orchestration Requirements
+
+- [ ] 7.1 Define a machine-readable host capability contract for domain-specific professional dependencies such as Codex skills, MCP servers, external binaries, and approval-gated bootstrap actions.
+- [ ] 7.2 Extend design truth sources, templates, and validators so generated workflows can declare required host capabilities separately from `TARGET_ROOT` assets.
+- [ ] 7.3 Add host-readiness detection and bootstrap evidence requirements so WorkflowProgram can distinguish “workflow files generated” from “workflow truly usable on this host”.
+- [ ] 7.4 Define an opt-in agent-team orchestration contract covering role declarations, ownership, fan-out limit, join policy, and runtime evidence expectations.
+- [ ] 7.5 Extend the conformance audit to mark current host-capability bootstrap and agent-team support as implemented, partial, or missing based on machine-checkable evidence rather than prompt text.

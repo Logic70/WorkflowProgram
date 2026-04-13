@@ -94,7 +94,11 @@ def validate_managed_manifest(path: Path) -> List[str]:
 
 
 def is_managed_target_path(path: str) -> bool:
-    return path.startswith(".claude/") or path.startswith(".workflowprogram/design/")
+    return (
+        path.startswith(".claude/")
+        or path.startswith(".workflowprogram/design/")
+        or path.startswith(".workflowprogram/runtime/")
+    )
 
 
 def snapshot_index(entries: List[Dict[str, Any]]) -> Dict[str, Dict[str, Any]]:
@@ -171,6 +175,34 @@ def infer_expected_intent(entry_skill: str) -> str:
     if entry_skill.endswith("-orchestrate"):
         return "orchestrate"
     return "develop"
+
+
+def is_workflowprogram_product_entry(entry_skill: str) -> bool:
+    """判断当前入口是否是 WorkflowProgram 自身的产品命令。"""
+
+    return entry_skill.startswith("workflowprogram-")
+
+
+def registered_entry_names(spec: Dict[str, Any]) -> set[str]:
+    """从 workflow spec 中提取目标工作流已注册的 commands/skills 名称。"""
+
+    registry = spec.get("registry", {})
+    if not isinstance(registry, dict):
+        return set()
+
+    names: set[str] = set()
+    for section in ("commands", "skills"):
+        items = registry.get(section, [])
+        if not isinstance(items, list):
+            continue
+        for item in items:
+            if isinstance(item, dict):
+                text = str(item.get("name", "")).strip()
+            else:
+                text = str(item).strip()
+            if text:
+                names.add(text)
+    return names
 
 
 def expected_flow_for_intent(spec: Dict[str, Any], intent: str) -> tuple[List[str], List[str], List[str], str] | None:
@@ -325,6 +357,7 @@ def build_checks(
     expected_intent = infer_expected_intent(entry_skill)
     observed_intent = route_payload.get("intent") if isinstance(route_payload, dict) else ""
     observed_intent_text = str(observed_intent).strip() or expected_intent
+    generated_registry_entries = registered_entry_names(spec)
 
     # entry 检查先回答“是不是用正确的产品入口、以正确的请求形态触发了执行”，
     # 再继续看更深层的运行时行为。
@@ -339,9 +372,29 @@ def build_checks(
         )
         declared_entry = str(entry.get("main_entry", "")).strip()
         if declared_entry:
-            status = "PASS" if declared_entry == entry_skill else "FAIL"
-            detail = f"Declared main_entry={declared_entry}; smoke entry={entry_skill}"
-            add_check(checks["entry"], "declared_main_entry", status, detail, "test_contract.entry.main_entry")
+            if is_workflowprogram_product_entry(entry_skill):
+                registered = declared_entry in generated_registry_entries
+                add_check(
+                    checks["entry"],
+                    "declared_generated_main_entry_registered",
+                    "PASS" if registered else "FAIL",
+                    (
+                        f"WorkflowProgram product entry={entry_skill}; generated workflow main_entry={declared_entry}; "
+                        f"registered_entries={sorted(generated_registry_entries) or ['<none>']}"
+                    ),
+                    "test_contract.entry.main_entry",
+                )
+                add_check(
+                    checks["entry"],
+                    "workflowprogram_product_entry_wraps_generated_entry",
+                    "PASS",
+                    f"WorkflowProgram product entry {entry_skill} is allowed to wrap generated workflow main_entry={declared_entry}.",
+                    "workflowprogram.product_entry",
+                )
+            else:
+                status = "PASS" if declared_entry == entry_skill else "FAIL"
+                detail = f"Declared main_entry={declared_entry}; smoke entry={entry_skill}"
+                add_check(checks["entry"], "declared_main_entry", status, detail, "test_contract.entry.main_entry")
         required_args = entry.get("required_args", [])
         requires_arguments = isinstance(required_args, list) and any(str(item).strip() == "$ARGUMENTS" for item in required_args)
         if requires_arguments:
@@ -850,6 +903,37 @@ def build_checks(
                         else "; ".join([*lowlevel_errors, *lowlevel_warnings[:3]]),
                         "TARGET_ROOT/.workflowprogram/design/workflow-lowlevel.md",
                     )
+        generated_runtime_contract = spec.get("generated_runtime_contract", {}) if isinstance(spec, dict) else {}
+        runtime_root_rel = str(generated_runtime_contract.get("runtime_root", "")).strip() if isinstance(generated_runtime_contract, dict) else ""
+        runtime_root_path = target_root / runtime_root_rel if runtime_root_rel else None
+        should_validate_generated_runtime = (
+            isinstance(generated_runtime_contract, dict)
+            and bool(generated_runtime_contract)
+            and (
+                observed_intent_text == "develop"
+                or (runtime_root_path is not None and runtime_root_path.exists())
+            )
+        )
+        if should_validate_generated_runtime:
+            target_spec_path = target_root / ".workflowprogram" / "design" / "workflow-spec.yaml"
+            runtime_validation = run_validator(
+                "validate-generated-runtime.py",
+                "--spec",
+                str(target_spec_path),
+                "--target-root",
+                str(target_root),
+            )
+            runtime_errors = [str(item) for item in runtime_validation.get("errors", [])]
+            runtime_warnings = [str(item) for item in runtime_validation.get("warnings", [])]
+            add_check(
+                checks["artifacts"],
+                "persistent_generated_runtime_valid",
+                "PASS" if not runtime_errors else "FAIL",
+                "generated target runtime assets passed deterministic validation."
+                if not runtime_errors
+                else "; ".join([*runtime_errors, *runtime_warnings[:3]]),
+                "TARGET_ROOT/.workflowprogram/runtime/",
+            )
     elif "artifacts" in contract.get("contract_categories", []):
         add_check(checks["artifacts"], "contract_source_fallback", "INFO", "Artifact checks derived from fixture preset.", "fixture_preset")
 

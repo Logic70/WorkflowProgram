@@ -16,6 +16,7 @@ Legend:
 | `workflow-requirement-discovery` | Satisfied | `S1` is machine-scoped to `develop`, `workflow-spec.md` now has a deterministic quality validator, and smoke/provider paths produce evidence that S1 draft quality is judged rather than only prompt-guided. |
 | `workflow-context-and-design` | Satisfied | `S2`/`S3` outputs, spec validation, approval state fields, manual vs auto approval handling, and product-level entry orchestration are now materially landed under one deterministic wrapper. |
 | `workflow-managed-generation` | Satisfied | Candidate generation, managed apply, runner, and state validation are now wired together through `workflow-entry.py`, so the main product entry no longer depends only on prompt discipline. |
+| `workflow-generated-runtime-orchestration` | Missing | Generated target workflows receive design assets, commands, and skills, but they do not yet ship their own deterministic target-side runtime entry plus runner-backed or equivalent control-plane mechanism. |
 | `workflow-runtime-evidence-and-progress` | Satisfied | Runtime evidence and progress assets are implemented, ownership is aligned to the runtime evidence spec, skip/error paths backfill minimum progress evidence, and the repo now has a capability matrix checker at validator level. |
 | `workflow-validation-feedback` | Satisfied | S5 judge, `test_contract`, smoke harness, provider abstraction, and the new runtime smoke matrix now cover adapter, fixture, and optional `claude_cli` paths under one repeatable command. |
 | `workflow-lessons-and-intent-flows` | Satisfied | S6 outputs and four-intent routing are now machine-checked: HighLevel declares the flows, runner/smoke enforce them, and `validate-lessons-delta.py` hard-checks `run_id`, `failure_kind`, constraint candidates, and user-facing history summaries. |
@@ -129,14 +130,17 @@ The main pattern is now:
 
 - `scripts and validators` are ahead
 - `HighLevel and LowLevel truth sources` are much closer to the implementation
-- the remaining gaps are no longer in the core `S0..S6` control plane alone; they now concentrate in three areas:
+- the remaining gaps are no longer in the core `S0..S6` control plane alone; they now concentrate in four areas:
+  - `target-side deterministic runtime orchestration for generated workflows`
   - `request-to-intent inference quality`
   - `host capability bootstrap for domain-specific professional tooling`
   - `machine-checkable agent-team orchestration`
 
 That means the repo is already useful for constrained development and validation work, the intent-flow plus S1/S6 quality contracts are materially landed, and the most important remaining work is now about expanding readiness and orchestration capability rather than rescuing the existing execution chain.
 
-Two newly added pending requirement families remain unimplemented by design:
+Three pending requirement families remain unimplemented by design:
+
+- `workflow-generated-runtime-orchestration`: missing as a product capability; generated workflows still stop at design assets plus prompt-driven commands/skills instead of shipping their own deterministic runtime entry and control-plane mechanism.
 
 - `workflow-host-capability-bootstrap`: missing as a product capability; specialized dependencies such as reverse-engineering skills, MCP servers, or external toolchains are not yet discovered or bootstrapped automatically.
 - `workflow-agent-team-orchestration`: missing as a machine-checkable capability; agent-team support is not yet modeled as an explicit workflow contract.

@@ -5,7 +5,7 @@ WorkflowProgram 目标写入的 managed asset 守卫。
 该工具落实一条核心设计规则：
 WorkflowProgram 必须先在 RUN_ROOT 下生成候选 workflow 资产，
 再判断它们能否安全回写到 TARGET_ROOT 的托管路径
-（`.claude/**` 与 `.workflowprogram/design/**`），
+（`.claude/**`、`.workflowprogram/design/**` 与 `.workflowprogram/runtime/**`），
 而不能静默覆盖用户修改。
 """
 
@@ -25,7 +25,7 @@ from typing import Any, Dict, Iterable, List, Optional
 from lib.io_utils import iso_now, write_json
 
 
-ALLOWED_MANAGED_PREFIXES = (".claude/", ".workflowprogram/design/")
+ALLOWED_MANAGED_PREFIXES = (".claude/", ".workflowprogram/design/", ".workflowprogram/runtime/")
 
 
 def make_run_id() -> str:

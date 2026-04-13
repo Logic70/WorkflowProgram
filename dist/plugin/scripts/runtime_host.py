@@ -449,11 +449,6 @@ def _copy_runtime_spec(repo_root: Path, run_root: Path, entry_skill: str) -> Pat
     payload = yaml.safe_load(spec_path.read_text(encoding="utf-8"))
     if not isinstance(payload, dict):
         raise RuntimeError(f"fixture spec is invalid: {spec_path}")
-    test_contract = payload.get("test_contract", {})
-    if isinstance(test_contract, dict):
-        entry = test_contract.get("entry", {})
-        if isinstance(entry, dict):
-            entry["main_entry"] = entry_skill
     target = run_root / "workflow-spec.yaml"
     _write_text(target, yaml.safe_dump(payload, allow_unicode=True, sort_keys=False))
     return target
@@ -489,6 +484,36 @@ def _generate_design_docs(spec_path: Path, run_root: Path) -> Dict[str, Path]:
         if completed.returncode != 0:
             raise RuntimeError(completed.stderr.strip() or completed.stdout.strip() or f"{script_name} failed")
     return outputs
+
+
+def _generate_target_runtime_assets(spec_path: Path, out_root: Path) -> Dict[str, Path]:
+    """基于真实生成器产出 target-side runtime 资产。"""
+
+    script_root = _repo_root() / ".claude" / "scripts"
+    completed = subprocess.run(
+        [
+            sys.executable,
+            str(script_root / "generate-target-runtime.py"),
+            "--spec",
+            str(spec_path),
+            "--out-root",
+            str(out_root),
+            "--json",
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if completed.returncode != 0:
+        raise RuntimeError(completed.stderr.strip() or completed.stdout.strip() or "generate-target-runtime.py failed")
+    payload = json.loads(completed.stdout)
+    files = payload.get("files", {})
+    return {
+        "entry_script": Path(str(files.get("entry_script", ""))).resolve(),
+        "runner_script": Path(str(files.get("runner_script", ""))).resolve(),
+        "state_validator_script": Path(str(files.get("state_validator_script", ""))).resolve(),
+        "runtime_manifest": Path(str(files.get("runtime_manifest", ""))).resolve(),
+    }
 
 
 def _write_lessons_delta(run_root: Path, entry_skill: str, request: str, failure_kind: str) -> None:
@@ -729,6 +754,7 @@ def _invoke_fixture_host(
             ("workflow_lowlevel", "workflow-lowlevel.md"),
         ):
             shutil.copy2(design_docs[source_name], candidate_design_root / target_name)
+        _generate_target_runtime_assets(spec_path, candidate_root / ".workflowprogram" / "runtime")
 
         cmd = [
             sys.executable,

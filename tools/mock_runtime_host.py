@@ -61,9 +61,6 @@ def copy_runtime_spec(
     payload = yaml.safe_load(spec_path.read_text(encoding="utf-8"))
     test_contract = payload.get("test_contract", {})
     if isinstance(test_contract, dict):
-        entry = test_contract.get("entry", {})
-        if isinstance(entry, dict):
-            entry["main_entry"] = entry_skill
         artifacts = test_contract.get("artifacts", {})
         if deliverables is not None and isinstance(artifacts, dict):
             artifacts["deliverables"] = deliverables
@@ -236,6 +233,36 @@ def generate_design_docs(repo_root: Path, run_root: Path) -> Dict[str, Path]:
     return outputs
 
 
+def generate_target_runtime_assets(repo_root: Path, spec_path: Path, out_root: Path) -> Dict[str, Path]:
+    """基于真实生成器产出 target-side runtime 资产。"""
+
+    script_path = repo_root / ".claude" / "scripts" / "generate-target-runtime.py"
+    completed = subprocess.run(
+        [
+            sys.executable,
+            str(script_path),
+            "--spec",
+            str(spec_path),
+            "--out-root",
+            str(out_root),
+            "--json",
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if completed.returncode != 0:
+        raise RuntimeError(completed.stderr.strip() or completed.stdout.strip() or "generate-target-runtime.py failed")
+    payload = json.loads(completed.stdout)
+    files = payload.get("files", {})
+    return {
+        "entry_script": Path(str(files.get("entry_script", ""))).resolve(),
+        "runner_script": Path(str(files.get("runner_script", ""))).resolve(),
+        "state_validator_script": Path(str(files.get("state_validator_script", ""))).resolve(),
+        "runtime_manifest": Path(str(files.get("runtime_manifest", ""))).resolve(),
+    }
+
+
 def write_progress_outputs(
     run_root: Path,
     stage_history: List[str],
@@ -336,6 +363,7 @@ def write_managed_outputs(run_root: Path, target_root: Path, conflict: bool) -> 
     design_spec_source = run_root / "outputs" / "candidate" / ".workflowprogram" / "design" / "workflow-spec.yaml"
     design_view_source = run_root / "outputs" / "candidate" / ".workflowprogram" / "design" / "workflow-view.md"
     design_lowlevel_source = run_root / "outputs" / "candidate" / ".workflowprogram" / "design" / "workflow-lowlevel.md"
+    runtime_root = run_root / "outputs" / "candidate" / ".workflowprogram" / "runtime"
     write_text(rules_source, "# Constraints\n\n- Keep workflow assets managed.\n")
     write_text(command_source, "## Usage\n\n1. Goal\n2. Verify\n")
     design_spec_source.parent.mkdir(parents=True, exist_ok=True)
@@ -345,6 +373,7 @@ def write_managed_outputs(run_root: Path, target_root: Path, conflict: bool) -> 
         (design_lowlevel_source, run_root / "workflow-lowlevel.md"),
     ):
         source_path.write_text(run_path.read_text(encoding="utf-8"), encoding="utf-8", newline="\n")
+    runtime_files = generate_target_runtime_assets(Path(__file__).resolve().parents[1], run_root / "workflow-spec.yaml", runtime_root)
     plan_entries = [
         {
             "relative_path": ".claude/settings.json",
@@ -382,6 +411,30 @@ def write_managed_outputs(run_root: Path, target_root: Path, conflict: bool) -> 
             "target_path": str(target_root / ".workflowprogram" / "design" / "workflow-lowlevel.md"),
             "decision": "create",
         },
+        {
+            "relative_path": ".workflowprogram/runtime/workflow-entry.py",
+            "source_path": str(runtime_files["entry_script"]),
+            "target_path": str(target_root / ".workflowprogram" / "runtime" / "workflow-entry.py"),
+            "decision": "create",
+        },
+        {
+            "relative_path": ".workflowprogram/runtime/workflow-runner.py",
+            "source_path": str(runtime_files["runner_script"]),
+            "target_path": str(target_root / ".workflowprogram" / "runtime" / "workflow-runner.py"),
+            "decision": "create",
+        },
+        {
+            "relative_path": ".workflowprogram/runtime/validate-run-state.py",
+            "source_path": str(runtime_files["state_validator_script"]),
+            "target_path": str(target_root / ".workflowprogram" / "runtime" / "validate-run-state.py"),
+            "decision": "create",
+        },
+        {
+            "relative_path": ".workflowprogram/runtime/runtime-manifest.json",
+            "source_path": str(runtime_files["runtime_manifest"]),
+            "target_path": str(target_root / ".workflowprogram" / "runtime" / "runtime-manifest.json"),
+            "decision": "create",
+        },
     ]
     write_json(
         outputs / "managed-change-plan.json",
@@ -389,7 +442,7 @@ def write_managed_outputs(run_root: Path, target_root: Path, conflict: bool) -> 
             "generated_at": iso_now(),
             "entries": plan_entries,
             "summary": {
-                "create": 5,
+                "create": 9,
                 "update": 0 if conflict else 1,
                 "conflict": 1 if conflict else 0,
             },
@@ -401,7 +454,7 @@ def write_managed_outputs(run_root: Path, target_root: Path, conflict: bool) -> 
             "run_root": str(run_root),
             "manifest_path": str(manifest_path),
             "summary": {
-                "create": 5,
+                "create": 9,
                 "update": 0 if conflict else 1,
                 "conflict": 1 if conflict else 0,
             },
@@ -481,6 +534,34 @@ def write_managed_outputs(run_root: Path, target_root: Path, conflict: bool) -> 
                         "ownership": "workflowprogram",
                         "producer_version": "mock-runtime-host",
                         "updated_at": iso_now(),
+                    },
+                    {
+                        "relative_path": ".workflowprogram/runtime/runtime-manifest.json",
+                        "last_applied_hash": "mock-managed-hash-runtime-manifest",
+                        "ownership": "workflowprogram",
+                        "producer_version": "mock-runtime-host",
+                        "updated_at": iso_now(),
+                    },
+                    {
+                        "relative_path": ".workflowprogram/runtime/validate-run-state.py",
+                        "last_applied_hash": "mock-managed-hash-runtime-validator",
+                        "ownership": "workflowprogram",
+                        "producer_version": "mock-runtime-host",
+                        "updated_at": iso_now(),
+                    },
+                    {
+                        "relative_path": ".workflowprogram/runtime/workflow-entry.py",
+                        "last_applied_hash": "mock-managed-hash-runtime-entry",
+                        "ownership": "workflowprogram",
+                        "producer_version": "mock-runtime-host",
+                        "updated_at": iso_now(),
+                    },
+                    {
+                        "relative_path": ".workflowprogram/runtime/workflow-runner.py",
+                        "last_applied_hash": "mock-managed-hash-runtime-runner",
+                        "ownership": "workflowprogram",
+                        "producer_version": "mock-runtime-host",
+                        "updated_at": iso_now(),
                     }
                 ]
             ),
@@ -508,6 +589,16 @@ def create_target_outputs(run_root: Path, target_root: Path) -> List[str]:
         target_path = design_root / name
         target_path.write_text(source_path.read_text(encoding="utf-8"), encoding="utf-8", newline="\n")
         files.append(f".workflowprogram/design/{name}")
+    runtime_root = target_root / ".workflowprogram" / "runtime"
+    runtime_files = generate_target_runtime_assets(Path(__file__).resolve().parents[1], run_root / "workflow-spec.yaml", runtime_root)
+    files.extend(
+        [
+            ".workflowprogram/runtime/workflow-entry.py",
+            ".workflowprogram/runtime/workflow-runner.py",
+            ".workflowprogram/runtime/validate-run-state.py",
+            ".workflowprogram/runtime/runtime-manifest.json",
+        ]
+    )
     return files
 
 
@@ -769,6 +860,7 @@ def main() -> int:
                 destination = candidate_root / ".workflowprogram" / "design" / target_name
                 destination.parent.mkdir(parents=True, exist_ok=True)
                 destination.write_text(design_docs[source_name].read_text(encoding="utf-8"), encoding="utf-8", newline="\n")
+            generate_target_runtime_assets(repo_root, run_root / "workflow-spec.yaml", candidate_root / ".workflowprogram" / "runtime")
             generated_files = create_target_outputs(run_root, target_root)
             if "requirement" in stage_history:
                 write_workflow_spec_draft(run_root, args.entry_skill, args.request)

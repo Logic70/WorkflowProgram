@@ -27,6 +27,7 @@ def base_cases(provider_command: str) -> List[Dict[str, Any]]:
             "provider": "command_adapter",
             "provider_command": provider_command,
             "expected_result": "PASS",
+            "invoke_target_runtime": True,
         },
         {
             "name": "adapter-audit-pass",
@@ -73,6 +74,7 @@ def base_cases(provider_command: str) -> List[Dict[str, Any]]:
             "fixture": "empty-project",
             "provider": "fixture_host",
             "expected_result": "PASS",
+            "invoke_target_runtime": True,
         },
         {
             "name": "fixture-audit-pass",
@@ -147,6 +149,39 @@ def run_case(case: Dict[str, Any], timeout: int) -> Dict[str, Any]:
     if ok and expected_category is not None:
         ok = observed_category == expected_category
 
+    target_runtime_payload: Dict[str, Any] | None = None
+    if ok and case.get("invoke_target_runtime") and observed_result == "PASS":
+        target_root = str(payload.get("target_root", "")).strip()
+        runtime_entry = Path(target_root) / ".workflowprogram" / "runtime" / "workflow-entry.py"
+        target_cmd = [
+            sys.executable,
+            str(runtime_entry),
+            "run",
+            "--target-root",
+            target_root,
+            "--plugin-root",
+            str(root / "dist" / "plugin"),
+            "--request",
+            "generated runtime smoke",
+            "--entry-skill",
+            "example",
+            "--intent",
+            "develop",
+            "--runtime-provider",
+            "fixture_host",
+            "--auto-approve",
+            "--json",
+        ]
+        target_completed = subprocess.run(target_cmd, capture_output=True, text=True, check=False)
+        try:
+            target_runtime_payload = json.loads(target_completed.stdout)
+        except json.JSONDecodeError:
+            target_runtime_payload = {
+                "status": "FAIL",
+                "error": target_completed.stderr.strip() or target_completed.stdout.strip() or "generated runtime returned invalid JSON",
+            }
+        ok = ok and target_completed.returncode == 0 and str(target_runtime_payload.get("status", "")).strip() == "PASS"
+
     return {
         "name": case["name"],
         "command": cmd,
@@ -156,6 +191,7 @@ def run_case(case: Dict[str, Any], timeout: int) -> Dict[str, Any]:
         "observed_result": observed_result,
         "observed_category": observed_category,
         "payload": payload,
+        "target_runtime": target_runtime_payload,
         "returncode": completed.returncode,
     }
 

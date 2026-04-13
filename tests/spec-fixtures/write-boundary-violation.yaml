@@ -64,6 +64,7 @@ stages:
     output: |
       outputs/candidate/.claude
       outputs/candidate/.workflowprogram/design
+      outputs/candidate/.workflowprogram/runtime
       outputs/managed-change-plan.json
       outputs/managed-change-result.json
       .claude/agents/*.md
@@ -73,6 +74,10 @@ stages:
       .workflowprogram/design/workflow-spec.yaml
       .workflowprogram/design/workflow-view.md
       .workflowprogram/design/workflow-lowlevel.md
+      .workflowprogram/runtime/workflow-entry.py
+      .workflowprogram/runtime/workflow-runner.py
+      .workflowprogram/runtime/validate-run-state.py
+      .workflowprogram/runtime/runtime-manifest.json
 
   - id: validate
     stage_slot: S5
@@ -226,6 +231,16 @@ runtime_contract:
       check: runtime_host_ready
       message: "运行宿主未就绪，跳过运行态验证"
 
+generated_runtime_contract:
+  runtime_root: .workflowprogram/runtime
+  design_spec_path: .workflowprogram/design/workflow-spec.yaml
+  entry_script: .workflowprogram/runtime/workflow-entry.py
+  runner_script: .workflowprogram/runtime/workflow-runner.py
+  state_validator_script: .workflowprogram/runtime/validate-run-state.py
+  runtime_manifest: .workflowprogram/runtime/runtime-manifest.json
+  run_root_dir: .workflowprogram/runs
+  mode: shared-control-plane-wrapper
+
 # 测试契约（支撑基础运行测试判定；引用 runtime_contract，不复制执行约束）
 test_contract:
   entry:
@@ -267,6 +282,10 @@ test_contract:
       - .workflowprogram/design/workflow-spec.yaml
       - .workflowprogram/design/workflow-view.md
       - .workflowprogram/design/workflow-lowlevel.md
+      - .workflowprogram/runtime/workflow-entry.py
+      - .workflowprogram/runtime/workflow-runner.py
+      - .workflowprogram/runtime/validate-run-state.py
+      - .workflowprogram/runtime/runtime-manifest.json
       - .workflowprogram/managed-files.json
     evidence_ref: runtime_contract.required_evidence
     optional_outputs:

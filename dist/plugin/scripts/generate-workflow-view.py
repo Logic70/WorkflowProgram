@@ -28,6 +28,7 @@ REQUIRED_TOP_KEYS = [
     "constraints",
     "resource_limits",
     "runtime_contract",
+    "generated_runtime_contract",
     "test_contract",
 ]
 
@@ -204,11 +205,16 @@ def render_refs_and_constraints(spec: Dict[str, Any]) -> List[str]:
 def render_contracts(spec: Dict[str, Any]) -> List[str]:
     """原样嵌入 runtime/test contract，方便审计时直接比对。"""
     runtime_contract = spec.get("runtime_contract", {})
+    generated_runtime_contract = spec.get("generated_runtime_contract", {})
     test_contract = spec.get("test_contract", {})
     return [
         "## Runtime Contract",
         "",
         f"```json\n{json.dumps(runtime_contract, ensure_ascii=False, indent=2)}\n```",
+        "",
+        "## Generated Runtime Contract",
+        "",
+        f"```json\n{json.dumps(generated_runtime_contract, ensure_ascii=False, indent=2)}\n```",
         "",
         "## Test Contract (Judgment Only)",
         "",

@@ -98,6 +98,7 @@ def parse_args() -> argparse.Namespace:
     run.add_argument("--plugin-root", default="", help="PLUGIN_ROOT path (defaults from script location)")
     run.add_argument("--request", default="", help="Original user request")
     run.add_argument("--intent", default="", help="Override routed intent")
+    run.add_argument("--entry-skill", default="", help="Override routed entry skill")
     run.add_argument("--auto-approve", action="store_true", help="Auto approve user_approval gates")
     run.add_argument(
         "--approval-status",
@@ -533,7 +534,9 @@ def build_artifact_entries(
         kind = infer_kind(output)
         lifecycle = "deliverable" if root == "TARGET_ROOT" else "evidence"
         managed = root == "TARGET_ROOT" and (
-            output.strip().startswith(".claude/") or output.strip().startswith(".workflowprogram/design/")
+            output.strip().startswith(".claude/")
+            or output.strip().startswith(".workflowprogram/design/")
+            or output.strip().startswith(".workflowprogram/runtime/")
         )
         rel_path = artifact_path_relative(output, root)
         base_id = f"{producer}.{re.sub(r'[^A-Za-z0-9_]', '_', rel_path)}"
@@ -929,9 +932,23 @@ def command_run(args: argparse.Namespace) -> int:
         raise RuntimeError("write boundary violation: workflow-spec.yaml not allowed in RUN_ROOT")
     shutil.copy2(spec_path, copied_spec)
 
-    routed = route_intent(args.request, target_root, bool(args.strict_route))
+    routed: Dict[str, Any] = {}
+    if args.entry_skill.strip():
+        routed = {
+            "intent": args.intent.strip() or "develop",
+            "entry_skill": args.entry_skill.strip(),
+            "confidence": 1.0,
+            "reason": "explicit-entry-skill",
+            "scores": {},
+            "ambiguous": False,
+            "strict_mode": False,
+            "target_root": str(target_root),
+            "request": args.request,
+        }
+    else:
+        routed = route_intent(args.request, target_root, bool(args.strict_route))
     intent = args.intent.strip() or str(routed["intent"])
-    entry_skill = str(routed["entry_skill"])
+    entry_skill = args.entry_skill.strip() or str(routed["entry_skill"])
     run_id = run_root.name
 
     ctx = RunnerContext(

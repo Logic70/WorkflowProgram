@@ -11,6 +11,7 @@ The current stage design is close to aligned, but the full WorkflowProgram desig
   - context discovery
   - design and contract generation
   - candidate generation and managed apply
+  - generated-workflow runtime orchestration and control-plane enforcement
   - runtime evidence and progress
   - validation and feedback loops
   - lessons, iteration, and intent flows
@@ -25,6 +26,7 @@ The current stage design is close to aligned, but the full WorkflowProgram desig
   - intent-to-stage mappings for `audit`, `iterate`, and `validate`
 - Produce an implementation-conformance audit so the current repo can be judged against these requirements as `satisfied / partial / missing`.
 - Add pending requirement families for:
+  - making generated target workflows ship their own deterministic entry wrapper and runner-backed state/control-plane mechanism instead of stopping at declarative design assets
   - identifying domain-specific professional capabilities required by a generated workflow
   - checking whether required skills, MCP servers, or external tools already exist on the host
   - installing or configuring missing host capabilities only through explicit, reviewable bootstrap steps
@@ -37,6 +39,7 @@ The current stage design is close to aligned, but the full WorkflowProgram desig
 - `workflow-requirement-discovery`: Defines `S1` requirement clarification behavior, quality gates, and scope.
 - `workflow-context-and-design`: Defines `S2` context discovery and `S3` design-contract generation requirements.
 - `workflow-managed-generation`: Defines `S4` candidate generation, managed apply, runner integration, and conflict handling.
+- `workflow-generated-runtime-orchestration`: Defines the highest-priority requirement for generated target workflows to ship a deterministic runtime entry path and machine-enforced state/control-plane transitions, rather than depending only on prompt discipline.
 - `workflow-runtime-evidence-and-progress`: Defines runtime evidence, stage progress, and control-plane proof requirements across stages.
 - `workflow-validation-feedback`: Defines `S5` workflow validation, test-contract consumption, smoke evidence, and feedback-loop behavior.
 - `workflow-lessons-and-intent-flows`: Defines `S6` lessons closure and the normative intent-to-stage mappings.

@@ -27,6 +27,7 @@ REQUIRED_TOP_KEYS = {
     "constraints",
     "resource_limits",
     "runtime_contract",
+    "generated_runtime_contract",
     "test_contract",
 }
 
@@ -65,6 +66,16 @@ DEPRECATED_ENV_SKIP_CHECKS = {
     "claude_cli_logged_in",
 }
 REQUIRED_RUNTIME_CONTRACT_KEYS = {"write_boundaries", "required_evidence", "failure_kinds", "environment_skip"}
+REQUIRED_GENERATED_RUNTIME_KEYS = {
+    "runtime_root",
+    "design_spec_path",
+    "entry_script",
+    "runner_script",
+    "state_validator_script",
+    "runtime_manifest",
+    "run_root_dir",
+    "mode",
+}
 VALID_ENTRY_TYPES = {"slash_command", "natural_language", "hybrid"}
 RUNTIME_REF_PATTERN = re.compile(r"^runtime_contract\.([A-Za-z_][A-Za-z0-9_]*)$")
 
@@ -701,6 +712,86 @@ def validate_test_contract(
         add_error(errors, "test_contract.failure.environment_skip_ref must reference runtime_contract.environment_skip")
 
 
+def parse_stage_outputs(output: Any) -> List[str]:
+    """把阶段 output 声明归一化为路径列表。"""
+
+    if output is None:
+        return []
+    if isinstance(output, list):
+        return [str(item).strip() for item in output if str(item).strip()]
+    text = str(output).strip()
+    if not text:
+        return []
+    if "\n" in text:
+        return [line.strip() for line in text.splitlines() if line.strip()]
+    return [text]
+
+
+def validate_generated_runtime_contract(
+    generated_runtime_contract: Dict[str, Any],
+    stages: List[Any],
+    intent_flows: Dict[str, Any],
+    test_contract: Dict[str, Any],
+    errors: List[str],
+    warnings: List[str],
+) -> None:
+    """校验目标侧 deterministic runtime 合同。"""
+
+    missing = sorted(REQUIRED_GENERATED_RUNTIME_KEYS - set(generated_runtime_contract.keys()))
+    for key in missing:
+        add_error(errors, f"generated_runtime_contract.{key} is required")
+
+    normalized: Dict[str, str] = {}
+    for key in REQUIRED_GENERATED_RUNTIME_KEYS:
+        value = str(generated_runtime_contract.get(key, "")).strip()
+        if not value:
+            add_error(errors, f"generated_runtime_contract.{key} must not be empty")
+            continue
+        normalized[key] = value
+        if key != "mode" and not value.startswith(".workflowprogram/"):
+            add_error(errors, f"generated_runtime_contract.{key} must stay under .workflowprogram/: {value}")
+
+    mode = normalized.get("mode", "")
+    if mode and mode != "shared-control-plane-wrapper":
+        add_warn(warnings, f"generated_runtime_contract.mode is uncommon: {mode}")
+
+    develop_flow = intent_flows.get("develop", {}) if isinstance(intent_flows, dict) else {}
+    required_slots = develop_flow.get("required_stage_slots", []) if isinstance(develop_flow, dict) else []
+    requires_s4 = isinstance(required_slots, list) and "S4" in [str(item).strip() for item in required_slots]
+    if not requires_s4:
+        return
+
+    stage_list = [item for item in stages if isinstance(item, dict)]
+    generate_stage = next((stage for stage in stage_list if str(stage.get("stage_slot", "")).strip() == "S4"), None)
+    if generate_stage is None:
+        add_error(errors, "generated_runtime_contract requires an S4 stage to persist target runtime assets")
+        return
+
+    stage_outputs = set(parse_stage_outputs(generate_stage.get("output")))
+    required_stage_outputs = {
+        "outputs/candidate/.workflowprogram/runtime",
+        normalized.get("entry_script", ""),
+        normalized.get("runner_script", ""),
+        normalized.get("state_validator_script", ""),
+        normalized.get("runtime_manifest", ""),
+    }
+    for item in sorted(path for path in required_stage_outputs if path):
+        if item not in stage_outputs:
+            add_error(errors, f"S4 output must declare generated runtime artifact: {item}")
+
+    artifacts = test_contract.get("artifacts", {}) if isinstance(test_contract, dict) else {}
+    deliverables = artifacts.get("deliverables", []) if isinstance(artifacts, dict) else []
+    deliverable_values = {str(item).strip() for item in deliverables if str(item).strip()} if isinstance(deliverables, list) else set()
+    for item in (
+        normalized.get("entry_script", ""),
+        normalized.get("runner_script", ""),
+        normalized.get("state_validator_script", ""),
+        normalized.get("runtime_manifest", ""),
+    ):
+        if item and item not in deliverable_values:
+            add_error(errors, f"test_contract.artifacts.deliverables must include generated runtime asset: {item}")
+
+
 def validate_spec(spec: Dict[str, Any]) -> Dict[str, Any]:
     """运行完整 workflow-spec 校验器，并返回结构化报告。"""
 
@@ -745,6 +836,9 @@ def validate_spec(spec: Dict[str, Any]) -> Dict[str, Any]:
 
     runtime_contract = require_mapping(spec.get("runtime_contract", {}), "runtime_contract", errors)
     validate_runtime_contract(runtime_contract, errors, warnings)
+
+    generated_runtime_contract = require_mapping(spec.get("generated_runtime_contract", {}), "generated_runtime_contract", errors)
+    validate_generated_runtime_contract(generated_runtime_contract, stages, intent_flows, spec.get("test_contract", {}), errors, warnings)
 
     test_contract = require_mapping(spec.get("test_contract", {}), "test_contract", errors)
     validate_test_contract(test_contract, runtime_contract, stage_ids, slot_map, intent_flows, registered_entries, errors, warnings)
