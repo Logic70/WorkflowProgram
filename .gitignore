@@ -2,6 +2,8 @@
 .claude/settings.local.json
 .claude/history/
 .claude/memory/
+.codex/
+openspec/
 **/*.local.json
 
 # Environment Variables
