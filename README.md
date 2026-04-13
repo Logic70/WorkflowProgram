@@ -1,472 +1,563 @@
 # WorkflowProgram-CN
 
-> **面向 Claude Code 生态的元工作流仓库**
+> 面向 Claude Code 生态的元工作流仓库
 
-WorkflowProgram-CN 是一个用于设计、交付、审计和迭代**可嵌入 Claude Code 的业务工作流仓库**的元工作流工具。
+WorkflowProgram-CN 不是业务应用模板，也不是一组零散 prompt。
+它的目标是帮助你为目标项目设计、交付、审计、验证和迭代一套可运行的 `.claude/` 工作流资产，并把这套过程产品化为：
 
-它不提供业务应用源码，而是提供一组可复用的命令、技能、Agent 定义、约束规则和校验脚本，帮助你用结构化的方式创建可自动化的工作流程。
+- 可执行的 `workflow-spec.yaml`
+- 可阅读的 `workflow-view.md`
+- 可维护的 `workflow-lowlevel.md`
+- 可验证的运行证据、状态与判定链
 
----
-
-## 产品定位
-
-**聚焦 Code Agent 领域**
-
-WorkflowProgram-CN 专为 Claude Code、OpenCode 等 AI 编程助手生态设计，产出物是符合 `.claude/` 结构规范的**工作流仓库**，而非通用的 CI/CD 模板。
-
-**典型产出示例**：[daily-news-workflow](https://github.com/Logic70/-daily-news-workflow) —— 一个包含标准 `.claude/` 结构、可被 WorkflowProgram-CN 审计和演进的新闻收集工作流。
-
----
-
-## 快速开始
-
-### 1. 环境准备
-
-```bash
-# 克隆仓库
-git clone https://github.com/Logic70/WorkflowProgram-CN.git
-cd WorkflowProgram-CN
-
-# 验证仓库结构
-# Windows:
-powershell -ExecutionPolicy Bypass -File .claude/scripts/validate-workflow.ps1
-# macOS/Linux:
-python3 .claude/scripts/validate-workflow.py
-```
-
-### 2. 三分钟上手
-
-```bash
-# 构建并以 plugin-dir 方式加载
-python3 tools/build_plugin.py
-claude --plugin-dir /mnt/d/Code/WorkflowProgram-CN/dist/plugin
-```
-
-```text
-# 推荐：先让总控 skill 识别目标
-/workflowprogram-orchestrate "为当前项目设计一个 Claude Code 工作流"
-
-# 显式主入口
-/workflowprogram-develop "创建一个用于每日收集科技新闻的工作流"
-/workflowprogram-audit /path/to/existing-workflow
-/workflowprogram-validate /path/to/existing-workflow
-```
-
-## 入门教程
-
-如果你想先理解这套仓库背后的设计哲学，再动手跑命令，先看这套教程：
+如果你希望先理解设计哲学，再动手使用，建议先看：
 
 - [WorkflowProgram 101 章节版](docs/workflowprogram-101/index.md)
 - [WorkflowProgram 101 单页版](docs/workflowprogram-101.md)
+- [WorkflowProgram 流程图文档](docs/workflowprogram-flow-slides/workflowprogram_overview.pptx)
 
 ---
 
-## 核心能力
+## 安装步骤
 
-### 1. 工作流设计（workflowprogram-develop）
+### 1. 环境准备
 
-面向 `TARGET_ROOT` 的主入口，用于为目标项目设计或更新 `.claude/` workflow 资产：
+建议准备以下环境：
 
-```text
-/workflowprogram-develop "创建一个用于每日收集科技新闻并生成摘要的工作流"
-```
+- `Python 3.10+`
+- `Claude Code CLI`
+- `git`
 
-**阶段**：
-1. 需求分析 → 2. 规格定义 → 3. 架构设计 → 4. 资产生成 → 5. workflow 验证建议
+用于本仓库维护的可选环境：
 
-### 2. 工作流编排与验证（workflowprogram-orchestrate, workflowprogram-validate）
+- `Node.js 20+`
+  - 仅在需要重新生成 PPT 文档时使用
 
-| 入口 | 用途 |
-|------|------|
-| `workflowprogram-orchestrate` | 识别自然语言需求并路由到正确主 skill |
-| `workflowprogram-validate` | 对目标项目中的 workflow 资产执行结构化验证 |
-
-### 3. 工作流演进（workflowprogram-audit, workflowprogram-iterate）
-
-| 入口 | 用途 |
-|------|------|
-| `workflowprogram-audit` | 审计目标工作流，识别结构问题和模式偏离 |
-| `workflowprogram-iterate` | 从 lessons.md 生成改进草案 |
-
-### 4. 仓库维护兼容命令（/ship, /preflight, /hotfix）
-
-| 命令 | 用途 |
-|------|------|
-| `/ship [<scope>]` | 顺序执行审查、校验和提交准备 |
-| `/preflight [<scope>]` | 并行预检查，不创建提交 |
-| `/hotfix [<description>]` | 热修复精简流程 |
-
----
-
-## 架构设计
-
-WorkflowProgram-CN 采用分层结构，将不同类型的资产分离：
-
-```
-WorkflowProgram-CN/
-├── .claude/
-│   ├── commands/          # 源码层命令定义
-│   ├── skills/            # 源码层技能定义
-│   ├── agents/            # 源码层 agent 定义
-│   ├── rules/             # 源码层规则
-│   ├── scripts/           # 源码层脚本
-│   └── settings.json      # 源码层注册表
-├── .claude-plugin/        # 插件清单元数据
-├── dist/plugin/           # 仓库内 canonical 运行时载荷目录
-├── tests/                 # fixture、expectation、transcript 与 runtime 证据
-├── tools/                 # 构建与 runtime smoke 工具
-├── docs/                  # 设计、phase 计划与归档文档
-├── CLAUDE.md              # 开发者说明
-├── README.md              # 本文件
-├── lessons.md             # 经验日志（失败记录、待提取约束）
-└── validation-report.md   # 校验报告
-```
-
-### 资产分层原则
-
-| 位置 | 用途 | 经验法则 |
-|------|------|----------|
-| `.claude/` | 源码真源 | 只在这里维护命令、技能、agent、规则和脚本 |
-| `dist/plugin/` | canonical 运行时载荷 | Claude Code 插件运行时消费的载荷目录（仓库内） |
-| `TARGET_ROOT/.claude/` | 目标项目最终交付 | 插件执行后写入目标项目的工作流资产 |
-| `TARGET_ROOT/.workflowprogram/managed-files.json` | managed 资产清单 | 记录哪些目标文件可由 WorkflowProgram 安全更新 |
-| `TARGET_ROOT/.workflowprogram/runs/<run-id>/` | 运行证据 | 记录 context、state、events、transcript 和 runtime report |
-
----
-
-## 推荐入口（Skills-First）
-
-当前推荐直接使用 `workflowprogram-*` skills 作为主入口：
-
-- `/workflowprogram-orchestrate`：总控入口，负责将自然语言请求路由到正确主能力
-- `/workflowprogram-develop`：为 `TARGET_ROOT` 设计或更新 workflow 资产
-- `/workflowprogram-audit`：审计目标项目中的 workflow 资产
-- `/workflowprogram-iterate`：基于 lessons 生成 workflow 改进草案
-- `/workflowprogram-validate`：对目标项目中的 workflow 资产执行结构化验证
-
-旧 `/develop`、`/evolve-workflow`、`/iterate-workflow` 继续保留为兼容 slash 入口；用户级主入口统一采用 `workflowprogram-*` skills。
-当前方案下，只有 `workflowprogram-orchestrate` 允许承接自然语言自动触发；其余 4 个叶子 skill 仍以显式 slash 调用为主。
-
-## 兼容命令清单
-
-### 工作流设计
-- `/develop <requirement> [--auto-approve]` —— 根据需求设计新工作流
-
-### 交付流水线
-- `/ship [<scope>] [--auto-approve]` —— 审查、校验、提交
-- `/preflight [<scope>]` —— 并行预检查
-- `/hotfix [<description>]` —— 热修复流程
-
-### 工作流演进
-- `/evolve-workflow [options] <path>` —— 审计目标工作流
-- `/iterate-workflow [--dry-run] [--apply] [<path>]` —— 从经验迭代改进
-
----
-
-## Plugin 运行时模型
-
-当前设计明确区分三层：
-
-- 源码层：`.claude/*`
-  - 仓库内部开发真源
-- 安装产物层：`dist/plugin/*`
-  - 插件运行时实际消费的目录
-- 目标项目层：`TARGET_ROOT/.claude/`
-  - WorkflowProgram 执行后写入目标项目的最终工作流资产
-
-其中 agent 采用双层模型：
-
-- 源码定义：`.claude/agents/`
-- 运行时暴露：`dist/plugin/agents/`
-
-## 插件发现与调用契约
-
-Claude Code 识别 WorkflowProgram 的前提，不是用户 `~/.claude` 下存在这些文件，而是 **WorkflowProgram 先被作为 plugin 加载**。
-
-当前受支持的发现模型是：
-
-1. 使用 `python3 tools/build_plugin.py` 生成 `dist/plugin/`
-2. 使用 `claude --plugin-dir /abs/path/to/dist/plugin` 启动 Claude Code
-3. Claude Code 从 `dist/plugin/skills/`、`dist/plugin/agents/`、`dist/plugin/commands/` 发现运行时资产
-
-因此：
-
-- `.claude/` 是源码真源
-- `dist/plugin/` 是 Claude Code 真正消费的运行时目录
-- `TARGET_ROOT/.claude/` 才是 WorkflowProgram 写给目标项目的最终工作流
-
-当前唯一受支持的显式调用语法是 slash 入口：
-
-- `/workflowprogram-orchestrate`
-- `/workflowprogram-develop`
-- `/workflowprogram-audit`
-- `/workflowprogram-iterate`
-- `/workflowprogram-validate`
-
-纯自然语言触发可以作为易用性增强，但不是发布验证的唯一契约。
-当前自然语言优化策略是：**只让 `workflowprogram-orchestrate` 承接自然语言自动触发**，再由它路由到叶子 skill，避免多个叶子 skill 互相竞争。
-为降低歧义，当前实现提供确定性路由脚本：
+### 2. 克隆与校验仓库
 
 ```bash
-python3 ${CLAUDE_PLUGIN_ROOT}/scripts/route-intent.py --request "<user request>" --target-root <TARGET_ROOT> --json
+git clone https://github.com/Logic70/WorkflowProgram-CN.git
+cd WorkflowProgram-CN
+
+# macOS / Linux
+python3 .claude/scripts/validate-workflow.py
+
+# Windows
+powershell -ExecutionPolicy Bypass -File .claude/scripts/validate-workflow.ps1
 ```
 
-当设置 `WORKFLOWPROGRAM_STRICT_ROUTE=1`（或 `--strict`）时，歧义请求会被程序硬阻断并要求先澄清。
+### 3. 构建插件运行时载荷
 
-## 目标项目资产更新契约
+```bash
+python3 tools/build_plugin.py
+```
 
-WorkflowProgram 不应把新资产直接静默覆盖到 `TARGET_ROOT/.claude/`。
+构建完成后，Claude Code 真正消费的是：
 
-当前受支持的最小流程是：
+- `dist/plugin/`
 
-1. 先在 `RUN_ROOT/outputs/candidate/.claude/` 生成候选文件
-2. 调用 `${CLAUDE_PLUGIN_ROOT}/scripts/managed-assets.py plan`
-3. 若无冲突，再调用 `apply-staged`
-4. 若有冲突，把候选版本保留在 `RUN_ROOT/outputs/conflicts/`
+而不是源码层 `.claude/`。
 
-应用成功后，工具会维护：
+### 4. 以 plugin-dir 方式启动 Claude Code
 
-- `TARGET_ROOT/.workflowprogram/managed-files.json`
-- `RUN_ROOT/outputs/managed-change-plan.json`
-- `RUN_ROOT/outputs/managed-change-result.json`
+```bash
+claude --plugin-dir /abs/path/to/WorkflowProgram-CN/dist/plugin
+```
 
-## 构建产物可追溯性
+当前稳定支持的安装/发现方式是：
 
-每次执行 `python3 tools/build_plugin.py` 后，`dist/plugin/` 下都应生成：
+1. Source Build 通道
+   先运行 `python3 tools/build_plugin.py`，再使用 `--plugin-dir dist/plugin`
 
-- `build-manifest.json`
+2. Release Package 通道
+   解压 release 附件中的 `plugin/` 目录，再使用 `--plugin-dir /abs/path/to/plugin`
 
-它至少记录：
-
-- `plugin_name`
-- `plugin_version`
-- `generated_at`
-- `source_commit`
-- `source_dirty`
-- 每个构建文件的 `path` 与 `sha256`
+当前**不建议**把 `dist/plugin/` 直接复制到用户 `~/.claude` 作为正式安装契约。
 
 ---
 
-## 动态验证
+## 设计哲学与概念
 
-Phase 3 已引入最小运行时 smoke harness：
+### 1. 它产出的不是应用代码，而是工作流产品
 
-- 开发期结构验证：`python3 .claude/scripts/validate-workflow.py`
-- 插件构建：`python3 tools/build_plugin.py`
-- 运行时 smoke：`python3 tools/runtime_smoke.py --fixture empty-project`
+WorkflowProgram-CN 产出的重点是：
 
-当前环境下，如果 Claude CLI 未登录，运行时 smoke 会返回 `ENVIRONMENT-SKIP`，同时仍会创建 `RUN_ROOT` 和完整证据文件。
+- `.claude/commands/*.md`
+- `.claude/skills/*/SKILL.md`
+- `.claude/agents/*.md`
+- `.claude/rules/constraints.md`
+- `.claude/settings.json`
 
-## 运行进展可视化
+也就是“让 Code Agent 能工作”的工作流资产，而不是业务系统源码。
 
-Phase 6 起，建议在 Stage 执行中统一写入进展资产：
+### 2. 三根目录必须分清
+
+| 位置 | 含义 | 作用 |
+|------|------|------|
+| `PLUGIN_ROOT` | 插件运行时模板与脚本来源 | WorkflowProgram 自己的能力仓 |
+| `TARGET_ROOT` | 目标项目目录 | 最终交付 `.claude/` 资产的地方 |
+| `RUN_ROOT` | 单次运行工作目录 | 记录 spec、视图、状态、事件、验证证据 |
+
+这三个根目录分离，是为了避免：
+
+- 把插件仓误当目标项目改写
+- 把中间态直接覆盖进目标资产
+- 让调试证据和交付物混在一起
+
+### 3. 三类设计产物分层
+
+当前设计真源已经收口为：
+
+- `workflow-spec.yaml`
+  - 机器可执行真源
+- `workflow-view.md`
+  - 只读概览视图
+- `workflow-lowlevel.md`
+  - 维护/迭代指导文档，不允许覆盖 YAML 语义
+
+其中：
+
+- 改执行语义，先改 `workflow-spec.yaml`
+- 改视图与维护说明，通过生成脚本重算
+
+### 4. 阶段模型固定为 `S0..S6`
+
+当前运行与验证口径围绕以下阶段展开：
+
+- `S0` 路由与目标准备
+- `S1` 需求澄清
+- `S2` 上下文研究
+- `S3` YAML 设计与审批
+- `S4` 受控写入与控制面执行
+- `S5` workflow 级验证判定
+- `S6` lessons / constraints 回流
+
+不是所有 intent 都会跑完整 `S1..S6`，而是由 `workflow-spec.yaml.intent_flows` 决定：
+
+- `develop -> S1,S2,S3,S4,S5,S6`
+- `audit -> S5,S6`
+- `iterate -> S6`
+- `validate -> S5`
+
+### 5. AI 与 Python 分工明确
+
+WorkflowProgram 的设计理念不是“全部让模型自由发挥”，而是：
+
+- AI 负责：
+  - 理解需求
+  - 设计方案
+  - 生成候选 workflow 资产
+- Python 脚本负责：
+  - 意图路由
+  - spec 校验
+  - 受控写入
+  - 状态落盘
+  - 运行证据归集
+  - workflow 级判定
+
+所以它是一条“AI 设计 + Python 控制面 + S5 judge”的产品化链路。
+
+---
+
+## 快速使用
+
+### 推荐入口
+
+当前推荐直接使用 `workflowprogram-*` 主入口：
+
+```text
+/workflowprogram-orchestrate "为当前项目设计一个 Claude Code 工作流"
+```
+
+如果你已经明确知道要做什么，也可以直接调用叶子入口：
+
+```text
+/workflowprogram-develop "为当前项目创建一个新闻采集与摘要工作流"
+/workflowprogram-audit /path/to/existing-project
+/workflowprogram-validate /path/to/existing-project
+/workflowprogram-iterate /path/to/existing-project
+```
+
+历史兼容入口仍保留：
+
+- `/develop`
+- `/evolve-workflow`
+- `/iterate-workflow`
+
+但当前产品主路径优先采用 `workflowprogram-*`。
+
+### 一次典型的 develop 使用方式
+
+```text
+/workflowprogram-develop "为当前项目创建一个每日收集科技新闻并生成摘要的工作流"
+```
+
+执行后你通常会看到这些结果：
+
+- `RUN_ROOT/workflow-spec.yaml`
+- `RUN_ROOT/workflow-view.md`
+- `RUN_ROOT/workflow-lowlevel.md`
+- `RUN_ROOT/outputs/candidate/.claude/`
+- `TARGET_ROOT/.workflowprogram/design/`
+  - 持久化后的 `workflow-spec.yaml / workflow-view.md / workflow-lowlevel.md`
+
+### 自动审批模式
+
+当你在 CI 或非交互场景使用时，可以启用自动审批：
+
+```text
+/workflowprogram-develop "需求描述" --auto-approve
+CI=true /workflowprogram-develop "需求描述"
+```
+
+显式人工批准也支持记录：
+
+- `approved`
+- `auto-approved`
+
+两者不会混为一种状态。
+
+---
+
+## 文件结构
+
+### 仓库结构
+
+```text
+WorkflowProgram-CN/
+├── .claude/
+│   ├── commands/                  # 源码层命令定义
+│   ├── skills/                    # 源码层技能定义
+│   ├── agents/                    # 源码层 agent 定义
+│   ├── rules/                     # 源码层规则
+│   ├── scripts/                   # 源码层脚本
+│   └── settings.json              # 源码层注册表
+├── .claude-plugin/                # 插件清单元数据
+├── dist/plugin/                   # 构建后的 canonical 运行时载荷
+├── docs/                          # 设计文档、教程、流程图、实现计划
+├── openspec/                      # OpenSpec 需求拆解与审计产物
+├── tests/                         # spec fixtures、smoke fixtures、transcripts
+├── tools/                         # 构建、smoke、矩阵验证工具
+├── CLAUDE.md                      # 仓库级协作说明
+├── lessons.md                     # 追加式经验日志
+├── validation-report.md           # 校验与实现进展记录
+└── README.md
+```
+
+### 目标项目侧结构
+
+在一次典型执行后，`TARGET_ROOT` 下会出现两类资产：
+
+```text
+TARGET_ROOT/
+├── .claude/                                   # 最终交付给目标项目的 workflow 资产
+└── .workflowprogram/
+    ├── managed-files.json                     # 托管文件清单
+    ├── design/
+    │   ├── workflow-spec.yaml                 # 持久化设计真源
+    │   ├── workflow-view.md                   # 持久化只读视图
+    │   └── workflow-lowlevel.md               # 持久化维护指导
+    └── runs/<run-id>/
+        ├── context.json
+        ├── state.json
+        ├── events.jsonl
+        ├── transcript.md
+        ├── validation-runtime-report.md
+        └── outputs/
+            ├── candidate/
+            ├── progress/
+            ├── stages/
+            └── ...
+```
+
+### 关键文件说明
+
+| 文件/目录 | 作用 |
+|-----------|------|
+| `.claude/settings.json` | 命令与 skill 的注册中心 |
+| `workflow-spec.yaml` | 机器可执行的 workflow 真源 |
+| `workflow-view.md` | 从 YAML 渲染的人类可读概览 |
+| `workflow-lowlevel.md` | 维护/迭代指导 |
+| `managed-files.json` | 目标侧受控文件清单 |
+| `state.json` / `events.jsonl` | 控制面状态与事件证据 |
+| `user-progress.md` | 面向用户的当前进展与关键节点摘要 |
+
+---
+
+## 运行过程
+
+### 1. 入口与路由
+
+自然语言请求优先进入：
+
+- `workflowprogram-orchestrate`
+
+再由：
+
+- `route-intent.py`
+
+把请求确定性地路由到：
+
+- `workflowprogram-develop`
+- `workflowprogram-audit`
+- `workflowprogram-iterate`
+- `workflowprogram-validate`
+
+显式 `/develop` 或 `workflowprogram-develop` 不会再“跳回” `orchestrate`；
+但 `workflow-entry.py` 仍会再次调用 `route-intent.py` 保留路由证据，并在 strict 模式下检查入口与请求是否冲突。
+
+### 2. develop 主链如何执行
+
+当前 develop 主链已经固定为确定性脚本链：
+
+```text
+workflow-entry.py run
+  -> validate-workflow-spec.py
+  -> generate-workflow-view.py
+  -> generate-workflow-lowlevel.py
+  -> managed-assets.py plan/apply-staged
+  -> workflow-runner.py run
+  -> validate-run-state.py
+  -> workflowprogram-validate / workflow-s5-judge.py
+```
+
+其中：
+
+- `workflow-entry.py`
+  - 把 prompt/skill 层说明桥接到真实脚本链
+- `managed-assets.py`
+  - 托管 `candidate -> TARGET_ROOT` 的安全应用
+- `workflow-runner.py`
+  - 控制面 runner，只负责 stage 转移、状态落盘、最小证据和边界语义
+- `workflowprogram-validate + workflow-s5-judge.py`
+  - 负责 workflow 级 S5 主判定
+
+### 3. 为什么不是直接写目标项目
+
+当前不会直接静默写入 `TARGET_ROOT/.claude/`，而是先走：
+
+1. `RUN_ROOT/outputs/candidate/`
+2. `managed-assets.py plan`
+3. `managed-assets.py apply-staged`
+
+如果发现冲突：
+
+- 停在 `S4`
+- 保留 candidate 与 conflict 副本
+- 不覆盖用户资产
+
+### 4. 进展与证据如何落盘
+
+当前已标准化三类进展产物：
 
 - `RUN_ROOT/outputs/progress/current-progress.json`
 - `RUN_ROOT/outputs/progress/milestones.jsonl`
 - `RUN_ROOT/outputs/progress/user-progress.md`
 
-统一脚本入口：
+统一更新脚本：
 
 ```bash
 python3 ${CLAUDE_PLUGIN_ROOT}/scripts/stage-progress.py update ...
 ```
 
-## 控制面执行与状态校验
+当前也已标准化控制面与运行证据：
 
-当前实现已提供程序化 runner 与状态校验：
+- `context.json`
+- `state.json`
+- `events.jsonl`
+- `transcript.md`
+- `validation-runtime-report.md`
+- `outputs/stages/s5-validation-summary.json`
+- `outputs/stages/s6-lessons-delta.md`
+
+### 5. 运行宿主与 smoke
+
+当前运行宿主已经抽象为：
+
+- `claude_cli`
+- `fixture_host`
+- `command_adapter`
+
+对应脚本：
+
+- `.claude/scripts/runtime_host.py`
+- `tools/runtime_smoke.py`
+- `tools/runtime_smoke_matrix.py`
+
+这意味着：
+
+- 正式主路径仍是 Claude Code CLI
+- 测试与验证可以通过 fixture 或 adapter 做确定性回归
+
+---
+
+## 维护说明
+
+### 1. 哪些文档是当前真源
+
+优先阅读：
+
+- [workflowprogram-stage-highlevel-design.md](docs/workflowprogram-stage-highlevel-design.md)
+- [workflowprogram-stage-lowlevel-design.md](docs/workflowprogram-stage-lowlevel-design.md)
+- [workflowprogram-stage-consistency-check.md](docs/workflowprogram-stage-consistency-check.md)
+
+文档真源索引见：
+
+- [workflowprogram-design-status.md](docs/workflowprogram-design-status.md)
+
+能力对齐矩阵见：
+
+- [workflowprogram-capability-matrix.json](docs/workflowprogram-capability-matrix.json)
+
+### 2. 修改 workflow 的正确姿势
+
+修改执行语义时，优先顺序是：
+
+1. 修改 `workflow-spec.yaml`
+2. 重新生成 `workflow-view.md`
+3. 重新生成 `workflow-lowlevel.md`
+4. 重新执行 validator / runner / smoke
+
+不要只改：
+
+- `workflow-view.md`
+- `workflow-lowlevel.md`
+- README 文字描述
+
+来试图改变真实执行语义。
+
+### 3. 仓库级验证命令
 
 ```bash
-# 1) 校验 workflow-spec 结构
-python3 ${CLAUDE_PLUGIN_ROOT}/scripts/validate-workflow-spec.py --spec <RUN_ROOT>/workflow-spec.yaml
-
-# 2) 执行程序化 stage 转移（控制面）
-python3 ${CLAUDE_PLUGIN_ROOT}/scripts/workflow-runner.py run --spec <RUN_ROOT>/workflow-spec.yaml --run-root <RUN_ROOT> --target-root <TARGET_ROOT> [--auto-approve]
-
-# 3) 校验 state/artifacts 枚举约束
-python3 ${CLAUDE_PLUGIN_ROOT}/scripts/validate-run-state.py --state <RUN_ROOT>/state.json
-```
-
-`validate-run-state.py` 会强制检查 `kind/root/producer/status` 等枚举，避免仅靠提示词约定。
-
-`validate-workflow-spec.py` 还会强制 `workflow-spec.yaml` 同时声明 `runtime_contract` 与 `test_contract`：
-
-- `runtime_contract`：执行期硬约束
-  - `write_boundaries`：允许写入路径边界
-  - `required_evidence`：最小运行证据集
-  - `failure_kinds`：失败类别枚举
-  - `environment_skip`：环境 skip 条件
-
-- `test_contract`：基础运行测试判定
-  - `entry`：主入口、入口类型、必需参数、缺参与非法入口 verdict
-  - `boundary`：引用写入边界，并补充 managed 覆盖/冲突/外部写入策略
-  - `flow`：required/skippable stages、失败回流、verdict 终止条件
-  - `artifacts`：关键交付物、关键证据引用、可缺失非关键输出
-  - `failure`：失败枚举引用、环境 skip 引用、`implemented_now` 覆盖度声明
-
-其中：
-
-- `test_contract` 对执行字段必须使用 `runtime_contract.<field>` 固定引用语法
-- `test_contract` 不得复制 `runtime_contract` 同名字段
-- `test_contract.failure.implemented_now` 必须是 `runtime_contract.failure_kinds` 的子集，且不得反向改变 runner 语义
-
-## 安装与验证路径
-
-当前文档定义两条受支持安装通道，它们共享同一运行时载荷结构：
-
-- Source Build 通道：
-  - 使用 `python3 tools/build_plugin.py` 生成 `dist/plugin/`
-  - 使用 `claude --plugin-dir /mnt/d/Code/WorkflowProgram-CN/dist/plugin` 做发现与运行验证
-
-- GitHub Release Package 通道：
-  - 下载并解压 release 附件 `workflowprogram-plugin-<version>.tar.gz`（或 zip）
-  - 确认解压目录包含 `plugin/build-manifest.json`
-  - 使用 `claude --plugin-dir /abs/path/to/<extracted>/plugin` 启动
-
-以下路径当前**不属于受支持稳态模型**：
-
-- 将 `dist/plugin/` 复制到用户 `~/.claude`
-- 在未完成实测前，直接把 marketplace 或 `/plugin install` 视为正式安装契约
-
-仓库中的 `tools/install_dev.sh` 和 `tools/quick_install.sh` 仅保留为实验性开发辅助脚本，不作为发布路径。
-
-
-## 详细使用指南
-
-### CI/CD 自动模式
-
-所有设计门禁支持自动批准：
-
-```text
-# 方式1: 命令行参数
-/develop "需求描述" --auto-approve
-/ship --auto-approve
-
-# 方式2: 环境变量
-CI=true /develop "需求描述"
-```
-
-### 严格资源模式
-
-设置 `STRICT_MODE=true` 启用更严格的 Turn Count 限制：
-- S: 20 turns / M: 50 turns / L: 100 turns / XL: 150 turns
-
-用于强制优化 Agent 效率和 CI/CD 快速验证。
-
----
-
-## 技能清单
-
-### 辅助/复用技能
-- `/review` —— 代码审查
-- `/test` —— 测试执行
-- `/commit` —— 提交准备
-- `/doc` —— 文档生成
-- `/workflow-audit` —— 工作流审计
-
-### 内部支持资产
-- `.claude/skills/develop/spec-template.md` —— /develop 规格模板
-
----
-
-## 工作流产出示例
-
-### daily-news-workflow
-
-一个由 WorkflowProgram-CN 生成的典型工作流仓库：
-
-**功能**：每日自动收集科技新闻，翻译为中文，部署到 GitHub Pages
-
-**结构**：
-```
-daily-news-workflow/
-├── .claude/               # 工作流标记（可被 WorkflowProgram-CN 演进）
-│   ├── commands/          # 命令设计文档（展示阶段结构，非自动加载）
-│   ├── skills/            # 技能定义
-│   └── settings.json      # 工作流元数据
-├── .github/workflows/     # GitHub Actions 自动化
-├── scripts/               # Python 收集器
-├── docs/                  # 输出目录（GitHub Pages）
-└── README.md
-```
-
-**演进能力**：
-- 在 WorkflowProgram-CN 中运行 `/evolve-workflow /path/to/daily-news-workflow`
-- 审计结构问题、从 lessons.md 提取约束、生成改进方案
-- `.claude/` 中的命令定义是**设计文档**，用于演进，不会自动加载为 Claude Code 的 `/` 命令
-
----
-
-## 经验沉淀机制
-
-WorkflowProgram-CN 使用三层机制管理知识：
-
-```
-┌─────────────────────────────────────────────┐
-│  constraints.md  ← 长期记忆（AI 上下文加载）  │
-│  - 精简的 ALWAYS/NEVER 规则                  │
-│  - 从 lessons 定期提取                       │
-└─────────────────────────────────────────────┘
-                        ▲
-                        │ 定期提取
-┌─────────────────────────────────────────────┐
-│  lessons.md  ← 短期日志（只追加）            │
-│  - 失败经验、Constraints To Extract         │
-│  - 由 /develop 等命令在失败时写入            │
-└─────────────────────────────────────────────┘
-                        ▲
-                        │ 会话内读写
-┌─────────────────────────────────────────────┐
-│  session-findings.md  ← 临时缓存（可选）     │
-│  - 当前会话的上下文                          │
-│  - 会话结束可归档或删除                      │
-└─────────────────────────────────────────────┘
-```
-
----
-
-## 校验策略
-
-所有共享工作流变更交付前必须通过仓库校验：
-
-```bash
-# Windows
-powershell -ExecutionPolicy Bypass -File .claude/scripts/validate-workflow.ps1
-
-# macOS/Linux
+# 仓库静态校验
 python3 .claude/scripts/validate-workflow.py
+
+# 插件构建
+python3 tools/build_plugin.py
+
+# spec 结构校验
+python3 .claude/scripts/validate-workflow-spec.py --spec <workflow-spec.yaml>
+
+# lowlevel 派生校验
+python3 .claude/scripts/validate-workflow-lowlevel.py \
+  --spec <workflow-spec.yaml> \
+  --lowlevel <workflow-lowlevel.md>
+
+# runner 状态校验
+python3 .claude/scripts/validate-run-state.py --state <RUN_ROOT>/state.json
+
+# lessons 产物校验
+python3 .claude/scripts/validate-lessons-delta.py --run-root <RUN_ROOT>
 ```
 
-**校验内容**：
-- 根目录与源码层必需文件（README.md, CLAUDE.md, lessons.md, .claude/rules/constraints.md）
-- `.claude/settings.json` JSON 合法性
-- 命令/技能注册一致性
-- 命令文件规范性（Usage、阶段、Goal/Verify）
-- 技能 YAML frontmatter 完整性
-
----
-
-## Plugin 构建与本地验证
-
-WorkflowProgram-CN 通过 `tools/build_plugin.py` 生成正式插件产物：
+### 4. 运行期验证命令
 
 ```bash
-python3 tools/build_plugin.py
-claude --plugin-dir /mnt/d/Code/WorkflowProgram-CN/dist/plugin
+# 单条 smoke
+python3 tools/runtime_smoke.py --fixture empty-project
+
+# 统一矩阵复验
+python3 tools/runtime_smoke_matrix.py --json
 ```
 
-Plugin 清单位于 `.claude-plugin/plugin.json`，运行时实际消费目录为 `dist/plugin/`。
+### 5. 经验沉淀机制
+
+WorkflowProgram 当前采用三层经验管理：
+
+- `lessons.md`
+  - 追加式失败经验日志
+- `.claude/rules/constraints.md`
+  - 提炼后的长期规则
+- `RUN_ROOT/outputs/stages/s6-lessons-delta.md`
+  - 单次运行提炼出来的 lessons 增量
+
+当前 `S6` 还会要求：
+
+- `user-progress.md` 必须包含“历史关键节点结果”
+- `s6-lessons-delta.md` 必须和当前 `run_id`、`failure_kind` 关联
+
+### 6. 文档与教程维护
+
+当前仓库已经有三套面向不同读者的文档：
+
+- `README.md`
+  - 面向首次接触的使用者
+- `docs/workflowprogram-101/`
+  - 面向想理解设计哲学和架构的人
+- `docs/workflowprogram-flow-slides/`
+  - 面向需要图文讲解和演示的人
+
+如果你更新了执行主链、设计资产或验证边界，通常应同步更新这三处中的至少一处。
+
+### 7. 本地 Git 仓维护流程
+
+推荐按下面的顺序维护本地仓库：
+
+1. 先新建或切到一个单一目的分支，只做一类改动。
+2. 优先修改真源文件，再修改派生产物。
+3. 改完后先跑静态校验，再跑构建，再跑运行期验证。
+4. 只提交和这次目标直接相关的文件，不把临时 transcript、锁文件、无关脏改动一起提交。
+
+具体建议：
+
+- 如果你修改了 `.claude/scripts/`、`.claude/skills/`、`.claude/commands/` 或设计文档，优先把这些文件视为真源。
+- `dist/plugin/`、`workflow-view.md`、`workflow-lowlevel.md`、PPT、报告类文件属于派生产物；只有在真源变化后才重建，不建议手工长期维护。
+- 修改 `workflow-spec.yaml` 语义后，至少应重新生成 `workflow-view.md`、`workflow-lowlevel.md`，并复跑 validator。
+- 修改运行主链、证据模型、judge、宿主适配时，除了静态校验，还应补跑 `runtime_smoke.py` 或 `runtime_smoke_matrix.py`。
+- 修改 `README.md`、`docs/workflowprogram-101/`、`docs/workflowprogram-flow-slides/` 时，应检查文档口径是否仍与 HighLevel、LowLevel 和实际脚本一致。
+
+一套可执行的本地维护命令顺序如下：
+
+```bash
+# 1. 查看当前分支和工作区，确认不会误带无关改动
+git status --short
+
+# 2. 修改真源文件
+#    例如 .claude/scripts/、.claude/skills/、docs/ 里的设计文档
+
+# 3. 重新生成派生产物
+python3 .claude/scripts/generate-workflow-view.py \
+  --spec <workflow-spec.yaml> \
+  --output <workflow-view.md>
+python3 .claude/scripts/generate-workflow-lowlevel.py \
+  --spec <workflow-spec.yaml> \
+  --output <workflow-lowlevel.md>
+python3 tools/build_plugin.py
+
+# 4. 跑静态校验
+python3 .claude/scripts/validate-workflow.py
+python3 .claude/scripts/validate-workflow-spec.py --spec <workflow-spec.yaml>
+python3 .claude/scripts/validate-workflow-lowlevel.py \
+  --spec <workflow-spec.yaml> \
+  --lowlevel <workflow-lowlevel.md>
+git diff --check
+
+# 5. 需要时再跑运行期验证
+python3 tools/runtime_smoke.py --fixture empty-project
+python3 tools/runtime_smoke_matrix.py --json
+
+# 6. 只暂存本次需要提交的文件
+git add <files...>
+git commit -m "<scope>: <summary>"
+git push origin <branch>
+```
+
+提交时的范围控制建议：
+
+- 单次提交尽量只覆盖一个主题，例如“收口 S5 judge”或“刷新 README 和教程”。
+- 如果仓库已经有其他未完成脏改动，用 `git add <files...>` 精确暂存，不要直接 `git add .`。
+- `tests/transcripts/`、PowerPoint 的 `~$*.pptx` 锁文件、运行期临时目录通常不应提交。
+- 如果这次修改了 `dist/plugin/`，要确保对应真源文件也在同一个提交里；不要只提交 dist 结果。
 
 ---
 
-## 关键约束
+## 相关文档
 
-| 规则 | 说明 |
-|------|------|
-| **产出物标准** | 所有工作流产出必须包含 `.claude/` 结构，可被 Code Agent 识别 |
-| **上下文管理** | 新会话只加载 `constraints.md`，避免 lessons.md 膨胀 |
-| **子代理内联** | 只要可以内联提示词，就不依赖外部 agent 文件 |
-| **并行限制** | 单次 fan-out 不超过 4 个并行代理 |
-| **本地配置隔离** | `.claude/settings.local.json` 不进入共享流程依赖 |
+- [WorkflowProgram 101 章节版](docs/workflowprogram-101/index.md)
+- [WorkflowProgram 流程图文档](docs/workflowprogram-flow-slides/workflowprogram_overview.pptx)
+- [文档状态索引](docs/workflowprogram-design-status.md)
+- [能力矩阵](docs/workflowprogram-capability-matrix.json)
+- [验证进展报告](validation-report.md)
 
 ---
 
