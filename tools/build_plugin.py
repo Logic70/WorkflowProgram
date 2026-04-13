@@ -11,14 +11,21 @@ WorkflowProgram 的 dist/plugin 构建器。
 """
 
 from pathlib import Path
-from datetime import datetime, timezone
 import hashlib
 import json
 import shutil
 import subprocess
+import sys
 
 
 ROOT = Path(__file__).resolve().parents[1]
+SCRIPT_ROOT = ROOT / ".claude" / "scripts"
+if str(SCRIPT_ROOT) not in sys.path:
+    sys.path.insert(0, str(SCRIPT_ROOT))
+
+from lib.io_utils import iso_now
+
+
 CLAUDE = ROOT / ".claude"
 PLUGIN_META = ROOT / ".claude-plugin"
 DIST = ROOT / "dist" / "plugin"
@@ -52,11 +59,6 @@ def write_text(path: Path, content: str) -> None:
     """以统一换行格式写入 UTF-8 文本。"""
     ensure_parent(path)
     path.write_text(content, encoding="utf-8", newline="\n")
-
-
-def iso_now() -> str:
-    """返回稳定的 UTC 时间戳，供 trace manifest 使用。"""
-    return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 
 def decorate_generated_text(src: Path, content: str) -> str:

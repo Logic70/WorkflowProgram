@@ -11,28 +11,22 @@ import argparse
 import json
 import subprocess
 import sys
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List
 
 import yaml
 
+SCRIPT_ROOT = Path(__file__).resolve().parents[1] / ".claude" / "scripts"
+if str(SCRIPT_ROOT) not in sys.path:
+    sys.path.insert(0, str(SCRIPT_ROOT))
 
-def iso_now() -> str:
-    """为模拟运行产物返回稳定的 UTC 时间戳。"""
-    return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+from lib.io_utils import iso_now, write_json
 
 
 def write_text(path: Path, content: str) -> None:
     """创建父目录后写入 UTF-8 文本。"""
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(content, encoding="utf-8", newline="\n")
-
-
-def write_json(path: Path, payload: Dict[str, Any]) -> None:
-    """创建父目录后写入格式化 JSON。"""
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8", newline="\n")
 
 
 def append_jsonl(path: Path, payload: Dict[str, Any]) -> None:

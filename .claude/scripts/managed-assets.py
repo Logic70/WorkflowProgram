@@ -22,14 +22,10 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional
 
+from lib.io_utils import iso_now, write_json
+
 
 ALLOWED_MANAGED_PREFIXES = (".claude/", ".workflowprogram/design/")
-
-
-def iso_now() -> str:
-    """返回 managed asset 证据文件统一使用的时间戳格式。"""
-
-    return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 
 def make_run_id() -> str:
@@ -43,12 +39,6 @@ def write_text(path: Path, content: str) -> None:
 
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(content, encoding="utf-8", newline="\n")
-
-
-def write_json(path: Path, payload: Dict[str, Any]) -> None:
-    """通过统一文本写入器写出规范化 JSON。"""
-
-    write_text(path, json.dumps(payload, ensure_ascii=False, indent=2) + "\n")
 
 
 def append_event(path: Path, payload: Dict[str, Any]) -> None:

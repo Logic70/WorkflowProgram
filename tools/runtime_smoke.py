@@ -19,12 +19,12 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-import yaml
-
 SCRIPT_ROOT = Path(__file__).resolve().parents[1] / ".claude" / "scripts"
 if str(SCRIPT_ROOT) not in sys.path:
     sys.path.insert(0, str(SCRIPT_ROOT))
 
+from lib.io_utils import iso_now, write_json
+from lib.yaml_utils import try_load_yaml_mapping
 from runtime_host import RuntimeHostInvocation, invoke_runtime_host, probe_runtime_host, resolve_runtime_host_config
 
 
@@ -102,18 +102,6 @@ class RuntimeSmokeError(Exception):
     pass
 
 
-def now_utc() -> datetime:
-    """返回去掉微秒的当前 UTC 时间。"""
-
-    return datetime.now(timezone.utc).replace(microsecond=0)
-
-
-def iso_now() -> str:
-    """返回 smoke 证据中统一使用的标准时间戳格式。"""
-
-    return now_utc().isoformat().replace("+00:00", "Z")
-
-
 def make_run_id(fixture: str) -> str:
     """为一次 smoke 运行生成唯一的 transcript/run 目录 id。"""
 
@@ -127,13 +115,6 @@ def write_text(path: Path, content: str) -> None:
     path.write_text(content, encoding="utf-8", newline="\n")
 
 
-def write_json(path: Path, payload: Dict[str, Any]) -> None:
-    """写出规范化 JSON。"""
-
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8", newline="\n")
-
-
 def append_event(path: Path, payload: Dict[str, Any]) -> None:
     """向 smoke JSONL 事件流追加一条结构化事件。"""
 
@@ -142,30 +123,11 @@ def append_event(path: Path, payload: Dict[str, Any]) -> None:
         handle.write(json.dumps(payload, ensure_ascii=False) + "\n")
 
 
-def preprocess_yaml_text(text: str) -> str:
-    """在解析 YAML 前去掉 BOM 和开头的 HTML 注释。"""
-
-    cleaned = text.lstrip("\ufeff")
-    while True:
-        stripped = cleaned.lstrip()
-        if not stripped.startswith("<!--"):
-            return cleaned
-        end = stripped.find("-->")
-        if end < 0:
-            return cleaned
-        cleaned = stripped[end + 3 :].lstrip("\r\n")
-
-
 def load_yaml_mapping(path: Path) -> Optional[Dict[str, Any]]:
     """在存在运行时生成的 workflow spec 时加载其 YAML 映射。"""
 
-    if not path.exists():
-        return None
-    try:
-        payload = yaml.safe_load(preprocess_yaml_text(path.read_text(encoding="utf-8")))
-    except Exception:
-        return None
-    return payload if isinstance(payload, dict) else None
+    payload = try_load_yaml_mapping(path)
+    return payload or None
 
 
 def derive_contract_summary(run_root: Path, fixture_meta: Dict[str, str]) -> Dict[str, Any]:

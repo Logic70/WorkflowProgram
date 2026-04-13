@@ -12,11 +12,15 @@ from __future__ import annotations
 import argparse
 import json
 import sys
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List
 
-import yaml
+SCRIPT_ROOT = Path(__file__).resolve().parents[1] / ".claude" / "scripts"
+if str(SCRIPT_ROOT) not in sys.path:
+    sys.path.insert(0, str(SCRIPT_ROOT))
+
+from lib.io_utils import utc_now
+from lib.yaml_utils import load_yaml_mapping
 
 
 REQUIRED_TOP_KEYS = [
@@ -33,11 +37,6 @@ REQUIRED_TOP_KEYS = [
 ]
 
 
-def utc_now() -> str:
-    """返回稳定的 UTC 时间戳字符串，用于生成视图元数据。"""
-    return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
-
-
 def parse_args() -> argparse.Namespace:
     """解析仓库侧视图生成器的输入输出路径。"""
     parser = argparse.ArgumentParser(description="Generate workflow-view.md from workflow-spec.yaml")
@@ -47,25 +46,9 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def preprocess_yaml_text(text: str) -> str:
-    """去掉开头的 BOM/注释，让带文档包裹的 YAML 也能被稳定解析。"""
-    cleaned = text.lstrip("\ufeff")
-    while True:
-        stripped = cleaned.lstrip()
-        if not stripped.startswith("<!--"):
-            return cleaned
-        end = stripped.find("-->")
-        if end < 0:
-            return cleaned
-        cleaned = stripped[end + 3 :].lstrip("\r\n")
-
-
 def load_spec(path: Path) -> Dict[str, Any]:
     """加载 workflow spec，并要求根节点必须是映射。"""
-    payload = yaml.safe_load(preprocess_yaml_text(path.read_text(encoding="utf-8")))
-    if not isinstance(payload, dict):
-        raise ValueError("workflow-spec.yaml must parse to a mapping object")
-    return payload
+    return load_yaml_mapping(path)
 
 
 def ensure_spec_shape(spec: Dict[str, Any]) -> List[str]:

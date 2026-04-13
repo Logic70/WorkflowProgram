@@ -12,21 +12,16 @@ import shutil
 import subprocess
 import sys
 from dataclasses import asdict, dataclass, field
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import yaml
+from lib.failure_codes import failure_kind_from_code
+from lib.io_utils import iso_now, write_json
 
 
 AUTH_STATUS_TIMEOUT_SECONDS = 5
 VALID_RUNTIME_PROVIDERS = {"claude_cli", "fixture_host", "command_adapter"}
-
-
-def iso_now() -> str:
-    """返回稳定的 UTC 时间戳。"""
-
-    return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 
 @dataclass
@@ -362,12 +357,6 @@ def _write_text(path: Path, content: str) -> None:
     path.write_text(content, encoding="utf-8", newline="\n")
 
 
-def _write_json(path: Path, payload: Dict[str, Any]) -> None:
-    """fixture_host 使用的内部 JSON 写入器。"""
-
-    _write_text(path, json.dumps(payload, ensure_ascii=False, indent=2) + "\n")
-
-
 def _append_jsonl(path: Path, payload: Dict[str, Any]) -> None:
     """fixture_host 使用的内部 JSONL 追加器。"""
 
@@ -397,20 +386,6 @@ def _stage_history_for_entry(entry_skill: str) -> List[str]:
     if entry_skill == "workflowprogram-iterate":
         return ["lessons"]
     return ["requirement", "context", "design", "generate", "validate", "lessons"]
-
-
-def _failure_kind_from_code(failure_code: str) -> str:
-    """把低层 failure code 映射为粗粒度 failure_kind 分类。"""
-
-    if not failure_code:
-        return "none"
-    if failure_code in {"CONFLICT", "CONFLICT_FAILURE"}:
-        return "conflict"
-    if failure_code in {"STRUCTURE_FAILURE", "INPUT_FAILURE"}:
-        return "design"
-    if failure_code in {"RUNTIME_HOST_MISSING", "TARGET_NOT_WRITABLE", "RUNTIME_HOST_NOT_READY"}:
-        return "environment"
-    return "implementation"
 
 
 def _write_workflow_spec_draft(run_root: Path, entry_skill: str, request: str) -> None:
@@ -552,7 +527,7 @@ def _write_progress_artifacts(
     """落地 S5/S6 检查所需的最小 progress 产物。"""
 
     progress_root = run_root / "outputs" / "progress"
-    _write_json(
+    write_json(
         progress_root / "current-progress.json",
         {
             "run_id": run_root.name,
@@ -615,7 +590,7 @@ def _write_runner_evidence(
     """补齐 develop fixture 路径所需的最小 runner 证据。"""
 
     outputs = run_root / "outputs"
-    _write_json(
+    write_json(
         outputs / "stages" / "s0-route.json",
         {
             "intent": "develop",
@@ -624,7 +599,7 @@ def _write_runner_evidence(
             "routed_at": iso_now(),
         },
     )
-    _write_json(
+    write_json(
         outputs / "stages" / "runner-summary.json",
         {
             "run_id": run_root.name,
@@ -691,7 +666,7 @@ def _invoke_fixture_host(
         design_docs = _generate_design_docs(spec_path, run_root)
         candidate_root = run_root / "outputs" / "candidate"
         candidate_claude_root = candidate_root / ".claude"
-        _write_json(
+        write_json(
             candidate_claude_root / "settings.json",
             {
                 "skills": {
@@ -855,7 +830,7 @@ def _invoke_fixture_host(
             "PASS",
             "",
         )
-        _write_lessons_delta(run_root, entry_skill, request, _failure_kind_from_code(""))
+        _write_lessons_delta(run_root, entry_skill, request, failure_kind_from_code(""))
         _write_progress_artifacts(
             run_root,
             ["requirement", "context", "design", "generate", "validate", "lessons"],
@@ -922,7 +897,7 @@ def _invoke_fixture_host(
         has_claude_root = (target_root / ".claude").exists()
         stage_history = _stage_history_for_entry(entry_skill)
         if has_claude_root:
-            _write_lessons_delta(run_root, entry_skill, request, _failure_kind_from_code(""))
+            _write_lessons_delta(run_root, entry_skill, request, failure_kind_from_code(""))
         _write_progress_artifacts(
             run_root,
             stage_history,
@@ -944,7 +919,7 @@ def _invoke_fixture_host(
         )
 
     if entry_skill == "workflowprogram-iterate":
-        _write_lessons_delta(run_root, entry_skill, request, _failure_kind_from_code(""))
+        _write_lessons_delta(run_root, entry_skill, request, failure_kind_from_code(""))
         _write_progress_artifacts(
             run_root,
             ["lessons"],

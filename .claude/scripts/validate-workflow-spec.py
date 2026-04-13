@@ -12,7 +12,8 @@ import sys
 from pathlib import Path
 from typing import Any, Dict, List, Set
 
-import yaml
+from lib.spec_utils import stage_slot_id_map
+from lib.yaml_utils import load_yaml_mapping
 
 
 REQUIRED_TOP_KEYS = {
@@ -65,20 +66,6 @@ DEPRECATED_ENV_SKIP_CHECKS = {
 REQUIRED_RUNTIME_CONTRACT_KEYS = {"write_boundaries", "required_evidence", "failure_kinds", "environment_skip"}
 VALID_ENTRY_TYPES = {"slash_command", "natural_language", "hybrid"}
 RUNTIME_REF_PATTERN = re.compile(r"^runtime_contract\.([A-Za-z_][A-Za-z0-9_]*)$")
-
-
-def preprocess_yaml_text(text: str) -> str:
-    """在解析 YAML 前去掉 BOM 和开头的 HTML 注释。"""
-
-    cleaned = text.lstrip("\ufeff")
-    while True:
-        stripped = cleaned.lstrip()
-        if not stripped.startswith("<!--"):
-            return cleaned
-        end = stripped.find("-->")
-        if end < 0:
-            return cleaned
-        cleaned = stripped[end + 3 :].lstrip("\r\n")
 
 
 def parse_args() -> argparse.Namespace:
@@ -251,20 +238,6 @@ def validate_stages(
         add_error(errors, f"stages must appear in stage_slot order: {', '.join(REQUIRED_STAGE_SLOT_ORDER)}")
 
     return stage_ids
-
-
-def stage_slot_map(stages: List[Any]) -> Dict[str, str]:
-    """把逻辑 stage slot 映射成后续检查可用的 stage id。"""
-
-    mapping: Dict[str, str] = {}
-    for raw_stage in stages:
-        if not isinstance(raw_stage, dict):
-            continue
-        stage_id = str(raw_stage.get("id", "")).strip()
-        stage_slot = str(raw_stage.get("stage_slot", "")).strip()
-        if stage_id and stage_slot and stage_slot not in mapping:
-            mapping[stage_slot] = stage_id
-    return mapping
 
 
 def validate_agent_refs(agent_refs: List[Any], errors: List[str]) -> Set[str]:
@@ -742,7 +715,7 @@ def validate_spec(spec: Dict[str, Any]) -> Dict[str, Any]:
 
     stages = require_list(spec.get("stages", []), "stages", errors)
     stage_ids = validate_stages(stages, agent_refs, errors, warnings)
-    slot_map = stage_slot_map(stages)
+    slot_map = stage_slot_id_map(stages)
 
     intent_flows = require_mapping(spec.get("intent_flows", {}), "intent_flows", errors)
     validate_intent_flows(intent_flows, slot_map, errors)
@@ -791,13 +764,9 @@ def main() -> int:
         return 1
 
     try:
-        payload = yaml.safe_load(preprocess_yaml_text(spec_path.read_text(encoding="utf-8")))
+        payload = load_yaml_mapping(spec_path)
     except Exception as exc:
         print(f"Error: failed to parse YAML: {exc}", file=sys.stderr)
-        return 1
-
-    if not isinstance(payload, dict):
-        print("Error: workflow spec must be a mapping object", file=sys.stderr)
         return 1
 
     report = validate_spec(payload)

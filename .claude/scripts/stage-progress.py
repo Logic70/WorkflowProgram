@@ -13,9 +13,10 @@ from __future__ import annotations
 import argparse
 import json
 from dataclasses import dataclass
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List
+
+from lib.io_utils import utc_now, write_json
 
 
 VALID_EVENTS = {"StageStarted", "StageCheckpoint", "StageCompleted"}
@@ -24,19 +25,10 @@ VALID_STAGES = {"S0", "S1", "S2", "S3", "S4", "S5", "S6"}
 VALID_APPROVAL_STATUS = {"pending", "approved", "rejected", "auto-approved"}
 
 
-def utc_now() -> str:
-    return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
-
-
 def safe_read_json(path: Path) -> Dict[str, Any]:
     if not path.exists():
         return {}
     return json.loads(path.read_text(encoding="utf-8"))
-
-
-def write_json(path: Path, payload: Dict[str, Any]) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
 
 def append_jsonl(path: Path, payload: Dict[str, Any]) -> None:

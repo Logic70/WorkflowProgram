@@ -14,11 +14,11 @@ import argparse
 import hashlib
 import json
 import re
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List
 
-import yaml
+from lib.io_utils import utc_now
+from lib.yaml_utils import load_yaml_mapping
 
 
 REQUIRED_TOP_KEYS = [
@@ -40,10 +40,6 @@ GENERATED_LINE_RE = re.compile(
 )
 
 
-def utc_now() -> str:
-    return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
-
-
 def sha256_file(path: Path) -> str:
     hasher = hashlib.sha256()
     with path.open("rb") as handle:
@@ -60,23 +56,8 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def preprocess_yaml_text(text: str) -> str:
-    cleaned = text.lstrip("\ufeff")
-    while True:
-        stripped = cleaned.lstrip()
-        if not stripped.startswith("<!--"):
-            return cleaned
-        end = stripped.find("-->")
-        if end < 0:
-            return cleaned
-        cleaned = stripped[end + 3 :].lstrip("\r\n")
-
-
 def load_spec(path: Path) -> Dict[str, Any]:
-    payload = yaml.safe_load(preprocess_yaml_text(path.read_text(encoding="utf-8")))
-    if not isinstance(payload, dict):
-        raise ValueError("workflow-spec.yaml must parse to a mapping object")
-    return payload
+    return load_yaml_mapping(path)
 
 
 def ensure_spec_shape(spec: Dict[str, Any]) -> List[str]:

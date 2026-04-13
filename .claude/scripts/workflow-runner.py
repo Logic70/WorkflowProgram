@@ -12,18 +12,19 @@ WorkflowProgram 的控制面 runner。
 from __future__ import annotations
 
 import argparse
-import fnmatch
 import json
 import re
 import shutil
 import subprocess
 import sys
 from dataclasses import dataclass
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 import yaml
+from lib.io_utils import utc_now, write_json
+from lib.spec_utils import path_matches_any, require_stage_slot, resolve_required_stage_slots, stage_slot_object_map
+from lib.yaml_utils import load_yaml_mapping
 
 from runtime_host import RuntimeHostConfig, probe_runtime_host, resolve_runtime_host_config
 
@@ -76,19 +77,6 @@ class RunnerContext:
     manual_approval: bool
 
 
-def utc_now() -> str:
-    """返回用于状态/证据文件的 RFC3339/ISO-8601 UTC 时间戳。"""
-
-    return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
-
-
-def write_json(path: Path, payload: Dict[str, Any]) -> None:
-    """创建父目录后，以稳定格式写入 UTF-8 JSON。"""
-
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8", newline="\n")
-
-
 def append_jsonl(path: Path, payload: Dict[str, Any]) -> None:
     """向 JSONL 文件追加一条 JSON 事件记录。"""
 
@@ -135,32 +123,12 @@ def script_dir() -> Path:
     return Path(__file__).resolve().parent
 
 
-def preprocess_yaml_text(text: str) -> str:
-    """在解析 YAML 前去掉 BOM 和开头的 HTML 注释。"""
-
-    cleaned = text.lstrip("\ufeff")
-    while True:
-        stripped = cleaned.lstrip()
-        if not stripped.startswith("<!--"):
-            return cleaned
-        end = stripped.find("-->")
-        if end < 0:
-            return cleaned
-        cleaned = stripped[end + 3 :].lstrip("\r\n")
-
-
 def resolve_plugin_root(explicit: str) -> Path:
     """根据显式参数或安装布局解析 PLUGIN_ROOT。"""
 
     if explicit:
         return Path(explicit).resolve()
     return script_dir().resolve().parents[1]
-
-
-def pattern_match_any(path: str, patterns: List[str]) -> bool:
-    """判断相对路径是否命中任意声明的 glob 模式。"""
-
-    return any(fnmatch.fnmatch(path, pattern) for pattern in patterns)
 
 
 def ensure_target_writable(target_root: Path) -> bool:
@@ -246,7 +214,7 @@ def check_boundary(runtime_contract: Dict[str, Any], root: str, rel_path: str) -
     if not isinstance(write_boundaries, dict):
         return True
     deny = [str(item).strip() for item in write_boundaries.get("deny", []) if str(item).strip()]
-    if deny and pattern_match_any(rel_path, deny):
+    if deny and path_matches_any(rel_path, deny):
         return False
 
     if root == "TARGET_ROOT":
@@ -257,7 +225,7 @@ def check_boundary(runtime_contract: Dict[str, Any], root: str, rel_path: str) -
         allow = [str(item).strip() for item in write_boundaries.get("temp_root_allow", []) if str(item).strip()]
     else:
         return True
-    return pattern_match_any(rel_path, allow) if allow else False
+    return path_matches_any(rel_path, allow) if allow else False
 
 
 def required_evidence_list(runtime_contract: Dict[str, Any]) -> List[str]:
@@ -409,15 +377,7 @@ def append_event(ctx: RunnerContext, event_type: str, stage: str, status: str, m
 def producer_for_stage(stage: Dict[str, Any]) -> str:
     """解析某个阶段定义显式声明的逻辑 stage slot。"""
 
-    stage_slot = str(stage.get("stage_slot", "")).strip()
-    if stage_slot:
-        if not re.fullmatch(r"S[1-6]", stage_slot):
-            raise RuntimeError(f"invalid stage_slot '{stage_slot}' for stage '{stage.get('id', '')}'")
-        return stage_slot
-    stage_id = str(stage.get("id", "")).strip()
-    if re.fullmatch(r"S[1-6]", stage_id):
-        return stage_id
-    raise RuntimeError(f"stage '{stage_id or '<unknown>'}' is missing explicit stage_slot")
+    return require_stage_slot(stage)
 
 
 def infer_root(path: str) -> str:
@@ -613,9 +573,10 @@ def build_artifact_entries(
 def load_spec(spec_path: Path) -> Dict[str, Any]:
     """加载 workflow-spec.yaml，并强制检查 runner 所需的最小前提。"""
 
-    payload = yaml.safe_load(preprocess_yaml_text(spec_path.read_text(encoding="utf-8")))
-    if not isinstance(payload, dict):
-        raise RuntimeError("workflow spec must be a mapping object")
+    try:
+        payload = load_yaml_mapping(spec_path)
+    except Exception as exc:
+        raise RuntimeError(f"failed to load workflow spec: {exc}") from exc
     if not isinstance(payload.get("stages"), list) or not payload["stages"]:
         raise RuntimeError("workflow spec must include non-empty stages list")
     return payload
@@ -624,27 +585,7 @@ def load_spec(spec_path: Path) -> Dict[str, Any]:
 def stage_slot_map_for_spec(stages: List[Dict[str, Any]]) -> Dict[str, Dict[str, Any]]:
     """按逻辑 stage slot 为阶段定义建立索引。"""
 
-    mapping: Dict[str, Dict[str, Any]] = {}
-    for stage in stages:
-        slot = producer_for_stage(stage)
-        if slot:
-            mapping[slot] = stage
-    return mapping
-
-
-def resolve_required_stage_slots(spec: Dict[str, Any], intent: str) -> List[str]:
-    """解析当前 intent 对应的逻辑阶段流。"""
-
-    intent_flows = spec.get("intent_flows", {})
-    if isinstance(intent_flows, dict):
-        flow = intent_flows.get(intent, {})
-        if isinstance(flow, dict):
-            required = flow.get("required_stage_slots", [])
-            if isinstance(required, list):
-                values = [str(item).strip() for item in required if str(item).strip()]
-                if values:
-                    return values
-    return DEFAULT_STAGE_SLOT_ORDER
+    return stage_slot_object_map(stages, strict=True)
 
 
 def pick_next_stage(
