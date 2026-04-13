@@ -25,15 +25,10 @@ import json
 import os
 import sys
 import uuid
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, Optional
 
-
-def iso_now() -> str:
-    """返回稳定的 UTC 时间戳，供状态快照和事件流共用。"""
-    return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
-
+from lib.io_utils import iso_now
 
 class StateBus:
     """管理工作流会话状态，并可选地输出事件流。"""

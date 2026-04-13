@@ -121,7 +121,7 @@ WorkflowProgram-CN/
 
 内部支持资产：
 
-- `.claude/skills/develop/spec-template.md`
+- `.claude/skills/workflow-spec-support/spec-template.md`
   `/develop` 生成 `workflow-spec.md` 时使用的规格模板。
 
 ## Plugin Runtime Model

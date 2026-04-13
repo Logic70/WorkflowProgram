@@ -21,9 +21,10 @@ import json
 import shutil
 import subprocess
 import sys
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
+
+from lib.io_utils import utc_now, write_json
 
 
 ENTRY_TO_INTENT = {
@@ -32,12 +33,6 @@ ENTRY_TO_INTENT = {
     "workflowprogram-iterate": "iterate",
     "workflowprogram-validate": "validate",
 }
-
-
-def utc_now() -> str:
-    """返回用于审计记录的 RFC3339/ISO-8601 UTC 时间戳。"""
-
-    return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 
 def parse_args() -> argparse.Namespace:
@@ -81,13 +76,6 @@ def resolve_plugin_root(explicit: str) -> Path:
     if explicit:
         return Path(explicit).resolve()
     return script_dir().parents[1]
-
-
-def write_json(path: Path, payload: Dict[str, Any]) -> None:
-    """创建父目录后，以稳定格式写入 UTF-8 JSON。"""
-
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8", newline="\n")
 
 
 def parse_json_output(text: str) -> Dict[str, Any]:

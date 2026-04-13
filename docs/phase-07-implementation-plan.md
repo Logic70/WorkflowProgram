@@ -133,7 +133,7 @@ Phase 7 聚焦把“设计已定义、实现已部分落地”的测试契约补
 python3 tools/build_plugin.py
 python3 .claude/scripts/validate-workflow.py
 powershell.exe -ExecutionPolicy Bypass -File .claude/scripts/validate-workflow.ps1
-python3 .claude/scripts/validate-workflow-spec.py --spec .claude/skills/develop/yaml-spec-template.md --json
+python3 .claude/scripts/validate-workflow-spec.py --spec .claude/skills/workflow-spec-support/yaml-spec-template.md --json
 ```
 
 动态验证：

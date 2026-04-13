@@ -40,7 +40,7 @@ COMMAND_DESCRIPTIONS = {
 }
 
 REPLACEMENTS = {
-    ".claude/skills/develop/spec-template.md": "${CLAUDE_PLUGIN_ROOT}/skills/develop/spec-template.md",
+    ".claude/skills/workflow-spec-support/spec-template.md": "${CLAUDE_PLUGIN_ROOT}/skills/workflow-spec-support/spec-template.md",
     ".claude/rules/constraints.md": "${CLAUDE_PLUGIN_ROOT}/rules/constraints.md",
     ".claude/scripts/validate-workflow.ps1": "${CLAUDE_PLUGIN_ROOT}/scripts/validate-workflow.ps1",
     ".claude/scripts/managed-assets.py": "${CLAUDE_PLUGIN_ROOT}/scripts/managed-assets.py",

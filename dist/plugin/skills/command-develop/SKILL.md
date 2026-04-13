@@ -87,7 +87,7 @@ python3 ${CLAUDE_PLUGIN_ROOT}/scripts/stage-progress.py update ...
    - 涉及多少种角色或专家维度？
    - 应由手动命令触发，还是由 hook 自动触发？
 3. 每轮只提 1-3 个最高优先级问题；若用户回答后仍存在设计歧义，则继续下一轮，不得只做单轮问答后直接结束。
-4. 当“用户诉求 / 最终目的 / 成功标准 / 触发方式 / 输入输出 / 质量门禁”都已明确后，使用 `${CLAUDE_PLUGIN_ROOT}/skills/develop/spec-template.md` 生成 `workflow-spec.md`。
+4. 当“用户诉求 / 最终目的 / 成功标准 / 触发方式 / 输入输出 / 质量门禁”都已明确后，使用 `${CLAUDE_PLUGIN_ROOT}/skills/workflow-spec-support/spec-template.md` 生成 `workflow-spec.md`。
 5. **Verify**: 规格中的每个字段都有明确值，包含 `User Intent` 与 `Clarification Summary`，`澄清轮次 >= 2`，且不再包含 `TBD`。
 
 **On failure**：把歧义点和所需补充信息记录到 `lessons.md`。

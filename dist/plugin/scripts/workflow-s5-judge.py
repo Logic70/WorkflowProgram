@@ -11,7 +11,6 @@
 from __future__ import annotations
 
 import argparse
-import fnmatch
 import json
 import re
 import subprocess
@@ -19,7 +18,9 @@ import sys
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-import yaml
+from lib.failure_codes import failure_kind_for_result
+from lib.spec_utils import path_matches_any, stage_slot_id_map
+from lib.yaml_utils import try_load_yaml_mapping
 
 
 RESULTS = {"PASS", "WARN", "FAIL", "ENVIRONMENT-SKIP"}
@@ -37,20 +38,6 @@ FAILURE_KIND_BY_CATEGORY = {
 }
 
 
-def preprocess_yaml_text(text: str) -> str:
-    """在解析 YAML 前去掉 BOM 和开头的 HTML 注释。"""
-
-    cleaned = text.lstrip("\ufeff")
-    while True:
-        stripped = cleaned.lstrip()
-        if not stripped.startswith("<!--"):
-            return cleaned
-        end = stripped.find("-->")
-        if end < 0:
-            return cleaned
-        cleaned = stripped[end + 3 :].lstrip("\r\n")
-
-
 def load_json(path: Path) -> Dict[str, Any]:
     """供确定性 judge 使用的尽力而为 JSON 加载器。"""
 
@@ -66,13 +53,7 @@ def load_json(path: Path) -> Dict[str, Any]:
 def load_yaml(path: Path) -> Dict[str, Any]:
     """供 workflow-spec.yaml 使用的尽力而为 YAML 加载器。"""
 
-    if not path.exists():
-        return {}
-    try:
-        payload = yaml.safe_load(preprocess_yaml_text(path.read_text(encoding="utf-8")))
-    except Exception:
-        return {}
-    return payload if isinstance(payload, dict) else {}
+    return try_load_yaml_mapping(path)
 
 
 def load_snapshot(path: Path) -> List[Dict[str, Any]]:
@@ -140,14 +121,10 @@ def diff_snapshot_paths(before: List[Dict[str, Any]], after: List[Dict[str, Any]
     return changed
 
 
-def path_matches_any(path: str, patterns: List[str]) -> bool:
-    """判断变更路径是否被任意声明的 glob 允许。"""
-
-    return any(fnmatch.fnmatch(path, pattern) for pattern in patterns)
-
-
 def matching_paths(paths: List[str], pattern: str) -> List[str]:
     """按单个 glob 模式过滤路径列表。"""
+
+    import fnmatch
 
     return [path for path in paths if fnmatch.fnmatch(path, pattern)]
 
@@ -197,23 +174,6 @@ def infer_expected_intent(entry_skill: str) -> str:
     return "develop"
 
 
-def stage_slot_to_id_map(spec: Dict[str, Any]) -> Dict[str, str]:
-    """把逻辑 stage slot（S1..S6）映射到 spec 中可执行的 stage id。"""
-
-    mapping: Dict[str, str] = {}
-    stages = spec.get("stages", [])
-    if not isinstance(stages, list):
-        return mapping
-    for item in stages:
-        if not isinstance(item, dict):
-            continue
-        stage_id = str(item.get("id", "")).strip()
-        stage_slot = str(item.get("stage_slot", "")).strip()
-        if stage_id and stage_slot and stage_slot not in mapping:
-            mapping[stage_slot] = stage_id
-    return mapping
-
-
 def expected_flow_for_intent(spec: Dict[str, Any], intent: str) -> tuple[List[str], List[str], List[str], str] | None:
     """解析某个 intent flow 对应的 required/optional/allowed stage id。"""
 
@@ -223,7 +183,7 @@ def expected_flow_for_intent(spec: Dict[str, Any], intent: str) -> tuple[List[st
     flow = intent_flows.get(intent, {})
     if not isinstance(flow, dict):
         return None
-    slot_map = stage_slot_to_id_map(spec)
+    slot_map = stage_slot_id_map(spec.get("stages", []))
     required_slots = flow.get("required_stage_slots", [])
     optional_slots = flow.get("optional_stage_slots", [])
     if not isinstance(required_slots, list):
@@ -276,24 +236,6 @@ def run_validator(script_name: str, *args: str) -> Dict[str, Any]:
         payload["status"] = "FAIL"
         payload.setdefault("errors", []).append(f"{script_name} exited with code {completed.returncode}")
     return payload if isinstance(payload, dict) else {"status": "FAIL", "errors": [f"{script_name} returned non-object payload"], "warnings": []}
-
-
-def map_failure_kind(result: str, failure_code: str) -> str:
-    """把观测到的 verdict/failure-code 组合转换成 failure_kind。"""
-
-    if result == "PASS":
-        return "none"
-    if result == "ENVIRONMENT-SKIP":
-        return "environment"
-    if failure_code in {"CONFLICT", "CONFLICT_FAILURE"}:
-        return "conflict"
-    if failure_code in {"STRUCTURE_FAILURE", "MISSING_ARGUMENT", "INPUT_FAILURE"}:
-        return "design"
-    if failure_code == "STRUCTURE_FAILURE":
-        return "design"
-    if failure_code in {"RUNTIME_FAILURE", "EVIDENCE_FAILURE"}:
-        return "implementation"
-    return "implementation"
 
 
 def derive_contract(run_root: Path, fallback_categories: List[str]) -> Dict[str, Any]:
@@ -373,7 +315,7 @@ def build_checks(
     route_payload = load_json(run_root / "outputs" / "stages" / "s0-route.json")
     runtime_contract = contract.get("runtime_contract", {})
     test_contract = contract.get("test_contract", {})
-    derived_failure_kind = map_failure_kind(result, failure_code)
+    derived_failure_kind = failure_kind_for_result(result, failure_code)
     provider_result = load_json(run_root / "outputs" / "runtime-provider-result.json")
     parsed_provider = provider_result.get("parsed", {}) if isinstance(provider_result.get("parsed"), dict) else {}
     before_target = load_snapshot(run_root / "outputs" / "target-root-before.json")
@@ -1002,7 +944,7 @@ def compute_final_judgment(
     if observed_result == "FAIL":
         return {
             "verdict": "FAIL",
-            "failure_kind": map_failure_kind(observed_result, observed_failure_code),
+            "failure_kind": failure_kind_for_result(observed_result, observed_failure_code),
             "failure_code": observed_failure_code or "none",
             "judge_basis": None,
         }
@@ -1168,7 +1110,7 @@ def main() -> int:
         args.checked_file,
         contract,
     )
-    observed_failure_kind = map_failure_kind(args.result, args.failure_code.strip())
+    observed_failure_kind = failure_kind_for_result(args.result, args.failure_code.strip())
     final_judgment = compute_final_judgment(args.result, args.failure_code.strip(), checks)
     summary_path = run_root / "outputs" / "stages" / "s5-validation-summary.json"
     report_path = run_root / "validation-runtime-report.md"

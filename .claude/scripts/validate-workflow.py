@@ -91,7 +91,7 @@ ACTIVE_ENTRY_DOCS = {
 }
 
 ACTIVE_TEMPLATE_DOC = {
-    ".claude/skills/develop/yaml-spec-template.md": [
+    ".claude/skills/workflow-spec-support/yaml-spec-template.md": [
         "stage_slot: S5",
         "workflowprogram-validate",
         "validation-runtime-report.md",
@@ -282,7 +282,7 @@ def validate_required_paths(root: Path, result: ValidationResult) -> None:
         "docs/workflowprogram-design-status.md",
         "docs/workflowprogram-capability-matrix.json",
         "docs/phase-07-implementation-plan.md",
-        ".claude/skills/develop/yaml-spec-template.md",
+        ".claude/skills/workflow-spec-support/yaml-spec-template.md",
     ]
 
     for relative_path in required_paths:

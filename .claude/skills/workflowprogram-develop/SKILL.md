@@ -18,7 +18,7 @@ disable-model-invocation: true
 - 读取模板、规则和参考资产时，应从 `PLUGIN_ROOT` 读取。
 - 不应直接把新文件静默写回 `TARGET_ROOT/.claude/`；应先生成候选产物，再通过 `${CLAUDE_PLUGIN_ROOT}/scripts/managed-assets.py` 决定是否应用。
 - 若 `TARGET_ROOT` 已存在 `.claude/`，优先复用并增量修改。
-- 必要时使用 `${CLAUDE_PLUGIN_ROOT}/skills/develop/spec-template.md` 作为规格模板来源。
+- 必要时使用 `${CLAUDE_PLUGIN_ROOT}/skills/workflow-spec-support/spec-template.md` 作为规格模板来源。
 - 不要把仓库维护命令包装进目标项目 workflow 设计。
 - 若出现目标文件冲突，应把候选版本保留在 `RUN_ROOT/outputs/`，而不是覆盖用户资产。
 - 对已应用文件，应维护 `TARGET_ROOT/.workflowprogram/managed-files.json`。

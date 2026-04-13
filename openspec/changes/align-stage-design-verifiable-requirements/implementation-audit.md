@@ -46,7 +46,7 @@ Implemented:
 
 - [develop.md](/mnt/d/Code/WorkflowProgram-CN/.claude/commands/develop.md)
 - [workflowprogram-develop/SKILL.md](/mnt/d/Code/WorkflowProgram-CN/.claude/skills/workflowprogram-develop/SKILL.md)
-- [spec-template.md](/mnt/d/Code/WorkflowProgram-CN/.claude/skills/develop/spec-template.md)
+- [spec-template.md](/mnt/d/Code/WorkflowProgram-CN/.claude/skills/workflow-spec-support/spec-template.md)
 - [validate-workflow-draft.py](/mnt/d/Code/WorkflowProgram-CN/.claude/scripts/validate-workflow-draft.py)
 
 Gap:
@@ -60,7 +60,7 @@ Gap:
 Implemented:
 
 - [validate-workflow-spec.py](/mnt/d/Code/WorkflowProgram-CN/.claude/scripts/validate-workflow-spec.py)
-- [yaml-spec-template.md](/mnt/d/Code/WorkflowProgram-CN/.claude/skills/develop/yaml-spec-template.md)
+- [yaml-spec-template.md](/mnt/d/Code/WorkflowProgram-CN/.claude/skills/workflow-spec-support/yaml-spec-template.md)
 - [workflow-runner.py](/mnt/d/Code/WorkflowProgram-CN/.claude/scripts/workflow-runner.py)
 
 Gap:

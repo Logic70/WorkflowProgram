@@ -537,14 +537,14 @@ python3 ${CLAUDE_PLUGIN_ROOT}/scripts/stage-progress.py update ...
 ### 实现方案
 
 - 主承载：`/develop` Stage 1、`workflowprogram-develop` Step 2
-- 模板来源：`skills/develop/spec-template.md`
+- 模板来源：`skills/workflow-spec-support/spec-template.md`
 - 校验承载：`validate-workflow-draft.py`
 
 ### 承载文件
 
 - [develop.md](/mnt/d/Code/WorkflowProgram-CN/.claude/commands/develop.md)
 - [workflowprogram-develop/SKILL.md](/mnt/d/Code/WorkflowProgram-CN/.claude/skills/workflowprogram-develop/SKILL.md)
-- [spec-template.md](/mnt/d/Code/WorkflowProgram-CN/.claude/skills/develop/spec-template.md)
+- [spec-template.md](/mnt/d/Code/WorkflowProgram-CN/.claude/skills/workflow-spec-support/spec-template.md)
 - [validate-workflow-draft.py](/mnt/d/Code/WorkflowProgram-CN/.claude/scripts/validate-workflow-draft.py)
 
 ## S2 领域研究（Explore Context）
@@ -662,7 +662,7 @@ python3 ${CLAUDE_PLUGIN_ROOT}/scripts/stage-progress.py update ...
 ### 承载文件
 
 - [develop.md](/mnt/d/Code/WorkflowProgram-CN/.claude/commands/develop.md)
-- [yaml-spec-template.md](/mnt/d/Code/WorkflowProgram-CN/.claude/skills/develop/yaml-spec-template.md)
+- [yaml-spec-template.md](/mnt/d/Code/WorkflowProgram-CN/.claude/skills/workflow-spec-support/yaml-spec-template.md)
 - [generate-workflow-view.py](/mnt/d/Code/WorkflowProgram-CN/.claude/scripts/generate-workflow-view.py)
 - [generate-workflow-lowlevel.py](/mnt/d/Code/WorkflowProgram-CN/.claude/scripts/generate-workflow-lowlevel.py)
 - [validate-workflow-lowlevel.py](/mnt/d/Code/WorkflowProgram-CN/.claude/scripts/validate-workflow-lowlevel.py)
