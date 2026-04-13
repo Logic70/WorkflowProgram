@@ -11,6 +11,8 @@ import sys
 from pathlib import Path
 from typing import Any, Dict, List
 
+from lib.diagnostics import DiagnosticCollector
+
 
 VALID_INTENT = {"develop", "audit", "iterate", "validate"}
 VALID_APPROVAL_STATUS = {"pending", "approved", "rejected", "auto-approved"}
@@ -137,16 +139,27 @@ def main() -> int:
     args = parse_args()
     state_path = Path(args.state).resolve()
     if not state_path.exists():
-        print(f"Error: state file not found: {state_path}", file=sys.stderr)
+        diagnostics = DiagnosticCollector()
+        diagnostics.error(f"state file not found: {state_path}")
+        if args.json:
+            print(json.dumps(diagnostics.payload(state=str(state_path)), ensure_ascii=False, indent=2))
+        else:
+            print(f"Error: state file not found: {state_path}", file=sys.stderr)
         return 1
 
     try:
         payload = json.loads(state_path.read_text(encoding="utf-8"))
     except Exception as exc:
-        print(f"Error: cannot parse JSON: {exc}", file=sys.stderr)
+        diagnostics = DiagnosticCollector()
+        diagnostics.error(f"cannot parse JSON: {exc}")
+        if args.json:
+            print(json.dumps(diagnostics.payload(state=str(state_path)), ensure_ascii=False, indent=2))
+        else:
+            print(f"Error: cannot parse JSON: {exc}", file=sys.stderr)
         return 1
 
-    errors: List[str] = []
+    diagnostics = DiagnosticCollector()
+    errors = diagnostics.errors
     values = payload.get("values")
     artifacts = payload.get("artifacts")
     if not isinstance(values, dict):
@@ -171,17 +184,15 @@ def main() -> int:
                 errors.append(f"Duplicate artifact id: {aid}")
             seen_ids.add(aid)
 
-    result = {
-        "status": "PASS" if not errors else "FAIL",
-        "state": str(state_path),
-        "errors": errors,
-    }
+    result = diagnostics.payload(state=str(state_path))
     if args.json:
         print(json.dumps(result, ensure_ascii=False, indent=2))
     else:
         print(f"[{result['status']}] state={state_path}")
         for item in errors:
             print(f"[ERROR] {item}")
+        for item in result["warnings"]:
+            print(f"[WARN] {item}")
     return 0 if not errors else 1
 
 

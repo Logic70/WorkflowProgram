@@ -12,6 +12,7 @@ import sys
 from pathlib import Path
 from typing import Any, Dict, List, Set
 
+from lib.diagnostics import DiagnosticCollector
 from lib.spec_utils import stage_slot_id_map
 from lib.yaml_utils import load_yaml_mapping
 
@@ -703,8 +704,9 @@ def validate_test_contract(
 def validate_spec(spec: Dict[str, Any]) -> Dict[str, Any]:
     """运行完整 workflow-spec 校验器，并返回结构化报告。"""
 
-    errors: List[str] = []
-    warnings: List[str] = []
+    collector = DiagnosticCollector()
+    errors = collector.errors
+    warnings = collector.warnings
 
     validate_top_level(spec, errors, warnings)
     meta = require_mapping(spec.get("meta", {}), "meta", errors)
@@ -747,11 +749,7 @@ def validate_spec(spec: Dict[str, Any]) -> Dict[str, Any]:
     test_contract = require_mapping(spec.get("test_contract", {}), "test_contract", errors)
     validate_test_contract(test_contract, runtime_contract, stage_ids, slot_map, intent_flows, registered_entries, errors, warnings)
 
-    return {
-        "status": "PASS" if not errors else "FAIL",
-        "errors": errors,
-        "warnings": warnings,
-    }
+    return collector.payload()
 
 
 def main() -> int:
@@ -760,13 +758,23 @@ def main() -> int:
     args = parse_args()
     spec_path = Path(args.spec).resolve()
     if not spec_path.exists():
-        print(f"Error: spec not found: {spec_path}", file=sys.stderr)
+        diagnostics = DiagnosticCollector()
+        diagnostics.error(f"spec not found: {spec_path}")
+        if args.json:
+            print(json.dumps(diagnostics.payload(spec=str(spec_path)), ensure_ascii=False, indent=2))
+        else:
+            print(f"Error: spec not found: {spec_path}", file=sys.stderr)
         return 1
 
     try:
         payload = load_yaml_mapping(spec_path)
     except Exception as exc:
-        print(f"Error: failed to parse YAML: {exc}", file=sys.stderr)
+        diagnostics = DiagnosticCollector()
+        diagnostics.error(f"failed to parse YAML: {exc}")
+        if args.json:
+            print(json.dumps(diagnostics.payload(spec=str(spec_path)), ensure_ascii=False, indent=2))
+        else:
+            print(f"Error: failed to parse YAML: {exc}", file=sys.stderr)
         return 1
 
     report = validate_spec(payload)
