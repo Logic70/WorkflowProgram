@@ -147,13 +147,15 @@ python tools/runtime_smoke_matrix.py
 python tools/build_plugin.py
 ```
 
-## Tutorials
+## WorkflowProgram 101
 
-- [HTML tutorial (Chinese)](docs/workflowprogram-101-html/index.html)
-- [HTML tutorial (English)](docs/workflowprogram-101-html/index.en.html)
-- [Single-page overview (English)](docs/workflowprogram-101.en.md)
-- [Chapter guide (Chinese)](docs/workflowprogram-101/index.md)
-- [Chapter guide (English)](docs/workflowprogram-101-en/index.md)
+Use these entry points when you want the tutorial rather than the reference README:
+
+- [WorkflowProgram 101 HTML tutorial (Chinese)](docs/workflowprogram-101-html/index.html)
+- [WorkflowProgram 101 HTML tutorial (English)](docs/workflowprogram-101-html/index.en.html)
+- [WorkflowProgram 101 single-page overview (English)](docs/workflowprogram-101.en.md)
+- [WorkflowProgram 101 chapter guide (Chinese)](docs/workflowprogram-101/index.md)
+- [WorkflowProgram 101 chapter guide (English)](docs/workflowprogram-101-en/index.md)
 
 ## License
 
