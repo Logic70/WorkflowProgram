@@ -1,5 +1,7 @@
 # WorkflowProgram 101：把工作流当成产品来设计
 
+[中文](index.md) | [English](../workflowprogram-101-en/index.md)
+
 > 一套可维护的工作流，不只是能生成文件，还要能说明怎么生成、怎么验证、怎么迭代。
 
 这是 `WorkflowProgram-CN` 的章节版入门教程。

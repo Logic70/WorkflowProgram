@@ -1,5 +1,7 @@
 # WorkflowProgram-CN
 
+[中文](README.md) | [English](README.en.md)
+
 面向 Claude Code 工作区的**元工作流引擎**。它不提供业务代码，而是帮你把 workflow 做成可交付、可验证、可迭代的产品。
 
 ## 它解决什么问题
@@ -147,8 +149,11 @@ python tools/build_plugin.py
 ## 教程
 
 - [HTML 版教程](docs/workflowprogram-101-html/index.html) -- 可视化、循序渐进
+- [HTML Tutorial (English)](docs/workflowprogram-101-html/index.en.html)
 - [单页版 Markdown](docs/workflowprogram-101.md) -- 快速扫一遍全貌
+- [Single-page Markdown (English)](docs/workflowprogram-101.en.md)
 - [章节版 Markdown](docs/workflowprogram-101/index.md) -- 逐章深入
+- [Chapter Guide (English)](docs/workflowprogram-101-en/index.md)
 
 ## 许可
 
