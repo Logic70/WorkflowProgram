@@ -1,0 +1,72 @@
+name: Deploy WorkflowProgram 101 Pages
+
+on:
+  push:
+    branches:
+      - codex/phase6-stage-progress
+    paths:
+      - ".github/workflows/deploy-workflowprogram-101-pages.yml"
+      - "README.md"
+      - "docs/workflowprogram-101-html/**"
+      - "docs/workflowprogram-101/**"
+      - "docs/workflowprogram-101.md"
+      - "docs/workflowprogram-design-status.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: workflowprogram-101-pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+
+      # 只发布 HTML 教程及其引用到的文档，避免把整个仓库作为静态站点暴露出去。
+      - name: Prepare static site
+        run: |
+          set -euo pipefail
+          mkdir -p _site
+          cp README.md _site/README.md
+          cp -R docs _site/docs
+          touch _site/.nojekyll
+          cat > _site/index.html <<'EOF'
+          <!doctype html>
+          <html lang="zh-CN">
+            <head>
+              <meta charset="utf-8" />
+              <meta name="viewport" content="width=device-width, initial-scale=1" />
+              <meta http-equiv="refresh" content="0; url=./docs/workflowprogram-101-html/" />
+              <title>WorkflowProgram 101</title>
+            </head>
+            <body>
+              <p>Redirecting to <a href="./docs/workflowprogram-101-html/">WorkflowProgram 101</a>...</p>
+            </body>
+          </html>
+          EOF
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: _site
+
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
