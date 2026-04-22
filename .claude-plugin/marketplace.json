@@ -14,7 +14,7 @@
       "name": "workflowprogram-cn",
       "source": {
         "source": "git-subdir",
-        "url": "https://github.com/Logic-70/WorkflowProgram-CN.git",
+        "url": "https://github.com/Logic70/WorkflowProgram.git",
         "path": "dist/plugin",
         "ref": "main"
       },
@@ -24,8 +24,8 @@
         "name": "Logic_70",
         "email": "zjmp8870@outlook.com"
       },
-      "homepage": "https://github.com/Logic-70/WorkflowProgram-CN",
-      "repository": "https://github.com/Logic-70/WorkflowProgram-CN",
+      "homepage": "https://github.com/Logic70/WorkflowProgram",
+      "repository": "https://github.com/Logic70/WorkflowProgram",
       "license": "MIT",
       "keywords": ["workflow", "commands", "skills", "agents", "audit"],
       "category": "workflow",

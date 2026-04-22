@@ -12,9 +12,20 @@
 
 主安装模型：
 
-1. 通过 Claude Code marketplace 添加本仓库提供的 marketplace。
-2. 安装 `workflowprogram-cn@logic70-plugins`。
-3. Claude Code 加载插件后，在 `SessionStart` 自动执行 Python runtime bootstrap。
+```bash
+claude plugin marketplace add Logic70/WorkflowProgram
+claude plugin install workflowprogram-cn@logic70-plugins
+```
+
+或在 Claude Code 会话内：
+
+```text
+/plugin marketplace add Logic70/WorkflowProgram
+/plugin install workflowprogram-cn@logic70-plugins
+/reload-plugins
+```
+
+Claude Code 加载插件后，会在 `SessionStart` 自动执行 Python runtime bootstrap。
 
 说明：
 

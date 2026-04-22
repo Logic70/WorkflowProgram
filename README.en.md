@@ -22,9 +22,24 @@ WorkflowProgram addresses these issues with four layers: **truth source**, **con
 
 The primary installation path is the Claude Code marketplace:
 
-1. Add the marketplace published by this repository.
-2. Install `workflowprogram-cn@logic70-plugins`.
-3. On first session start, the plugin bootstraps its private Python dependency layer into `${CLAUDE_PLUGIN_DATA}/python/site-packages`.
+```bash
+claude plugin marketplace add Logic70/WorkflowProgram
+claude plugin install workflowprogram-cn@logic70-plugins
+```
+
+If you are already inside the Claude Code interactive UI, you can run:
+
+```text
+/plugin marketplace add Logic70/WorkflowProgram
+/plugin install workflowprogram-cn@logic70-plugins
+/reload-plugins
+```
+
+After installation:
+
+1. Restart `claude`, or run `/reload-plugins` in the current session
+2. On first session start, the plugin bootstraps its private Python dependency layer into `${CLAUDE_PLUGIN_DATA}/python/site-packages`
+3. For minimal troubleshooting, run `workflowprogram-doctor`
 
 Source builds of `dist/plugin/` remain useful for repository development and debugging, but they are no longer the primary end-user install model.
 
