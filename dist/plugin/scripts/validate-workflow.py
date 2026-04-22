@@ -18,7 +18,9 @@ import hashlib
 import importlib.util
 import json
 import re
+import subprocess
 import sys
+import tempfile
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -38,12 +40,32 @@ FORBIDDEN_LEGACY_PATHS = [
     'rules',
     'scripts',
     'tools/sync_plugin_assets.py',
+    'tools/install_dev.sh',
+    'tools/quick_install.sh',
 ]
 
 ACTIVE_DESIGN_DOCS = {
     "docs/workflowprogram-stage-highlevel-design.md": [
         "runtime_contract",
         "test_contract",
+        "generated_runtime_contract",
+        "shared-control-plane-wrapper",
+        "logic70-plugins",
+        "workflowprogram-python",
+        "site-packages",
+        "capability_discovery",
+        "host-capability-candidates.json",
+        "host-bootstrap-instructions.md",
+        "clarification-record.json",
+        "open-questions.json",
+        "assumption-log.md",
+        "design-readiness-report.json",
+        "clarification-challenge-report.json",
+        "clarification-handoff.json",
+        "clarification-evidence.json",
+        "requirement-clarification-lead",
+        "host_capabilities",
+        "agent_team_contract",
         "workflow-entry.py",
         "workflowprogram-validate",
         "runtime_smoke.py",
@@ -53,6 +75,25 @@ ACTIVE_DESIGN_DOCS = {
     "docs/workflowprogram-stage-lowlevel-design.md": [
         "runtime_contract",
         "test_contract",
+        "generated_runtime_contract",
+        "runtime_capabilities",
+        "workflowprogram-python",
+        "SessionStart",
+        "site-packages",
+        "capability_discovery",
+        "host_capabilities",
+        "agent_team_contract",
+        "discover-host-capabilities.py",
+        "probe-host-capabilities.py",
+        "apply-host-bootstrap.py",
+        "generate-environment-remediation.py",
+        "generate-clarification-package.py",
+        "generate-clarification-review.py",
+        "requirement-clarification-lead",
+        "control-plane helper",
+        "clarification-challenge-report.json",
+        "clarification-handoff.json",
+        "clarification-evidence.json",
         "workflow-entry.py",
         "runtime_contract.<field>",
         "implemented_now",
@@ -73,6 +114,20 @@ ACTIVE_ENTRY_DOCS = {
     ".claude/commands/develop.md": [
         "runtime_contract",
         "test_contract",
+        "generated_runtime_contract",
+        ".workflowprogram/runtime/",
+        "generate-target-runtime.py",
+        "discover-host-capabilities.py",
+        "probe-host-capabilities.py",
+        "apply-host-bootstrap.py",
+        "generate-environment-remediation.py",
+        "generate-clarification-package.py",
+        "generate-clarification-review.py",
+        "requirement-clarification-lead",
+        "control-plane helper",
+        "clarification-challenge-report.json",
+        "clarification-handoff.json",
+        "clarification-evidence.json",
         "workflow-entry.py",
         "runtime_contract.<field>",
         "workflowprogram-validate",
@@ -82,8 +137,18 @@ ACTIVE_ENTRY_DOCS = {
     ".claude/skills/workflowprogram-develop/SKILL.md": [
         "runtime_contract",
         "test_contract",
+        "generated_runtime_contract",
+        ".workflowprogram/runtime/",
+        "generate-target-runtime.py",
+        "discover-host-capabilities.py",
+        "probe-host-capabilities.py",
+        "apply-host-bootstrap.py",
         "workflow-entry.py",
         "implemented_now",
+        "generate-clarification-review.py",
+        "clarification-handoff.json",
+        "clarification-evidence.json",
+        "requirement-clarification-lead",
         "workflowprogram-validate",
         "runtime_smoke.py",
         "s5-validation-summary.json",
@@ -91,9 +156,26 @@ ACTIVE_ENTRY_DOCS = {
     ],
 }
 
+FORBIDDEN_ACTIVE_DOC_SNIPPETS = {
+    ".claude/commands/develop.md": [
+        "python3 ${CLAUDE_PLUGIN_ROOT}/scripts/stage-progress.py update ...",
+    ],
+    ".claude/skills/workflowprogram-develop/SKILL.md": [
+        "执行过程中必须通过 `${CLAUDE_PLUGIN_ROOT}/scripts/stage-progress.py` 写入进展与关键节点结果。",
+    ],
+    "docs/workflowprogram-stage-lowlevel-design.md": [
+        "python3 ${CLAUDE_PLUGIN_ROOT}/scripts/stage-progress.py update ...",
+    ],
+}
+
 ACTIVE_TEMPLATE_DOC = {
     ".claude/skills/workflow-spec-support/yaml-spec-template.md": [
         "stage_slot: S5",
+        "generated_runtime_contract",
+        "runtime_capabilities",
+        "capability_discovery",
+        "host_capabilities",
+        "agent_team_contract",
         "workflowprogram-validate",
         "validation-runtime-report.md",
         "test_contract",
@@ -117,6 +199,8 @@ ACTIVE_STATUS_DOCS = {
         "历史追溯文档",
         "已关闭决策",
         "workflow-entry.py",
+        "shared-control-plane-wrapper",
+        "capability_discovery",
     ],
 }
 
@@ -129,6 +213,7 @@ SOURCE_DIST_FILE_ROOTS = {
     ".claude/scripts": "scripts",
     ".claude/skills": "skills",
     ".claude-plugin": ".claude-plugin",
+    ".claude-plugin/root": "",
 }
 
 
@@ -207,6 +292,8 @@ def load_build_plugin_module(root: Path):
 
 def expected_dist_bytes(build_plugin: Any, source_root_rel: str, source_file: Path) -> bytes:
     """计算某个源码文件在 dist/plugin 中应产出的精确字节内容。"""
+    if source_root_rel == ".claude-plugin/root":
+        return source_file.read_bytes()
     if source_root_rel == ".claude-plugin":
         return source_file.read_bytes()
 
@@ -255,6 +342,15 @@ def validate_required_paths(root: Path, result: ValidationResult) -> None:
         ".claude/scripts/generate-target-runtime.py",
         ".claude/scripts/generate-workflow-view.py",
         ".claude/scripts/generate-workflow-lowlevel.py",
+        ".claude/scripts/probe-host-capabilities.py",
+        ".claude/scripts/discover-host-capabilities.py",
+        ".claude/scripts/apply-host-bootstrap.py",
+        ".claude/scripts/generate-environment-remediation.py",
+        ".claude/scripts/generate-clarification-package.py",
+        ".claude/scripts/generate-clarification-review.py",
+        ".claude/scripts/bootstrap-python-runtime.py",
+        ".claude/scripts/doctor.py",
+        ".claude/scripts/lib/control_plane.py",
         ".claude/scripts/validate-generated-runtime.py",
         ".claude/scripts/validate-workflow-lowlevel.py",
         ".claude/scripts/validate-lessons-delta.py",
@@ -269,13 +365,20 @@ def validate_required_paths(root: Path, result: ValidationResult) -> None:
         ".claude/scripts/validate-workflow.py",  # Self-check
         ".claude-plugin/plugin.json",
         ".claude-plugin/marketplace.json",
+        ".claude-plugin/root/requirements.lock.txt",
+        ".claude-plugin/root/runtime-manifest.json",
+        ".claude-plugin/root/hooks/hooks.json",
+        ".claude-plugin/root/bin/workflowprogram-python",
+        ".claude-plugin/root/bin/workflowprogram-doctor",
         "tools/build_plugin.py",
         "tools/generate-view.py",
         "tools/mock_runtime_host.py",
         "tools/runtime_smoke.py",
         "tools/runtime_smoke_matrix.py",
+        "tools/test_plugin_bootstrap.py",
         "tests/fixtures",
         "tests/spec-fixtures",
+        "tests/draft-fixtures",
         "tests/expectations",
         "tests/transcripts",
         "docs/workflowprogram-stage-highlevel-design.md",
@@ -394,6 +497,169 @@ def validate_document_contracts(root: Path, result: ValidationResult) -> None:
                 result.add_pass(f"Active template doc '{relative_path}' includes '{marker}'")
             else:
                 result.add_error(f"Active template doc '{relative_path}' is missing '{marker}'")
+
+    for relative_path, snippets in FORBIDDEN_ACTIVE_DOC_SNIPPETS.items():
+        full_path = root / relative_path
+        if not full_path.exists():
+            result.add_error(f"Missing active doc for anti-regression check: {relative_path}")
+            continue
+        try:
+            content = full_path.read_text(encoding="utf-8")
+        except Exception as e:
+            result.add_error(f"Cannot read active doc '{relative_path}' for anti-regression check: {e}")
+            continue
+
+        for snippet in snippets:
+            if snippet in content:
+                result.add_error(
+                    f"Active doc '{relative_path}' re-exposes fragile progress CLI assembly: '{snippet}'"
+                )
+            else:
+                result.add_pass(f"Active doc '{relative_path}' avoids fragile progress CLI snippet '{snippet}'")
+
+
+def validate_stage_progress_hardening(root: Path, result: ValidationResult) -> None:
+    """Validate helper-backed progress emission and direct CLI compatibility."""
+
+    helper_path = root / ".claude" / "scripts" / "lib" / "control_plane.py"
+    script_path = root / ".claude" / "scripts" / "stage-progress.py"
+    if not helper_path.exists() or not script_path.exists():
+        result.add_error("Missing control-plane helper or stage-progress script for hardening validation")
+        return
+
+    helper_spec = importlib.util.spec_from_file_location("workflowprogram_control_plane_helper", helper_path)
+    if helper_spec is None or helper_spec.loader is None:
+        result.add_error(f"Cannot load control-plane helper from {helper_path}")
+        return
+    helper_module = importlib.util.module_from_spec(helper_spec)
+    helper_spec.loader.exec_module(helper_module)
+
+    sample_run_root = Path("/tmp/workflow-hardening-sample-run")
+    command = helper_module.build_stage_progress_command(
+        python_executable=sys.executable,
+        stage_progress_script=script_path,
+        run_root=sample_run_root,
+        stage="S2",
+        node="context_scan",
+        event="StageCheckpoint",
+        status="ok",
+        percent=55,
+        result="context report ready",
+        next_action="review findings",
+        artifact_refs=["outputs/stages/s2-context-report.md", ""],
+        verdict="PASS",
+        approval_status="approved",
+    )
+    expected_command = [
+        sys.executable,
+        str(script_path),
+        "update",
+        "--run-root",
+        str(sample_run_root),
+        "--stage",
+        "S2",
+        "--node",
+        "context_scan",
+        "--event",
+        "StageCheckpoint",
+        "--status",
+        "ok",
+        "--percent",
+        "55",
+        "--result",
+        "context report ready",
+        "--next-action",
+        "review findings",
+        "--verdict",
+        "PASS",
+        "--approval-status",
+        "approved",
+        "--artifact-ref",
+        "outputs/stages/s2-context-report.md",
+    ]
+    if command == expected_command:
+        result.add_pass("control-plane helper builds the expected stage-progress CLI argv")
+    else:
+        result.add_error("control-plane helper argv mapping drifted from the expected stage-progress CLI contract")
+
+    with tempfile.TemporaryDirectory(prefix="workflow-stage-progress-helper-") as temp_dir:
+        run_root = Path(temp_dir)
+        for idx, event in enumerate(("StageStarted", "StageCheckpoint", "StageCompleted"), start=1):
+            helper_module.emit_stage_progress(
+                python_executable=sys.executable,
+                stage_progress_script=script_path,
+                run_root=run_root,
+                stage="S1",
+                node=f"node_{idx}",
+                event=event,
+                status="running" if event == "StageStarted" else "ok",
+                percent=idx * 25,
+                result=f"{event} through helper",
+                next_action="continue",
+                artifact_refs=[f"outputs/stages/{event.lower()}.md"],
+                verdict="PASS" if event != "StageStarted" else "",
+                approval_status="approved" if event == "StageCompleted" else "",
+            )
+
+        current_path = run_root / "outputs" / "progress" / "current-progress.json"
+        milestones_path = run_root / "outputs" / "progress" / "milestones.jsonl"
+        user_progress_path = run_root / "outputs" / "progress" / "user-progress.md"
+        if current_path.exists() and milestones_path.exists() and user_progress_path.exists():
+            result.add_pass("helper-backed progress emission materializes all progress artifacts")
+        else:
+            result.add_error("helper-backed progress emission did not materialize all progress artifacts")
+
+        try:
+            current_payload = json.loads(current_path.read_text(encoding="utf-8"))
+            milestone_lines = [line for line in milestones_path.read_text(encoding="utf-8").splitlines() if line.strip()]
+            user_progress = user_progress_path.read_text(encoding="utf-8")
+        except Exception as exc:
+            result.add_error(f"Cannot read helper-backed progress artifacts: {exc}")
+        else:
+            if current_payload.get("current_stage") == "S1" and current_payload.get("last_status") == "ok":
+                result.add_pass("helper-backed progress emission keeps current-progress.json semantics intact")
+            else:
+                result.add_error("helper-backed progress emission changed current-progress.json semantics")
+            if len(milestone_lines) == 3:
+                result.add_pass("helper-backed progress emission preserves milestone append behavior")
+            else:
+                result.add_error("helper-backed progress emission did not append the expected milestone count")
+            if "## 历史关键节点结果" in user_progress:
+                result.add_pass("helper-backed progress emission preserves user-progress.md structure")
+            else:
+                result.add_error("helper-backed progress emission changed user-progress.md structure")
+
+    with tempfile.TemporaryDirectory(prefix="workflow-stage-progress-cli-") as temp_dir:
+        run_root = Path(temp_dir)
+        direct_command = [
+            sys.executable,
+            str(script_path),
+            "update",
+            "--run-root",
+            str(run_root),
+            "--stage",
+            "S0",
+            "--node",
+            "route_intent",
+            "--event",
+            "StageStarted",
+            "--status",
+            "running",
+            "--percent",
+            "5",
+            "--result",
+            "direct cli compatibility",
+            "--next-action",
+            "continue routing",
+            "--json",
+        ]
+        completed = subprocess.run(direct_command, capture_output=True, text=True, check=False)
+        if completed.returncode == 0:
+            result.add_pass("Direct stage-progress.py CLI compatibility is preserved")
+        else:
+            result.add_error(
+                f"Direct stage-progress.py CLI compatibility regressed: {completed.stderr.strip() or completed.stdout.strip()}"
+            )
 
 
 def validate_settings_json(root: Path, result: ValidationResult) -> Optional[Dict]:
@@ -575,6 +841,8 @@ def validate_plugin_metadata(root: Path, result: ValidationResult) -> Optional[D
     """校验插件元数据文件，并返回解析后的 plugin.json 内容。"""
     plugin_json_path = root / ".claude-plugin" / "plugin.json"
     marketplace_json_path = root / ".claude-plugin" / "marketplace.json"
+    runtime_manifest_path = root / ".claude-plugin" / "root" / "runtime-manifest.json"
+    hooks_path = root / ".claude-plugin" / "root" / "hooks" / "hooks.json"
 
     plugin_meta: Optional[Dict[str, Any]] = None
     try:
@@ -594,10 +862,49 @@ def validate_plugin_metadata(root: Path, result: ValidationResult) -> Optional[D
         plugins = marketplace_meta.get("plugins")
         if isinstance(plugins, list) and plugins:
             result.add_pass("marketplace.json defines at least one plugin entry")
+            first_plugin = plugins[0]
+            if isinstance(first_plugin, dict):
+                source = first_plugin.get("source")
+                if isinstance(source, dict):
+                    if source.get("source") == "git-subdir":
+                        result.add_pass("marketplace.json uses git-subdir source")
+                    else:
+                        result.add_error("marketplace.json source.source must be git-subdir")
+                    if str(source.get("path", "")).strip() == "dist/plugin":
+                        result.add_pass("marketplace.json points to dist/plugin")
+                    else:
+                        result.add_error("marketplace.json source.path must be dist/plugin")
+                else:
+                    result.add_error("marketplace.json plugin source must be a mapping/object")
         else:
             result.add_error("marketplace.json must define at least one plugin entry")
     except Exception as e:
         result.add_error(f"Cannot parse .claude-plugin/marketplace.json: {e}")
+
+    try:
+        runtime_manifest = json.loads(runtime_manifest_path.read_text(encoding="utf-8"))
+        result.add_pass("Parsed .claude-plugin/root/runtime-manifest.json")
+        if runtime_manifest.get("python_dependency_model") == "plugin-local-site-packages":
+            result.add_pass("runtime-manifest declares plugin-local-site-packages")
+        else:
+            result.add_error("runtime-manifest must declare python_dependency_model=plugin-local-site-packages")
+        if str(runtime_manifest.get("launcher", "")).strip() == "bin/workflowprogram-python":
+            result.add_pass("runtime-manifest launcher points to bin/workflowprogram-python")
+        else:
+            result.add_error("runtime-manifest launcher must be bin/workflowprogram-python")
+    except Exception as e:
+        result.add_error(f"Cannot parse .claude-plugin/root/runtime-manifest.json: {e}")
+
+    try:
+        hooks_meta = json.loads(hooks_path.read_text(encoding="utf-8"))
+        result.add_pass("Parsed .claude-plugin/root/hooks/hooks.json")
+        session_start = hooks_meta.get("hooks", {}).get("SessionStart")
+        if isinstance(session_start, list) and session_start:
+            result.add_pass("hooks.json defines SessionStart hook")
+        else:
+            result.add_error("hooks.json must define a non-empty SessionStart hook")
+    except Exception as e:
+        result.add_error(f"Cannot parse .claude-plugin/root/hooks/hooks.json: {e}")
 
     return plugin_meta
 
@@ -668,6 +975,120 @@ def validate_capability_matrix(root: Path, result: ValidationResult) -> None:
                     result.add_error(f"Capability '{capability_id}' file '{relative_path}' is missing '{marker_text}'")
 
 
+def validate_draft_fixtures(root: Path, result: ValidationResult) -> None:
+    """运行 S1 deep clarification draft fixtures。"""
+    fixtures_root = root / "tests" / "draft-fixtures"
+    if not fixtures_root.exists():
+        result.add_error("Missing tests/draft-fixtures")
+        return
+
+    generator_script = root / ".claude" / "scripts" / "generate-clarification-package.py"
+    review_script = root / ".claude" / "scripts" / "generate-clarification-review.py"
+    validator_script = root / ".claude" / "scripts" / "validate-workflow-draft.py"
+
+    for fixture_dir in sorted(path for path in fixtures_root.iterdir() if path.is_dir()):
+        fixture_name = fixture_dir.name
+        meta_path = fixture_dir / "fixture.json"
+        spec_path = fixture_dir / "workflow-spec.md"
+        if not meta_path.exists():
+            result.add_error(f"Draft fixture '{fixture_name}' is missing fixture.json")
+            continue
+        if not spec_path.exists():
+            result.add_error(f"Draft fixture '{fixture_name}' is missing workflow-spec.md")
+            continue
+
+        try:
+            meta = json.loads(meta_path.read_text(encoding="utf-8"))
+        except Exception as exc:
+            result.add_error(f"Cannot parse draft fixture manifest '{meta_path}': {exc}")
+            continue
+
+        expected_status = str(meta.get("expected_status", "")).strip()
+        if expected_status not in {"PASS", "FAIL"}:
+            result.add_error(f"Draft fixture '{fixture_name}' must declare expected_status PASS or FAIL")
+            continue
+
+        with tempfile.TemporaryDirectory(prefix=f"workflow-draft-fixture-{fixture_name}-") as temp_dir:
+            run_root = Path(temp_dir)
+            temp_spec_path = run_root / "workflow-spec.md"
+            temp_spec_path.write_text(spec_path.read_text(encoding="utf-8"), encoding="utf-8")
+
+            for script_path, label in (
+                (generator_script, "generate-clarification-package"),
+                (review_script, "generate-clarification-review"),
+            ):
+                command = [
+                    sys.executable,
+                    str(script_path),
+                    "--spec",
+                    str(temp_spec_path),
+                    "--run-root",
+                    str(run_root),
+                    "--json",
+                ]
+                completed = subprocess.run(command, capture_output=True, text=True)
+                if completed.returncode != 0:
+                    stderr = completed.stderr.strip()
+                    stdout = completed.stdout.strip()
+                    details = stderr or stdout or f"exit code {completed.returncode}"
+                    result.add_error(f"Draft fixture '{fixture_name}' failed during {label}: {details}")
+                    break
+                result.add_pass(f"Draft fixture '{fixture_name}' generated {label} outputs")
+            else:
+                validate_command = [
+                    sys.executable,
+                    str(validator_script),
+                    "--spec",
+                    str(temp_spec_path),
+                    "--run-root",
+                    str(run_root),
+                    "--json",
+                ]
+                completed = subprocess.run(validate_command, capture_output=True, text=True)
+                try:
+                    payload = json.loads(completed.stdout or "{}")
+                except Exception as exc:
+                    result.add_error(f"Draft fixture '{fixture_name}' produced invalid validator JSON: {exc}")
+                    continue
+
+                observed_status = str(payload.get("status", "")).strip()
+                if observed_status == expected_status:
+                    result.add_pass(f"Draft fixture '{fixture_name}' returned expected status {expected_status}")
+                else:
+                    result.add_error(
+                        f"Draft fixture '{fixture_name}' returned status {observed_status or 'UNKNOWN'} (expected {expected_status})"
+                    )
+
+                for snippet in meta.get("expected_error_substrings", []):
+                    if any(str(snippet) in error for error in payload.get("errors", [])):
+                        result.add_pass(f"Draft fixture '{fixture_name}' exposes expected error snippet '{snippet}'")
+                    else:
+                        result.add_error(f"Draft fixture '{fixture_name}' is missing expected error snippet '{snippet}'")
+
+                if meta.get("expected_handoff_ready") is True:
+                    handoff_path = run_root / "outputs" / "stages" / "clarification-handoff.json"
+                    evidence_path = run_root / "outputs" / "stages" / "clarification-evidence.json"
+                    try:
+                        handoff = json.loads(handoff_path.read_text(encoding="utf-8"))
+                        evidence = json.loads(evidence_path.read_text(encoding="utf-8"))
+                    except Exception as exc:
+                        result.add_error(f"Draft fixture '{fixture_name}' cannot read handoff/evidence outputs: {exc}")
+                        continue
+                    if handoff.get("ready") is True:
+                        result.add_pass(f"Draft fixture '{fixture_name}' produces ready handoff for S2/S3")
+                    else:
+                        result.add_error(f"Draft fixture '{fixture_name}' must produce ready handoff for S2/S3")
+                    if handoff.get("s2_inputs") and handoff.get("s3_inputs"):
+                        result.add_pass(f"Draft fixture '{fixture_name}' includes non-empty s2_inputs and s3_inputs")
+                    else:
+                        result.add_error(f"Draft fixture '{fixture_name}' must include non-empty s2_inputs and s3_inputs")
+                    evidence_checks = evidence.get("evidence_checks", {})
+                    if evidence_checks.get("s2_handoff_ready") is True and evidence_checks.get("s3_handoff_ready") is True:
+                        result.add_pass(f"Draft fixture '{fixture_name}' records handoff readiness in clarification evidence")
+                    else:
+                        result.add_error(f"Draft fixture '{fixture_name}' must record s2/s3 handoff readiness in clarification evidence")
+
+
 def validate_dist_plugin(root: Path, plugin_meta: Optional[Dict[str, Any]], result: ValidationResult) -> None:
     """根据源码树和 build trace manifest 校验 dist/plugin。"""
     dist_root = root / "dist" / "plugin"
@@ -679,6 +1100,11 @@ def validate_dist_plugin(root: Path, plugin_meta: Optional[Dict[str, Any]], resu
     required_paths = [
         dist_root / ".claude-plugin" / "plugin.json",
         dist_root / ".claude-plugin" / "marketplace.json",
+        dist_root / "requirements.lock.txt",
+        dist_root / "runtime-manifest.json",
+        dist_root / "hooks" / "hooks.json",
+        dist_root / "bin" / "workflowprogram-python",
+        dist_root / "bin" / "workflowprogram-doctor",
         dist_root / "build-manifest.json",
         dist_root / "scripts" / "managed-assets.py",
         dist_root / "scripts" / "route-intent.py",
@@ -686,6 +1112,14 @@ def validate_dist_plugin(root: Path, plugin_meta: Optional[Dict[str, Any]], resu
         dist_root / "scripts" / "generate-target-runtime.py",
         dist_root / "scripts" / "generate-workflow-view.py",
         dist_root / "scripts" / "generate-workflow-lowlevel.py",
+        dist_root / "scripts" / "probe-host-capabilities.py",
+        dist_root / "scripts" / "discover-host-capabilities.py",
+        dist_root / "scripts" / "apply-host-bootstrap.py",
+        dist_root / "scripts" / "generate-environment-remediation.py",
+        dist_root / "scripts" / "generate-clarification-package.py",
+        dist_root / "scripts" / "generate-clarification-review.py",
+        dist_root / "scripts" / "bootstrap-python-runtime.py",
+        dist_root / "scripts" / "doctor.py",
         dist_root / "scripts" / "stage-progress.py",
         dist_root / "scripts" / "validate-generated-runtime.py",
         dist_root / "scripts" / "validate-lessons-delta.py",
@@ -762,6 +1196,8 @@ def validate_dist_plugin(root: Path, plugin_meta: Optional[Dict[str, Any]], resu
         source_root = root / source_root_rel
         destination_root = dist_root / dist_root_rel
         for source_file in iter_source_files(source_root):
+            if source_root_rel == ".claude-plugin" and (root / ".claude-plugin" / "root") in source_file.parents:
+                continue
             relative = source_file.relative_to(source_root)
             built_file = destination_root / relative
             dist_relative = str(built_file.relative_to(dist_root)).replace("\\", "/")
@@ -845,7 +1281,9 @@ def main():
         validate_primary_skill_set(settings, result)
 
     validate_document_contracts(root, result)
+    validate_stage_progress_hardening(root, result)
     validate_capability_matrix(root, result)
+    validate_draft_fixtures(root, result)
     validate_constraints(root, result)
     plugin_meta = validate_plugin_metadata(root, result)
     validate_dist_plugin(root, plugin_meta, result)

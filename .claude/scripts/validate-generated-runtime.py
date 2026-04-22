@@ -10,6 +10,14 @@ import json
 from pathlib import Path
 from typing import Any, Dict, List
 
+from lib.host_team_utils import (
+    agent_team_contract_from_spec,
+    agent_team_enabled,
+    capability_discovery_from_spec,
+    host_global_adapter,
+    host_capabilities_from_spec,
+    runtime_capabilities_from_contract,
+)
 from lib.yaml_utils import load_yaml_mapping
 
 
@@ -22,6 +30,7 @@ REQUIRED_GENERATED_RUNTIME_KEYS = {
     "runtime_manifest",
     "run_root_dir",
     "mode",
+    "runtime_capabilities",
 }
 
 
@@ -65,7 +74,16 @@ def validate_generated_runtime(spec_path: Path, target_root: Path) -> Dict[str, 
         if missing_keys:
             errors.append(f"generated_runtime_contract missing required keys: {', '.join(missing_keys)}")
 
-        normalized = {key: str(contract.get(key, "")).strip() for key in REQUIRED_GENERATED_RUNTIME_KEYS}
+        normalized = {key: str(contract.get(key, "")).strip() for key in REQUIRED_GENERATED_RUNTIME_KEYS if key != "runtime_capabilities"}
+        expected_runtime_capabilities = runtime_capabilities_from_contract(contract)
+        capability_discovery = capability_discovery_from_spec(spec)
+        declared_host_capabilities = host_capabilities_from_spec(spec)
+        host_global_adapter_declared = any(
+            str(item.get("bootstrap", {}).get("scope", "")).strip() == "host_global" and bool(host_global_adapter(item))
+            for item in declared_host_capabilities
+            if isinstance(item, dict) and isinstance(item.get("bootstrap"), dict)
+        )
+        declared_agent_team = agent_team_contract_from_spec(spec)
         main_entry = (
             str(spec.get("test_contract", {}).get("entry", {}).get("main_entry", "")).strip()
             if isinstance(spec.get("test_contract", {}), dict)
@@ -111,11 +129,28 @@ def validate_generated_runtime(spec_path: Path, target_root: Path) -> Dict[str, 
                 "runtime_manifest": normalized.get("runtime_manifest", ""),
                 "run_root_dir": normalized.get("run_root_dir", ""),
                 "runtime_mode": normalized.get("mode", ""),
+                "runtime_capabilities": expected_runtime_capabilities,
                 "default_entry_skill": main_entry,
+                "capability_discovery_enabled": bool(capability_discovery.get("enabled", False)),
+                "capability_discovery_domains": capability_discovery.get("domains", []) if isinstance(capability_discovery.get("domains", []), list) else [],
+                "host_capabilities_declared": bool(declared_host_capabilities),
+                "host_global_adapter_declared": host_global_adapter_declared,
+                "agent_team_enabled": agent_team_enabled(declared_agent_team),
             }
             for key, expected in expected_pairs.items():
-                observed = str(manifest_payload.get(key, "")).strip()
-                if observed != expected:
+                observed_value = manifest_payload.get(key)
+                if isinstance(expected, list):
+                    observed = [str(item).strip() for item in observed_value] if isinstance(observed_value, list) else []
+                    if observed != expected:
+                        errors.append(f"runtime manifest field '{key}' mismatch: expected '{expected}', got '{observed}'")
+                    continue
+                if isinstance(expected, bool):
+                    observed = observed_value if isinstance(observed_value, bool) else None
+                    if observed is not expected:
+                        errors.append(f"runtime manifest field '{key}' mismatch: expected '{expected}', got '{observed}'")
+                    continue
+                observed = str(observed_value).strip() if observed_value is not None else ""
+                if observed != str(expected).strip():
                     errors.append(f"runtime manifest field '{key}' mismatch: expected '{expected}', got '{observed}'")
 
         if entry_path.exists():
@@ -125,20 +160,32 @@ def validate_generated_runtime(spec_path: Path, target_root: Path) -> Dict[str, 
                 f"DESIGN_SPEC_REL = {normalized.get('design_spec_path', '')!r}",
                 f"RUNNER_SCRIPT_REL = {normalized.get('runner_script', '')!r}",
                 f"STATE_VALIDATOR_SCRIPT_REL = {normalized.get('state_validator_script', '')!r}",
+                "workflowprogram-python",
             ):
                 if needle not in entry_text:
                     errors.append(f"entry wrapper is missing expected marker: {needle}")
+            if capability_discovery.get("enabled") is True and "DISCOVER_HOST_SCRIPT = \"discover-host-capabilities.py\"" not in entry_text:
+                errors.append("entry wrapper is missing discover-host-capabilities.py integration marker")
+            if declared_host_capabilities and "PROBE_HOST_SCRIPT = \"probe-host-capabilities.py\"" not in entry_text:
+                errors.append("entry wrapper is missing probe-host-capabilities.py integration marker")
+            if declared_host_capabilities and "ENVIRONMENT_REMEDIATION_SCRIPT = \"generate-environment-remediation.py\"" not in entry_text:
+                errors.append("entry wrapper is missing generate-environment-remediation.py integration marker")
+            if host_global_adapter_declared and "--approve-host-global-bootstrap" not in entry_text:
+                errors.append("entry wrapper is missing approve-host-global-bootstrap integration marker")
+            if agent_team_enabled(declared_agent_team) and "TEAM_ORCHESTRATION_ENABLED = True" not in entry_text:
+                errors.append("entry wrapper is missing TEAM_ORCHESTRATION_ENABLED marker")
 
         if runner_path.exists():
             runner_text = runner_path.read_text(encoding="utf-8")
-            for needle in ("workflow-runner.py", "--entry-skill", "--intent"):
+            for needle in ("workflow-runner.py", "--entry-skill", "--intent", "workflowprogram-python"):
                 if needle not in runner_text:
                     errors.append(f"runner wrapper is missing expected marker: {needle}")
 
         if validator_path.exists():
             validator_text = validator_path.read_text(encoding="utf-8")
-            if "validate-run-state.py" not in validator_text:
-                errors.append("state validator wrapper does not reference validate-run-state.py")
+            for needle in ("validate-run-state.py", "workflowprogram-python"):
+                if needle not in validator_text:
+                    errors.append(f"state validator wrapper is missing expected marker: {needle}")
     except Exception as exc:
         errors.append(str(exc))
 

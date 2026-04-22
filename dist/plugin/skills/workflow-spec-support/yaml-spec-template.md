@@ -246,6 +246,81 @@ generated_runtime_contract:
   runtime_manifest: .workflowprogram/runtime/runtime-manifest.json
   run_root_dir: .workflowprogram/runs
   mode: shared-control-plane-wrapper
+  runtime_capabilities:
+    - state_transitions
+    - run_state_validation
+    # - capability_discovery
+    # - host_capability_probe
+    # - team_orchestration
+
+# 可选能力搜索与推荐契约
+# capability_discovery:
+#   enabled: true
+#   domains:
+#     - reverse_engineering
+#   include_local_installed: true
+#   include_curated_profiles: true
+#   infer_from_request: true
+#   # 可选：对领域 profile 做显式裁剪或替换；用户显式选择优先于 profile 默认值
+#   profile_overrides:
+#     exclude_capability_ids:
+#       - radare2_cli
+#     replace_capabilities:
+#       - replaces: ghidra_cli
+#         id: binary_ninja_cli
+#         kind: external_binary
+#         name: Binary Ninja CLI
+#         probe:
+#           binary: binaryninja
+#         summary: Prefer Binary Ninja over Ghidra CLI
+#         manual_steps:
+#           - Ensure Binary Ninja CLI is installed and available in PATH
+#     disable_team_default: false
+
+# 可选宿主能力契约
+# host_capabilities:
+#   - id: ghidra_mcp
+#     kind: mcp_server
+#     name: Ghidra MCP
+#     required: true
+#     probe:
+#       server_name: ghidra
+#     bootstrap:
+#       scope: host_global
+#       summary: Install and configure Ghidra MCP
+#       project_local_outputs: []
+#       # 若 scope=host_global，可选声明审批后的受限 adapter
+#       # adapter:
+#       #   type: symlink_binary   # symlink_binary | uv_tool | pipx_install | npm_global
+#       #   source_binary: workflowprogram-python
+#       #   target_path: /tmp/workflowprogram-host-global/bin/ghidra-wrapper
+#       # 若 scope=project_local，可选声明声明式 bootstrap 资产
+#       # assets:
+#       #   - path: .workflowprogram/bootstrap/bin/ghidra-wrapper.sh
+#       #     format: shell
+#       #     executable: true
+#       #     content: |
+#       #       #!/usr/bin/env bash
+#       #       exec ghidraRun "$@"
+#     approval_required: true
+
+# 可选 agent team 契约
+# agent_team_contract:
+#   enabled: true
+#   max_fan_out: 2
+#   join_policy: all_must_pass
+#   roles:
+#     - id: reviewer
+#       responsibility: review generated assets
+#       ownership_stage_slots: [S5]
+#       output_patterns:
+#         - outputs/stages/team/S5/reviewer/review-report.md
+#       required: true
+#   execution:
+#     - stage_slot: S5
+#       role_ids:
+#         - reviewer
+#       join_role: reviewer
 
 # 测试契约（支撑基础运行测试判定；引用 runtime_contract，不复制执行约束）
 test_contract:

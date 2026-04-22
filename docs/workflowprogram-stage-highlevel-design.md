@@ -18,9 +18,12 @@
 
 - 入口能力由 `workflowprogram-*` skills 承载。
 - 自然语言自动触发策略仅开放 `workflowprogram-orchestrate`，并通过 `route-intent.py` 提供确定性路由（strict 模式可硬阻断歧义）。
-- 主产品入口的确定性脚本链为 `workflow-entry.py -> managed-assets.py -> workflow-runner.py -> validate-run-state.py`；叶子 skill 不应只靠提示词顺序隐式串联这些脚本。
+- 主产品入口的确定性脚本链为 `workflow-entry.py -> (validate spec/view/lowlevel/target-runtime, managed-assets, probe/apply bootstrap) -> workflow-runner.py -> validate-run-state.py`；叶子 skill 不应只靠提示词顺序隐式串联这些脚本。
+- 生成后的目标工作流也必须交付自己的 `.workflowprogram/runtime/` 控制面包装层；当前固定模式为 `shared-control-plane-wrapper`，即目标侧 wrapper 调共享脚本，而不是复制一套独立引擎。
 - 目标项目写入采用 staged candidate + managed apply 流程。
 - 运行证据统一写入 `TARGET_ROOT/.workflowprogram/runs/<run-id>/`。
+- 若工作流启用 `capability_discovery`，则在 `host_capabilities` 最终定稿前，必须先生成候选能力推荐与结构化人工指引。
+- 若工作流依赖宿主专业能力或显式 agent team，则必须分别通过 `host_capabilities` 与 `agent_team_contract` 在 `workflow-spec.yaml` 中声明。
 
 ### 2.2 冲突收敛决策
 
@@ -55,22 +58,22 @@ TARGET_ROOT/
 
 ### 3.1 安装与分发模型（可执行）
 
-`dist/plugin/` 不是“唯一可能安装位置”，而是“仓库内唯一 canonical 运行时载荷目录”。  
-用户安装时可以把同构载荷放到任意绝对路径，再通过 `--plugin-dir` 指向该路径。
+`dist/plugin/` 不是“源码目录的一个副本”，而是“仓库内唯一 canonical marketplace 运行时载荷目录”。
+最终用户的主安装路径是 marketplace；源码构建仍可用于本仓库开发和调试。
 
 | 通道 | 载荷来源 | 安装步骤 | 当前状态 |
 |---|---|---|---|
-| Source Build | 本仓库 `dist/plugin/` | `python3 tools/build_plugin.py` -> `claude --plugin-dir <repo>/dist/plugin` | 受支持 |
-| GitHub Release Package | Release 附件中的 `plugin/` 目录 | 下载并解压 -> 校验 `build-manifest.json` -> `claude --plugin-dir <extract>/plugin` | 受支持（当发布包提供时） |
-| Marketplace / `/plugin install` | 平台安装器 | 安装后由平台决定目录，仍应可映射到 `PLUGIN_ROOT` 模型 | 未定案 |
+| Marketplace / `/plugin install` | 平台安装器 + 本仓库 `dist/plugin/` 载荷 | 添加 marketplace -> 安装 `workflowprogram-cn@logic70-plugins` -> `SessionStart` 自动准备 plugin-local Python runtime | 主路径 |
+| Source Build | 本仓库 `dist/plugin/` | `python3 tools/build_plugin.py`，仅供仓库开发/调试 | 辅助路径 |
 
 ### 3.2 GitHub 安装步骤（用户视角）
 
-1. 从 GitHub Release 下载 `workflowprogram-plugin-<version>.tar.gz`（或 zip）。
-2. 解压后确认存在 `plugin/skills`、`plugin/agents`、`plugin/commands`、`plugin/.claude-plugin`、`plugin/build-manifest.json`。
-3. 在目标项目目录启动：
-   `claude --plugin-dir /abs/path/to/plugin`
-4. 在会话中执行 `/workflowprogram-orchestrate ...` 或其他 `workflowprogram-*` 入口。
+1. 在 Claude Code 中添加本仓库发布的 marketplace。
+2. 安装 `workflowprogram-cn@logic70-plugins`。
+3. 首次 `SessionStart` 自动把 `PyYAML` 安装到 `${CLAUDE_PLUGIN_DATA}/python/site-packages`。
+4. 插件内所有 Python 控制面脚本统一通过 `workflowprogram-python` 访问这层 plugin-local `site-packages`。
+5. 在目标项目目录直接启动 `claude`。
+6. 在会话中执行 `/workflowprogram-orchestrate ...` 或其他 `workflowprogram-*` 入口。
 
 ## 4. 用户界面使用流程
 
@@ -105,6 +108,8 @@ TARGET_ROOT/
 最终输出（交付层）：
 
 - `TARGET_ROOT/.claude/` 资产（`settings.json`、`skills/`、`agents/`、`rules/`、可选 `commands/`）
+- `TARGET_ROOT/.workflowprogram/design/` 设计资产（`workflow-spec.yaml`、`workflow-view.md`、`workflow-lowlevel.md`）
+- `TARGET_ROOT/.workflowprogram/runtime/` 目标侧 deterministic runtime 资产（`workflow-entry.py`、`workflow-runner.py`、`validate-run-state.py`、`runtime-manifest.json`）
 - `TARGET_ROOT/.workflowprogram/managed-files.json`
 - `RUN_ROOT` 证据（`context.json`、`state.json`、`events.jsonl`、`transcript.md`、`validation-runtime-report.md`、`outputs/`）
 - 进展可视化资产（`outputs/progress/current-progress.json`、`outputs/progress/milestones.jsonl`、`outputs/progress/user-progress.md`）
@@ -124,12 +129,22 @@ TARGET_ROOT/
 ### S1 需求澄清阶段（Explore Requirement）
 
 - 目标：通过持续多轮对话把自然语言需求收敛为无歧义规格，明确用户诉求、最终目的与成功标准。
-- 输出：`workflow-spec.md`（人类可读规格草案）。
+- 输出：
+  - `workflow-spec.md`（人类可读规格草案）
+  - `clarification-record.json`
+  - `open-questions.json`
+  - `assumption-log.md`
+  - `design-readiness-report.json`
+  - `clarification-challenge-report.json`
+  - `clarification-handoff.json`
+  - `clarification-evidence.json`
 - 适用范围：仅适用于 `develop` 主链；`audit / iterate / validate` 不进入 S1，除非后续设计显式扩展。
 - 规范要求：
   - S1 不得只做单轮问答后立即结束；只要仍存在会影响设计的歧义，就必须继续向用户追问。
+  - `requirement-clarification-lead` 是唯一直接与用户对话的角色；challenge roles 只能在内部审阅草案、提出补问建议与 handoff 建议，不得直接对用户发问。
   - 每轮只聚焦当前最高优先级的未决问题，直到“用户诉求 / 最终目的 / 成功标准 / 触发方式 / 输入输出 / 质量门禁”全部明确。
-  - `workflow-spec.md` 必须包含 `User Intent` 与 `Clarification Summary`，用于记录澄清收敛结果。
+  - `workflow-spec.md` 必须包含 `User Intent`、`Clarification Summary`、`Open Questions`、`Assumptions and Boundaries`、`Readback Confirmation`。
+  - S1 必须把澄清结果派生为结构化澄清包与 challenge/handoff/evidence 产物，供 `S2/S3` 直接消费，而不是只依赖 prose draft。
 
 ### S2 领域研究阶段（Explore Context）
 
@@ -143,12 +158,22 @@ TARGET_ROOT/
   - `workflow-spec.yaml`（机器可读控制面）
   - `runtime_contract`（内嵌于 `workflow-spec.yaml`，定义写入边界、证据集、失败枚举、环境 skip）
 - `test_contract`（内嵌于 `workflow-spec.yaml`，定义入口/边界/流程/产物/失败五类基础测试判定）
+  - `generated_runtime_contract`（内嵌于 `workflow-spec.yaml`，定义目标侧 runtime 包装层的交付路径与 `runtime_capabilities`）
+  - 可选 `capability_discovery`（能力发现与推荐契约）
+  - 可选 `host_capabilities`（宿主专业能力契约）
+  - 可选 `agent_team_contract`（显式 team 拓扑契约）
   - 其中 `test_contract.flow` 默认表达 `develop` 主链；非 `develop` 流转由 `intent_flows` 约束
   - `workflow-view.md`（只读视图）
   - `workflow-lowlevel.md`（维护与迭代指导；不得覆盖 YAML 语义）
 - 规范要求：
   - `develop` 主链必须在 S3 完成后经过审批 gate，方可进入 S4。
   - 审批记录必须区分 `approved`（人工批准）与 `auto-approved`（CI 或参数自动放行）。
+  - `generated_runtime_contract.mode` 当前固定为 `shared-control-plane-wrapper`；目标工作流必须交付 wrapper，不得只交付提示词与设计文档。
+  - 当声明 `capability_discovery.enabled=true` 时，`generated_runtime_contract.runtime_capabilities` 必须包含 `capability_discovery`。
+  - `capability_discovery` 可按领域画像展开基线能力包；当前至少支持 `reverse_engineering`，并允许通过 `profile_overrides` 显式移除、替换 profile 默认能力。
+  - 当声明 `host_capabilities` 时，`generated_runtime_contract.runtime_capabilities` 必须包含 `host_capability_probe`。
+  - 当声明 `agent_team_contract.enabled=true` 时，`generated_runtime_contract.runtime_capabilities` 必须包含 `team_orchestration`。
+  - 领域画像可选地推荐默认 `agent_team_contract`，但推荐值必须保持可编辑，且不得覆盖用户显式选择。
 
 ### S4 资产生成与受控写入阶段（Generate + Managed Apply）
 
@@ -156,10 +181,17 @@ TARGET_ROOT/
 - 输出：
   - `RUN_ROOT/outputs/candidate/.claude/*`
   - `RUN_ROOT/outputs/candidate/.workflowprogram/design/*`
+  - `RUN_ROOT/outputs/candidate/.workflowprogram/runtime/*`
   - `managed-change-plan/result/summary`
   - `TARGET_ROOT/.workflowprogram/managed-files.json`
   - 应用后的 `TARGET_ROOT/.claude/*`（无冲突场景）
   - 应用后的 `TARGET_ROOT/.workflowprogram/design/{workflow-spec.yaml,workflow-view.md,workflow-lowlevel.md}`（无冲突场景）
+  - 应用后的 `TARGET_ROOT/.workflowprogram/runtime/{workflow-entry.py,workflow-runner.py,validate-run-state.py,runtime-manifest.json}`（无冲突场景）
+- 规范要求：
+  - 目标侧 runtime 继续采用 `shared-control-plane-wrapper`，通过 wrapper 调共享控制面，不复制独立引擎。
+  - 若声明 `capability_discovery`，产品入口与目标侧 runtime 入口都必须先生成 `host-capability-candidates.json` 与 `host-bootstrap-instructions.md`，再进入 host probe / runner。
+  - 若能力发现启用领域画像，则 `host-capability-candidates.json` 必须保留画像来源、被排除能力、被替换能力，以及是否推荐默认 team 拓扑。
+  - 若声明 `host_capabilities`，产品入口与目标侧 runtime 入口都必须在 runner 前执行宿主探测；允许自动执行 `project_local + approval_required=false` 的 bootstrap，并仅在显式审批后执行受支持的 `host_global` adapter。
 
 ### S5 验证阶段（Validate）
 
@@ -172,22 +204,29 @@ TARGET_ROOT/
   - `context.json`、`state.json`、`events.jsonl` 属于运行态/控制面证据，由 runner 负责保留。
   - `validation-runtime-report.md` 与 `outputs/stages/s5-validation-summary.json` 属于 S5 判定产物。
   - `transcript.md` 属于动态运行证据，由 `runtime_smoke.py` 或等效 harness 补充，供 S5 消费。
+  - 若声明 `capability_discovery`，S5 必须消费 `host-capability-candidates.json` 与 `host-bootstrap-instructions.md`，并验证候选与人工指引都已生成。
+  - 若声明 `host_capabilities`，S5 必须消费 `host-capability-report.json`，并在 `validate/audit` 场景对当前宿主执行实时 probe。
+  - 若声明 `host_capabilities`，`validate/audit/iterate` 还必须产出 `environment-remediation-report.json` 与 `environment-remediation-guide.md`，把未解决的 manual step / bootstrap / re-check 指引显式写给用户。
+  - 若声明 `agent_team_contract.enabled=true`，S5 必须消费 `team-plan.json`、`team-results.json`、`team-join-summary.json` 与对应事件证据；确定性 provider 缺结构化 team evidence 时不得判为 clean PASS。
 
 ### S6 闭环阶段（Lessons & Constraints）
 
 - 目标：将失败经验、冲突与可复用约束沉淀。
 - 输出：`lessons.md` 增量、约束候选、下一轮改进建议。
+- 规范要求：
+  - 若环境失败包含宿主能力证据，`iterate` 必须把重复失败提升为 remediation proposal，而不是只重复 failure code。
+  - 若 `environment-remediation-report.json` 指出重复 blocker，`s6-lessons-delta.md` 必须至少包含一个 remediation / bootstrap / re-check 类候选项。
 
 ### 5A. Stage 可验证验收矩阵
 
 | Stage | 可验证准出条件 | 最小证据 |
 |---|---|---|
 | S0 | `intent` 属于 4 个枚举，`target_root` 为绝对路径且目录已存在（不存在时已创建） | `RUN_ROOT/outputs/stages/s0-route.json` |
-| S1 | `workflow-spec.md` 存在、不含 `TBD/待补`，包含 `User Intent` 与 `Clarification Summary`，且保留触发方式/输入/输出/质量门禁四段；`澄清轮次 >= 2` | `RUN_ROOT/workflow-spec.md` |
+| S1 | `workflow-spec.md` 存在、不含 `TBD/待补`，包含 `User Intent`、`Clarification Summary`、`Open Questions`、`Assumptions and Boundaries`、`Readback Confirmation`；`澄清轮次 >= 2`；`design-readiness-report.json=READY`；`clarification-handoff.json.ready=true`；challenge roles 未直接面向用户 | `RUN_ROOT/workflow-spec.md`、`RUN_ROOT/outputs/stages/clarification-record.json`、`RUN_ROOT/outputs/stages/open-questions.json`、`RUN_ROOT/outputs/stages/assumption-log.md`、`RUN_ROOT/outputs/stages/design-readiness-report.json`、`RUN_ROOT/outputs/stages/clarification-challenge-report.json`、`RUN_ROOT/outputs/stages/clarification-handoff.json`、`RUN_ROOT/outputs/stages/clarification-evidence.json` |
 | S2 | 上下文报告包含“可复用资产/缺口/命名建议”三段 | `RUN_ROOT/outputs/stages/s2-context-report.md` |
-| S3 | `workflow-spec.yaml` 可解析且关键键存在（含 `runtime_contract` 与 `test_contract`）；`workflow-view.md` 与 `workflow-lowlevel.md` 已生成，且 `workflow-lowlevel.md` 可由 `workflow-spec.yaml` 确定性重算；审批状态已记录且未绕过 gate | `RUN_ROOT/workflow-spec.yaml`、`RUN_ROOT/workflow-view.md`、`RUN_ROOT/workflow-lowlevel.md`、`outputs/stages/s3-design-summary.json` |
-| S4 | candidate 目录存在；managed plan/result 存在；`TARGET_ROOT/.workflowprogram/managed-files.json` 已写入且带 `updated_at`；目标侧设计包已持久化；冲突不覆盖目标文件 | `RUN_ROOT/outputs/candidate/.claude/`、`RUN_ROOT/outputs/candidate/.workflowprogram/design/`、`managed-change-plan/result`、`TARGET_ROOT/.workflowprogram/managed-files.json` |
-| S5 | 产生 workflow 级结论，且证据链文件齐全 | `validation-runtime-report.md`、`outputs/stages/s5-validation-summary.json` |
+| S3 | `workflow-spec.yaml` 可解析且关键键存在（含 `runtime_contract`、`test_contract`、`generated_runtime_contract`）；`workflow-view.md` 与 `workflow-lowlevel.md` 已生成，且 `workflow-lowlevel.md` 可由 `workflow-spec.yaml` 确定性重算；审批状态已记录且未绕过 gate | `RUN_ROOT/workflow-spec.yaml`、`RUN_ROOT/workflow-view.md`、`RUN_ROOT/workflow-lowlevel.md`、`outputs/stages/s3-design-summary.json` |
+| S4 | candidate 目录存在；managed plan/result 存在；`TARGET_ROOT/.workflowprogram/managed-files.json` 已写入且带 `updated_at`；目标侧设计包与 `.workflowprogram/runtime/` 已持久化；冲突不覆盖目标文件 | `RUN_ROOT/outputs/candidate/.claude/`、`RUN_ROOT/outputs/candidate/.workflowprogram/design/`、`RUN_ROOT/outputs/candidate/.workflowprogram/runtime/`、`managed-change-plan/result`、`TARGET_ROOT/.workflowprogram/managed-files.json` |
+| S5 | 产生 workflow 级结论，且证据链文件齐全；若声明能力发现、宿主能力或 team 契约，则对应 discovery / probe / team evidence 已纳入判定 | `validation-runtime-report.md`、`outputs/stages/s5-validation-summary.json`、条件性 `outputs/stages/host-capability-candidates.json`、`outputs/stages/host-bootstrap-instructions.md`、`outputs/stages/host-capability-report.json`、`outputs/stages/team-plan.json`、`outputs/stages/team-results.json`、`outputs/stages/team-join-summary.json` |
 | S6 | 输出 lessons 增量与约束候选，关联本次 `run-id` 与 `failure_kind`，且 `user-progress.md` 含“历史关键节点结果” | `RUN_ROOT/outputs/stages/s6-lessons-delta.md` |
 
 ### 5B. 基础运行测试契约
@@ -198,11 +237,24 @@ TARGET_ROOT/
   - 执行期硬约束：写入边界、最小证据集、失败类别枚举、环境 skip 条件
 - `test_contract`
   - 基础运行测试判定：`entry / boundary / flow / artifacts / failure`
+- `generated_runtime_contract`
+  - 目标工作流 deterministic runtime 的机器契约；当前模式固定为 `shared-control-plane-wrapper`
+- 可选 `capability_discovery`
+  - 目标能力发现与推荐契约，用于在 `host_capabilities` 最终定稿前生成候选 `skill / MCP / CLI` 清单
+- 可选 `host_capabilities`
+  - 宿主专业能力声明、probe 方式与 bootstrap 范围；若 `bootstrap.scope=project_local`，还可声明要生成的复用配置 / wrapper / bootstrap 资产
+- 可选 `agent_team_contract`
+  - opt-in team 拓扑、fan-out 限额、join policy 与运行证据要求
 
 统一原则：
 
 - `runtime_contract` 决定 runner 可以做什么、必须保留什么、如何降级。
 - `test_contract` 决定基础测试应检查什么、哪些结果算通过或失败。
+- `generated_runtime_contract` 决定目标工作流是否真正交付了自己的 wrapper + control-plane 接口，而不只是提示词资产。
+- `capability_discovery` 只负责候选能力推荐与结构化人工指引，不直接修改 `TARGET_ROOT` 交付物。
+- `host_capabilities` 只描述宿主依赖，不改变 `TARGET_ROOT` 交付语义；对应 readiness / bootstrap 证据必须落在 `RUN_ROOT`。唯一允许进入 `TARGET_ROOT` 的宿主 bootstrap 资产，必须严格限制在 `TARGET_ROOT/.workflowprogram/bootstrap/**`。
+- 只要存在 `required && status != ready`，最终 summary 必须 `FAIL`，且 `failure_kind = environment`。
+- `agent_team_contract` 只在显式声明时生效；普通 subagent 并不自动等于 team orchestration。
 - `workflowprogram-validate` 是 `test_contract` 的主消费方，`runtime_smoke.py` 是补充烟测与证据采集工具。
 - `test_contract` 对执行字段只允许引用，不允许复制同名内容。
 - `test_contract.failure.implemented_now` 仅表达“当前实现覆盖度”，不得反向改变 runner 的 `verdict` 或 `failure_kind` 语义。
@@ -215,10 +267,17 @@ TARGET_ROOT/
   - `validate-workflow-spec.py`
   - `generate-workflow-view.py`
   - `generate-workflow-lowlevel.py`
+  - `generate-target-runtime.py`
   - `managed-assets.py plan/apply-staged`
+  - `discover-host-capabilities.py`
+  - `probe-host-capabilities.py`
+  - `apply-host-bootstrap.py`（自动执行 `project_local + approval_required=false`，并在显式审批后执行受支持的 `host_global` adapter）
+  - `generate-environment-remediation.py`
   - `workflow-runner.py run`
   - `validate-run-state.py`
 - 编排结果必须落盘到 `RUN_ROOT/outputs/stages/entry-orchestration-summary.json`。
+- 目标工作流自己的 deterministic runtime 入口是 `TARGET_ROOT/.workflowprogram/runtime/workflow-entry.py`，并沿用同样的 shared-control-plane-wrapper 顺序：`probe/apply-bootstrap -> environment-remediation -> workflow-runner -> validate-run-state`。
+- 若声明 `capability_discovery`，则该顺序应扩展为 `discover -> probe/apply-bootstrap -> environment-remediation -> workflow-runner -> validate-run-state`。
 
 基础运行测试的统一场景骨架至少包含：
 

@@ -28,6 +28,7 @@ from lib.io_utils import iso_now
 
 CLAUDE = ROOT / ".claude"
 PLUGIN_META = ROOT / ".claude-plugin"
+PLUGIN_ROOT_ASSETS = PLUGIN_META / "root"
 DIST = ROOT / "dist" / "plugin"
 
 COMMAND_DESCRIPTIONS = {
@@ -95,9 +96,23 @@ def copy_plugin_manifest(src_dir: Path, dst_dir: Path) -> None:
     """把插件元数据文件原样复制到 dist 载荷。"""
     for src in sorted(src_dir.rglob("*")):
         if src.is_file():
+            if PLUGIN_ROOT_ASSETS in src.parents:
+                continue
             dst = dst_dir / src.relative_to(src_dir)
             ensure_parent(dst)
             shutil.copy2(src, dst)
+
+
+def copy_plugin_root_assets(src_dir: Path, dst_dir: Path) -> None:
+    """把插件根级资产复制到 dist/plugin 根目录。"""
+    if not src_dir.exists():
+        return
+    for src in sorted(src_dir.rglob("*")):
+        if not src.is_file():
+            continue
+        dst = dst_dir / src.relative_to(src_dir)
+        ensure_parent(dst)
+        shutil.copy2(src, dst)
 
 
 def apply_replacements(content: str) -> str:
@@ -128,7 +143,7 @@ def prepare_output_dirs(root: Path) -> None:
     """从零重建 dist/plugin 目录。"""
     if root.exists():
         shutil.rmtree(root)
-    for dirname in [".claude-plugin", "agents", "commands", "skills", "rules", "scripts"]:
+    for dirname in [".claude-plugin", "agents", "bin", "commands", "hooks", "skills", "rules", "scripts"]:
         (root / dirname).mkdir(parents=True, exist_ok=True)
 
 
@@ -177,6 +192,11 @@ def build_commands() -> None:
 def build_plugin_manifest_dir() -> None:
     """把插件市场元数据复制到 dist/plugin。"""
     copy_plugin_manifest(PLUGIN_META, DIST / ".claude-plugin")
+
+
+def build_plugin_root_assets() -> None:
+    """把插件根目录运行时资产复制到 dist/plugin 根。"""
+    copy_plugin_root_assets(PLUGIN_ROOT_ASSETS, DIST)
 
 
 def sha256_file(path: Path) -> str:
@@ -264,6 +284,7 @@ def main() -> None:
     dirty = source_dirty()
     prepare_output_dirs(DIST)
     build_plugin_manifest_dir()
+    build_plugin_root_assets()
     build_agents()
     build_rules()
     build_scripts()

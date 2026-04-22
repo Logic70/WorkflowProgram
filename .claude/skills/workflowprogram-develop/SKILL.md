@@ -22,14 +22,20 @@ disable-model-invocation: true
 - 不要把仓库维护命令包装进目标项目 workflow 设计。
 - 若出现目标文件冲突，应把候选版本保留在 `RUN_ROOT/outputs/`，而不是覆盖用户资产。
 - 对已应用文件，应维护 `TARGET_ROOT/.workflowprogram/managed-files.json`。
-- 执行过程中必须通过 `${CLAUDE_PLUGIN_ROOT}/scripts/stage-progress.py` 写入进展与关键节点结果。
-- `workflow-spec.md` 草案在进入 YAML 设计前必须通过 `${CLAUDE_PLUGIN_ROOT}/scripts/validate-workflow-draft.py` 的确定性质量门槛。
+- 执行过程中必须由 runner / control-plane helper 在内部调用 `${CLAUDE_PLUGIN_ROOT}/scripts/stage-progress.py` 写入进展与关键节点结果；不要把严格 CLI 参数组装交给模型。
+- `workflow-spec.md` 草案在进入 YAML 设计前必须通过 `${CLAUDE_PLUGIN_ROOT}/scripts/validate-workflow-draft.py` 的确定性质量门槛，并产出 `clarification-record.json`、`open-questions.json`、`assumption-log.md`、`design-readiness-report.json`、`clarification-challenge-report.json`、`clarification-handoff.json`、`clarification-evidence.json`。
 - S1 必须通过多轮用户对话澄清“用户诉求、最终目的、成功标准”；若这些信息仍不清楚，不得提前结束需求阶段。
 - `workflow-spec.yaml` 产出后必须调用 `${CLAUDE_PLUGIN_ROOT}/scripts/validate-workflow-spec.py` 进行结构校验。
 - `workflow-spec.yaml` 必须包含 `intent_flows`，明确 `develop / audit / iterate / validate` 的逻辑阶段流。
 - `workflow-spec.yaml` 必须包含 `runtime_contract`，且至少声明：`write_boundaries`、`required_evidence`、`failure_kinds`、`environment_skip`。
 - `workflow-spec.yaml` 必须包含 `test_contract`，且至少声明：`entry`、`boundary`、`flow`、`artifacts`、`failure`。
+- `workflow-spec.yaml` 必须包含 `generated_runtime_contract`，且 `mode` 当前固定为 `shared-control-plane-wrapper`。
+- 若 workflow 需要先发现候选专业能力，则 `workflow-spec.yaml` 还必须声明 `capability_discovery`，并同步扩展 `generated_runtime_contract.runtime_capabilities`。
+- 若 workflow 依赖宿主专业能力或显式 team，则 `workflow-spec.yaml` 还必须声明 `host_capabilities`、`agent_team_contract`，并同步扩展 `generated_runtime_contract.runtime_capabilities`。
+- 若 `host_capabilities.bootstrap.scope=project_local`，优先用声明式 `bootstrap.assets` 生成复用配置 / wrapper / marker 资产，而不是只留下占位输出。
+- 若声明 `host_capabilities`，产品入口与目标侧 runtime 都必须在 probe/bootstrap 后生成 `environment-remediation-report.json` 与 `environment-remediation-guide.md`；若重复环境失败存在，则 S6 必须把修复建议提升到 `s6-lessons-delta.md`。
 - develop 成功后，必须把 `workflow-spec.yaml`、`workflow-view.md`、`workflow-lowlevel.md` 持久化到 `TARGET_ROOT/.workflowprogram/design/`。
+- develop 成功后，还必须把目标侧 runtime 资产持久化到 `TARGET_ROOT/.workflowprogram/runtime/`。
 - `workflow-lowlevel.md` 仅用于维护与迭代指导，不得覆盖 `workflow-spec.yaml` 语义。
 - `test_contract` 对执行字段必须使用 `runtime_contract.<field>` 固定引用语法，且不得复制 `runtime_contract` 同名字段。
 - `test_contract.failure.implemented_now` 必须是 `runtime_contract.failure_kinds` 的子集，且不得反向改变 runner 的 verdict/failure_kind 语义。
@@ -49,9 +55,12 @@ disable-model-invocation: true
 
 1. 用统一规格模板整理需求。
 2. 每轮只提出当前最关键的 1-3 个未决问题，并根据用户回答继续追问，直到诉求、目的和成功标准清楚为止。
-3. 在 `workflow-spec.md` 中显式整理 `User Intent` 与 `Clarification Summary`。
-4. 形成工作流规格、模式选择和文件清单。
-4. 写入进展事件：`S1 StageCheckpoint` 与 `S1 StageCompleted`。
+3. 在 `workflow-spec.md` 中显式整理 `User Intent`、`Clarification Summary`、`Open Questions`、`Assumptions and Boundaries`、`Readback Confirmation`。
+4. 调用 `${CLAUDE_PLUGIN_ROOT}/scripts/generate-clarification-package.py`，生成 S1 结构化澄清包。
+5. 调用 `${CLAUDE_PLUGIN_ROOT}/scripts/generate-clarification-review.py`，生成 challenge/handoff/evidence 三份审阅产物。
+6. 约束：`requirement-clarification-lead` 是唯一与用户直接对话的角色；`scenario-extractor`、`assumption-auditor`、`constraint-reviewer` 只能在内部 challenge 中提出补问与 handoff 建议，不得直接触达用户。
+7. 形成工作流规格、模式选择和文件清单，并让 `S2/S3` 显式消费 `clarification-handoff.json`。
+8. 写入进展事件：`S1 StageCheckpoint` 与 `S1 StageCompleted`。
 
 ## Step 3: Design Assets
 
@@ -63,16 +72,22 @@ disable-model-invocation: true
 - `rules/`
 - 必要时的 `commands/` 兼容层
 - `.workflowprogram/design/{workflow-spec.yaml,workflow-view.md,workflow-lowlevel.md}`
+- `.workflowprogram/runtime/{workflow-entry.py,workflow-runner.py,validate-run-state.py,runtime-manifest.json}`
 
 生成候选资产后，使用以下流程：
 
-1. 调用 `${CLAUDE_PLUGIN_ROOT}/scripts/workflow-entry.py run --spec <RUN_ROOT>/workflow-spec.yaml --run-root <RUN_ROOT> --target-root <TARGET_ROOT> --entry-skill workflowprogram-develop --request "<原始需求>" [--auto-approve|--approval-status approved]`
+1. 调用 `workflowprogram-python ${CLAUDE_PLUGIN_ROOT}/scripts/workflow-entry.py run --spec <RUN_ROOT>/workflow-spec.yaml --run-root <RUN_ROOT> --target-root <TARGET_ROOT> --entry-skill workflowprogram-develop --request "<原始需求>" [--auto-approve|--approval-status approved]`
 2. `workflow-entry.py` 必须按固定顺序调用：
    - `validate-workflow-spec.py`
    - `generate-workflow-view.py`
    - `generate-workflow-lowlevel.py`
+   - `generate-target-runtime.py`
    - `managed-assets.py plan`
    - `managed-assets.py apply-staged`
+   - `discover-host-capabilities.py`
+   - `probe-host-capabilities.py`
+   - `apply-host-bootstrap.py`（仅 `project_local + approval_required=false`）
+   - `generate-environment-remediation.py`
    - `workflow-runner.py run`
    - `validate-run-state.py`
 3. 若 `managed-assets.py apply-staged` 报冲突，停止在 S4，保留 candidate 与 conflict 副本，不静默覆盖目标项目

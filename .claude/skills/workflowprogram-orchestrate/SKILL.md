@@ -22,7 +22,7 @@ version: 1.0.0
 - 这是当前唯一应承接自然语言自动触发的 `workflowprogram-*` 入口。
 - 其他 `workflowprogram-develop/audit/iterate/validate` 仍应优先通过显式 slash 调用。
 - 若请求不明确，只提出最小必要的一个澄清问题。
-- 路由前应优先调用 `${CLAUDE_PLUGIN_ROOT}/scripts/route-intent.py --request "<用户请求>" --target-root <TARGET_ROOT> --json`。
+- 路由前应优先调用 `workflowprogram-python ${CLAUDE_PLUGIN_ROOT}/scripts/route-intent.py --request "<用户请求>" --target-root <TARGET_ROOT> --json`。
 - 当路由结果进入叶子入口后，确定性脚本链应通过 `${CLAUDE_PLUGIN_ROOT}/scripts/workflow-entry.py` 驱动，而不是只靠口头步骤串联。
 - 当 `WORKFLOWPROGRAM_STRICT_ROUTE=1` 或显式 strict 模式开启时，若路由歧义则必须先澄清，不得直接分发到叶子 skill。
 

@@ -18,6 +18,14 @@ import json
 from pathlib import Path
 from typing import Any, Dict, List
 
+from lib.host_team_utils import (
+    agent_team_contract_from_spec,
+    agent_team_enabled,
+    capability_discovery_from_spec,
+    host_global_adapter,
+    host_capabilities_from_spec,
+    runtime_capabilities_from_contract,
+)
 from lib.io_utils import iso_now, write_json
 from lib.yaml_utils import load_yaml_mapping
 
@@ -45,6 +53,7 @@ REQUIRED_GENERATED_RUNTIME_KEYS = {
     "runtime_manifest",
     "run_root_dir",
     "mode",
+    "runtime_capabilities",
 }
 
 
@@ -64,19 +73,25 @@ def ensure_spec_shape(spec: Dict[str, Any]) -> List[str]:
     return missing
 
 
-def require_runtime_contract(spec: Dict[str, Any]) -> Dict[str, str]:
+def require_runtime_contract(spec: Dict[str, Any]) -> Dict[str, Any]:
     contract = spec.get("generated_runtime_contract")
     if not isinstance(contract, dict):
         raise ValueError("generated_runtime_contract must be a mapping/object")
     missing = sorted(REQUIRED_GENERATED_RUNTIME_KEYS - set(contract.keys()))
     if missing:
         raise ValueError(f"generated_runtime_contract missing required keys: {', '.join(missing)}")
-    normalized: Dict[str, str] = {}
+    normalized: Dict[str, Any] = {}
     for key in REQUIRED_GENERATED_RUNTIME_KEYS:
+        if key == "runtime_capabilities":
+            continue
         value = str(contract.get(key, "")).strip()
         if not value:
             raise ValueError(f"generated_runtime_contract.{key} must not be empty")
         normalized[key] = value
+    runtime_capabilities = runtime_capabilities_from_contract(contract)
+    if not runtime_capabilities:
+        raise ValueError("generated_runtime_contract.runtime_capabilities must not be empty")
+    normalized["runtime_capabilities"] = runtime_capabilities
     return normalized
 
 
@@ -91,7 +106,13 @@ def default_entry_skill(spec: Dict[str, Any]) -> str:
     return value or "workflow"
 
 
-def render_entry_wrapper(contract: Dict[str, str], main_entry: str) -> str:
+def render_entry_wrapper(
+    contract: Dict[str, Any],
+    main_entry: str,
+    *,
+    team_enabled_flag: bool,
+    capability_discovery_enabled_flag: bool,
+) -> str:
     return f"""#!/usr/bin/env python3
 from __future__ import annotations
 
@@ -111,6 +132,13 @@ DESIGN_SPEC_REL = {contract["design_spec_path"]!r}
 RUN_ROOT_DIR_REL = {contract["run_root_dir"]!r}
 RUNNER_SCRIPT_REL = {contract["runner_script"]!r}
 STATE_VALIDATOR_SCRIPT_REL = {contract["state_validator_script"]!r}
+DISCOVER_HOST_SCRIPT = "discover-host-capabilities.py"
+PROBE_HOST_SCRIPT = "probe-host-capabilities.py"
+APPLY_HOST_BOOTSTRAP_SCRIPT = "apply-host-bootstrap.py"
+ENVIRONMENT_REMEDIATION_SCRIPT = "generate-environment-remediation.py"
+RUNTIME_CAPABILITIES = {contract["runtime_capabilities"]!r}
+CAPABILITY_DISCOVERY_ENABLED = {capability_discovery_enabled_flag!r}
+TEAM_ORCHESTRATION_ENABLED = {team_enabled_flag!r}
 
 
 def utc_run_id() -> str:
@@ -134,6 +162,10 @@ def resolve_plugin_root(explicit: str) -> Path:
     if env_value:
         return Path(env_value).resolve()
     raise RuntimeError("target runtime requires --plugin-root or CLAUDE_PLUGIN_ROOT")
+
+
+def plugin_python(plugin_root: Path) -> Path:
+    return plugin_root / "bin" / "workflowprogram-python"
 
 
 def parse_json_output(text: str) -> Dict[str, Any]:
@@ -168,6 +200,108 @@ def write_json(path: Path, payload: Dict[str, Any]) -> None:
     path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\\n", encoding="utf-8", newline="\\n")
 
 
+def required_host_missing(report: Dict[str, Any]) -> bool:
+    capabilities = report.get("capabilities", [])
+    if not isinstance(capabilities, list):
+        return False
+    return any(
+        isinstance(item, dict)
+        and bool(item.get("required", False))
+        and str(item.get("status", "")).strip() != "ready"
+        for item in capabilities
+    )
+
+
+def run_required_json_command(name: str, cmd: List[str]) -> Dict[str, Any]:
+    code, payload, text = run_command(cmd)
+    if code != 0:
+        raise RuntimeError(f"{{name}} failed: {{text}}")
+    if not payload:
+        raise RuntimeError(f"{{name}} did not return JSON output")
+    return payload
+
+
+def probe_host_capabilities(plugin_root: Path, spec_path: Path, target_root: Path, run_root: Path) -> Dict[str, Any]:
+    payload = run_required_json_command(
+        PROBE_HOST_SCRIPT,
+        [
+            str(plugin_python(plugin_root)),
+            str(plugin_root / "scripts" / PROBE_HOST_SCRIPT),
+            "--spec",
+            str(spec_path),
+            "--target-root",
+            str(target_root),
+            "--run-root",
+            str(run_root),
+            "--json",
+        ],
+    )
+    report = payload.get("report", {{}})
+    if not isinstance(report, dict):
+        raise RuntimeError("probe-host-capabilities.py did not return a report object")
+    return report
+
+
+def discover_host_capabilities(plugin_root: Path, spec_path: Path, target_root: Path, run_root: Path, request_text: str) -> Dict[str, Any]:
+    payload = run_required_json_command(
+        DISCOVER_HOST_SCRIPT,
+        [
+            str(plugin_python(plugin_root)),
+            str(plugin_root / "scripts" / DISCOVER_HOST_SCRIPT),
+            "--spec",
+            str(spec_path),
+            "--target-root",
+            str(target_root),
+            "--run-root",
+            str(run_root),
+            "--request",
+            request_text,
+            "--json",
+        ],
+    )
+    report = payload.get("report", {{}})
+    if not isinstance(report, dict):
+        raise RuntimeError("discover-host-capabilities.py did not return a report object")
+    return report
+
+def apply_host_bootstrap(plugin_root: Path, spec_path: Path, target_root: Path, run_root: Path, *, allow_host_global: bool) -> Dict[str, Any]:
+    cmd = [
+        str(plugin_python(plugin_root)),
+        str(plugin_root / "scripts" / APPLY_HOST_BOOTSTRAP_SCRIPT),
+        "--spec",
+        str(spec_path),
+        "--target-root",
+        str(target_root),
+        "--run-root",
+        str(run_root),
+        "--json",
+    ]
+    if allow_host_global:
+        cmd.append("--allow-host-global")
+    return run_required_json_command(APPLY_HOST_BOOTSTRAP_SCRIPT, cmd)
+
+
+def generate_environment_remediation(plugin_root: Path, spec_path: Path, target_root: Path, run_root: Path) -> Dict[str, Any]:
+    payload = run_required_json_command(
+        ENVIRONMENT_REMEDIATION_SCRIPT,
+        [
+            str(plugin_python(plugin_root)),
+            str(plugin_root / "scripts" / ENVIRONMENT_REMEDIATION_SCRIPT),
+            "--spec",
+            str(spec_path),
+            "--target-root",
+            str(target_root),
+            "--run-root",
+            str(run_root),
+            "--json",
+        ],
+    )
+    report = payload.get("report", {{}})
+    if not isinstance(report, dict):
+        raise RuntimeError("generate-environment-remediation.py did not return a report object")
+    return report
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run generated workflow deterministic entry wrapper")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -183,6 +317,7 @@ def parse_args() -> argparse.Namespace:
     run.add_argument("--provider-command", default="", help="Provider command for command_adapter")
     run.add_argument("--claude-bin", default="claude", help="Claude binary for claude_cli")
     run.add_argument("--auto-approve", action="store_true", help="Resolve approval gate automatically")
+    run.add_argument("--approve-host-global-bootstrap", action="store_true", help="Allow approved host-global bootstrap adapters")
     run.add_argument("--approval-status", default="", choices=["approved"], help="Resolve approval gate as manually approved")
     run.add_argument("--json", action="store_true", help="Print JSON summary")
     return parser.parse_args()
@@ -197,7 +332,7 @@ def main() -> int:
     run_root.mkdir(parents=True, exist_ok=True)
 
     validate_cmd = [
-        sys.executable,
+        str(plugin_python(plugin_root)),
         str(plugin_root / "scripts" / "validate-workflow-spec.py"),
         "--spec",
         str(spec_path),
@@ -217,6 +352,36 @@ def main() -> int:
         else:
             print(payload["error"])
         return 1
+
+    discovery_report = discover_host_capabilities(plugin_root, spec_path, target_root, run_root, args.request) if CAPABILITY_DISCOVERY_ENABLED else None
+    host_report = probe_host_capabilities(plugin_root, spec_path, target_root, run_root)
+    host_bootstrap = None
+    environment_remediation_report = None
+    auto_project_local = [
+        item
+        for item in host_report.get("bootstrap_plan", [])
+        if isinstance(item, dict)
+        and str(item.get("scope", "")).strip() == "project_local"
+        and bool(item.get("approval_required", False)) is False
+    ] if isinstance(host_report.get("bootstrap_plan", []), list) else []
+    approved_host_global = [
+        item
+        for item in host_report.get("bootstrap_plan", [])
+        if isinstance(item, dict)
+        and str(item.get("scope", "")).strip() == "host_global"
+        and bool(item.get("approval_required", False)) is True
+    ] if isinstance(host_report.get("bootstrap_plan", []), list) else []
+    if auto_project_local or (approved_host_global and args.approve_host_global_bootstrap):
+        host_bootstrap = apply_host_bootstrap(
+            plugin_root,
+            spec_path,
+            target_root,
+            run_root,
+            allow_host_global=bool(args.approve_host_global_bootstrap),
+        )
+        host_report = probe_host_capabilities(plugin_root, spec_path, target_root, run_root)
+    if isinstance(host_report.get("capabilities", []), list):
+        environment_remediation_report = generate_environment_remediation(plugin_root, spec_path, target_root, run_root)
 
     runner_cmd = [
         sys.executable,
@@ -296,15 +461,30 @@ def main() -> int:
         "spec": str(spec_path),
         "entry_skill": args.entry_skill,
         "intent": args.intent,
+        "runtime_capabilities": RUNTIME_CAPABILITIES,
+        "capability_discovery_report": discovery_report,
+        "host_capability_report": host_report,
+        "host_bootstrap_result": host_bootstrap,
+        "environment_remediation_report": environment_remediation_report,
+        "team_orchestration_enabled": TEAM_ORCHESTRATION_ENABLED,
         "runner": runner_payload,
         "state_validation": state_payload,
     }}
+    if required_host_missing(host_report):
+        summary["status"] = "FAIL"
+        summary["failure_kind"] = "environment"
     write_json(run_root / "outputs" / "stages" / "entry-orchestration-summary.json", summary)
     if args.json:
         print(json.dumps(summary, ensure_ascii=False, indent=2))
     else:
         print(f"[{{summary['status']}}] generated workflow runtime completed: {{run_root}}")
-    return 0 if summary["status"] == "PASS" else 2
+    if summary["status"] == "PASS":
+        return 0
+    if summary["status"] == "ENVIRONMENT-SKIP":
+        return 3
+    if summary["status"] == "BLOCKED":
+        return 2
+    return 1
 
 
 if __name__ == "__main__":
@@ -332,6 +512,10 @@ def resolve_plugin_root(explicit: str) -> Path:
     if env_value:
         return Path(env_value).resolve()
     raise RuntimeError("generated workflow runner requires --plugin-root or CLAUDE_PLUGIN_ROOT")
+
+
+def plugin_python(plugin_root: Path) -> Path:
+    return plugin_root / "bin" / "workflowprogram-python"
 
 
 def parse_json_output(text: str) -> Dict[str, Any]:
@@ -391,7 +575,7 @@ def main() -> int:
     args = parse_args()
     plugin_root = resolve_plugin_root(getattr(args, "plugin_root", ""))
     cmd = [
-        sys.executable,
+        str(plugin_python(plugin_root)),
         str(plugin_root / "scripts" / "workflow-runner.py"),
         args.command,
     ]
@@ -462,6 +646,10 @@ def resolve_plugin_root(explicit: str) -> Path:
     raise RuntimeError("generated workflow state validator requires --plugin-root or CLAUDE_PLUGIN_ROOT")
 
 
+def plugin_python(plugin_root: Path) -> Path:
+    return plugin_root / "bin" / "workflowprogram-python"
+
+
 def parse_json_output(text: str) -> Dict[str, Any]:
     text = text.strip()
     if not text:
@@ -498,7 +686,7 @@ def main() -> int:
 
     plugin_root = resolve_plugin_root(args.plugin_root)
     cmd = [
-        sys.executable,
+        str(plugin_python(plugin_root)),
         str(plugin_root / "scripts" / "validate-run-state.py"),
         "--state",
         str(Path(args.state).resolve()),
@@ -517,11 +705,24 @@ if __name__ == "__main__":
 """
 
 
-def manifest_payload(contract: Dict[str, str], main_entry: str) -> Dict[str, Any]:
+def manifest_payload(
+    contract: Dict[str, Any],
+    main_entry: str,
+    *,
+    spec: Dict[str, Any],
+) -> Dict[str, Any]:
+    capability_discovery = capability_discovery_from_spec(spec)
+    declared_host_capabilities = host_capabilities_from_spec(spec)
+    host_global_adapter_declared = any(
+        str(item.get("bootstrap", {}).get("scope", "")).strip() == "host_global" and bool(host_global_adapter(item))
+        for item in declared_host_capabilities
+        if isinstance(item, dict) and isinstance(item.get("bootstrap"), dict)
+    )
     return {
         "manifest_version": 1,
         "generated_at": iso_now(),
         "runtime_mode": contract["mode"],
+        "runtime_capabilities": contract["runtime_capabilities"],
         "runtime_root": contract["runtime_root"],
         "design_spec_path": contract["design_spec_path"],
         "entry_script": contract["entry_script"],
@@ -531,8 +732,16 @@ def manifest_payload(contract: Dict[str, str], main_entry: str) -> Dict[str, Any
         "run_root_dir": contract["run_root_dir"],
         "default_intent": "develop",
         "default_entry_skill": main_entry,
+        "capability_discovery_enabled": bool(capability_discovery.get("enabled", False)),
+        "capability_discovery_domains": capability_discovery.get("domains", []) if isinstance(capability_discovery.get("domains", []), list) else [],
+        "host_capabilities_declared": bool(declared_host_capabilities),
+        "host_global_adapter_declared": host_global_adapter_declared,
+        "agent_team_enabled": agent_team_enabled(agent_team_contract_from_spec(spec)),
         "shared_plugin_dependency": True,
         "shared_scripts": [
+            "discover-host-capabilities.py",
+            "apply-host-bootstrap.py",
+            "probe-host-capabilities.py",
             "validate-workflow-spec.py",
             "workflow-runner.py",
             "validate-run-state.py",
@@ -556,6 +765,8 @@ def main() -> int:
         payload["missing_top_keys"] = ensure_spec_shape(spec)
         contract = require_runtime_contract(spec)
         main_entry = default_entry_skill(spec)
+        team_enabled_flag = agent_team_enabled(agent_team_contract_from_spec(spec))
+        capability_discovery_enabled_flag = bool(capability_discovery_from_spec(spec).get("enabled", False))
 
         entry_path = out_root / Path(contract["entry_script"]).name
         runner_path = out_root / Path(contract["runner_script"]).name
@@ -563,10 +774,19 @@ def main() -> int:
         manifest_path = out_root / Path(contract["runtime_manifest"]).name
 
         out_root.mkdir(parents=True, exist_ok=True)
-        entry_path.write_text(render_entry_wrapper(contract, main_entry), encoding="utf-8", newline="\n")
+        entry_path.write_text(
+            render_entry_wrapper(
+                contract,
+                main_entry,
+                team_enabled_flag=team_enabled_flag,
+                capability_discovery_enabled_flag=capability_discovery_enabled_flag,
+            ),
+            encoding="utf-8",
+            newline="\n",
+        )
         runner_path.write_text(render_runner_wrapper(), encoding="utf-8", newline="\n")
         validator_path.write_text(render_state_validator_wrapper(), encoding="utf-8", newline="\n")
-        write_json(manifest_path, manifest_payload(contract, main_entry))
+        write_json(manifest_path, manifest_payload(contract, main_entry, spec=spec))
 
         payload["files"] = {
             "entry_script": str(entry_path),

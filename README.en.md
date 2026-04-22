@@ -18,24 +18,23 @@ WorkflowProgram addresses these issues with four layers: **truth source**, **con
 
 ## Installation
 
-**Prerequisites**: Python 3.10+, `pyyaml`
+**Prerequisite**: a host `python3` interpreter with Python 3.10+ is available.
 
-```bash
-git clone https://github.com/Logic70/WorkflowProgram-CN
-cd WorkflowProgram-CN
-pip install pyyaml
-python tools/build_plugin.py
-```
+The primary installation path is the Claude Code marketplace:
 
-After the build finishes, `dist/plugin/` is the plugin directory you can load.
+1. Add the marketplace published by this repository.
+2. Install `workflowprogram-cn@logic70-plugins`.
+3. On first session start, the plugin bootstraps its private Python dependency layer into `${CLAUDE_PLUGIN_DATA}/python/site-packages`.
+
+Source builds of `dist/plugin/` remain useful for repository development and debugging, but they are no longer the primary end-user install model.
 
 ## Quick Start
 
-Launch Claude Code in your target project and load the plugin:
+Launch Claude Code in your target project:
 
 ```bash
 cd your-project
-claude --plugin-dir /path/to/WorkflowProgram-CN/dist/plugin
+claude
 ```
 
 Then describe what you want in natural language:
@@ -77,14 +76,22 @@ Then describe what you want in natural language:
 | `S5` | Validate the workflow and produce the verdict |
 | `S6` | Feed lessons and constraint candidates back into the next run |
 
-Different intents follow different stage paths: `develop` uses `S1-S6`, `audit` uses `S5-S6`, `validate` uses `S5`, and `iterate` uses `S6`.
+Every request passes through `S0` first. `workflow-spec.yaml.intent_flows` then defines the logical requirements for `S1-S6`. In the default template, `develop` uses `S1-S6`, `audit` uses `S5-S6`, `validate` uses `S5` with optional `S6`, and `iterate` uses `S6` with optional `S5`.
 
 ### AI vs Python Responsibilities
 
 - **AI**: understand user intent, refine design decisions, and generate candidate assets inside each stage.
-- **Python**: `workflow-entry.py` drives the deterministic script chain, `workflow-runner.py` controls state transitions, and `workflow-s5-judge.py` produces the verdict.
+- **Python**: `workflow-entry.py` drives the deterministic script chain, including spec/view/lowlevel/runtime rendering, managed apply, capability probing, and environment remediation; `workflow-runner.py` controls state transitions; `workflow-s5-judge.py` produces the verdict.
 
 Execution order is decided by programs, not by hoping the model remembers the next step.
+
+### Target Runtime And Optional Capability Layers
+
+- A successful develop flow persists not only `.claude/` assets, but also `TARGET_ROOT/.workflowprogram/design/{workflow-spec.yaml,workflow-view.md,workflow-lowlevel.md}`.
+- The target project also receives its own deterministic runtime wrapper at `TARGET_ROOT/.workflowprogram/runtime/{workflow-entry.py,workflow-runner.py,validate-run-state.py,runtime-manifest.json}`.
+- If a workflow declares `capability_discovery`, the entry path first generates candidate `skill / MCP / CLI` recommendations plus manual guidance.
+- If a workflow declares `host_capabilities`, both the entry path and S5 consume `host-capability-report.json`, `environment-remediation-report.json`, and `environment-remediation-guide.md`.
+- If a workflow declares `agent_team_contract`, S5 also validates structured Team evidence such as `team-plan.json`, `team-results.json`, and `team-join-summary.json`.
 
 ### Managed Write Flow
 
@@ -119,13 +126,13 @@ WorkflowProgram-CN/
 ├── lessons.md                   # Lessons log
 ├── .claude/
 │   ├── settings.json            # Commands and skills registry
-│   ├── commands/                # Orchestration entry commands
-│   ├── skills/                  # Skills, including product entry skills
+│   ├── commands/                # Source command entries
+│   ├── skills/                  # Skills and templates
 │   ├── agents/                  # Expert agent definitions
 │   ├── rules/constraints.md     # Long-lived constraints
-│   └── scripts/                 # Python scripts and shared libraries
-├── .claude-plugin/              # Plugin metadata
-├── dist/plugin/                 # Build output loaded by --plugin-dir
+│   └── scripts/                 # Deterministic script chain, validators, and shared libraries
+├── .claude-plugin/              # Plugin metadata and plugin-root source assets
+├── dist/plugin/                 # Build output and canonical marketplace payload
 ├── docs/                        # Design docs, tutorials, implementation plans
 ├── tests/                       # Fixtures, expectations, transcripts
 └── tools/                       # Build scripts, smoke tools, mock hosts
@@ -137,10 +144,15 @@ WorkflowProgram-CN/
 # Repository-level validation
 python .claude/scripts/validate-workflow.py
 
+# Spec / lowlevel / generated runtime validation
+python .claude/scripts/validate-workflow-spec.py --spec <workflow-spec.yaml>
+python .claude/scripts/validate-workflow-lowlevel.py --spec <workflow-spec.yaml> --lowlevel <workflow-lowlevel.md>
+python .claude/scripts/validate-generated-runtime.py --spec <workflow-spec.yaml> --runtime-root <target-runtime-root>
+
 # Smoke test a single fixture
 python tools/runtime_smoke.py --fixture empty-project --runtime-provider fixture_host
 
-# Run the smoke matrix
+# Run the smoke matrix, including capability / host / team cases
 python tools/runtime_smoke_matrix.py
 
 # Rebuild the plugin

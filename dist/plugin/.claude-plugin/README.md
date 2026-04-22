@@ -10,31 +10,25 @@
 
 ## 受支持的加载与安装模型
 
-```bash
-python3 tools/build_plugin.py
-claude --plugin-dir /mnt/d/Code/WorkflowProgram-CN/dist/plugin
-```
+主安装模型：
+
+1. 通过 Claude Code marketplace 添加本仓库提供的 marketplace。
+2. 安装 `workflowprogram-cn@logic70-plugins`。
+3. Claude Code 加载插件后，在 `SessionStart` 自动执行 Python runtime bootstrap。
 
 说明：
 
-- 当前受支持的加载方式是 `--plugin-dir`
-- `dist/plugin/` 是仓库内 canonical 载荷目录
+- `dist/plugin/` 是仓库内 canonical marketplace 载荷目录
 - `.claude/` 只作为源码真源，不直接作为插件运行目录
-- Claude Code 运行时从 `dist/plugin/skills/`、`dist/plugin/agents/`、`dist/plugin/commands/` 发现插件能力
+- `.claude-plugin/root/` 是会被展开到插件根目录的运行时资产真源
+- Claude Code 运行时从 `PLUGIN_ROOT` 下的 `skills/`、`agents/`、`commands/`、`bin/`、`hooks/` 发现插件能力
 - `dist/plugin/build-manifest.json` 记录本次构建的版本、commit 和文件摘要
+- 宿主机需要 `Python 3.10+` 的 `python3`
+- Python 依赖通过 `${CLAUDE_PLUGIN_DATA}/python/site-packages` 准备，不要求用户全局安装 `pyyaml`
 
-支持的分发通道：
+开发与调试模型：
 
-- Source Build：从源码仓构建 `dist/plugin/` 并加载
-- GitHub Release Package：下载发布包中的 `plugin/` 并加载
-- Marketplace：仍待定案
-
-### GitHub Release Package 安装步骤
-
-1. 下载发布附件 `workflowprogram-plugin-<version>.tar.gz`（或 zip）。
-2. 解压并确认存在 `plugin/build-manifest.json` 与 `plugin/skills`。
-3. 在目标项目目录执行：
-   `claude --plugin-dir /abs/path/to/<extracted>/plugin`
+- Source Build：从源码仓构建 `dist/plugin/` 供本地调试使用
 
 ## 推荐主入口
 
@@ -48,13 +42,11 @@ claude --plugin-dir /mnt/d/Code/WorkflowProgram-CN/dist/plugin
 
 旧 commands 仅作为兼容入口保留。
 
-## Marketplace 通道
+## Python Runtime
 
-marketplace 或 `/plugin install` 通道仍属于后续定案事项。
-
-在 marketplace 或 `/plugin install` 的行为完成实测定案前，本文档不把它们视为受支持稳态契约。
-
-`tools/install_dev.sh` 和 `tools/quick_install.sh` 只应被视为实验性开发辅助路径；它们不代表正式插件生命周期模型。
+- 插件在 `SessionStart` 通过 `${CLAUDE_PLUGIN_ROOT}/scripts/bootstrap-python-runtime.py` 准备私有 Python 依赖。
+- 插件内的 Python 主入口应通过 `workflowprogram-python` 调用，而不是裸 `python3`。
+- 如需最小化排障，执行 `workflowprogram-doctor`。
 
 ## 运行时模型
 
@@ -62,6 +54,8 @@ marketplace 或 `/plugin install` 通道仍属于后续定案事项。
 - 插件运行时 agent：`dist/plugin/agents/`
 - 插件运行时 skill：`dist/plugin/skills/`
 - 插件 trace manifest：`dist/plugin/build-manifest.json`
+- Python launcher：`dist/plugin/bin/workflowprogram-python`
+- 安装 doctor：`dist/plugin/bin/workflowprogram-doctor`
 - 进展脚本：`dist/plugin/scripts/stage-progress.py`
 - 路由脚本：`dist/plugin/scripts/route-intent.py`
 - 规格校验脚本：`dist/plugin/scripts/validate-workflow-spec.py`
