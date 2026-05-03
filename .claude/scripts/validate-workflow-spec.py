@@ -6,13 +6,27 @@
 from __future__ import annotations
 
 import argparse
+import fnmatch
 import json
 import re
 import sys
 from pathlib import Path
 from typing import Any, Dict, List, Set
 
+from lib.capability_discovery import KNOWN_CAPABILITY_DISCOVERY_DOMAINS
 from lib.diagnostics import DiagnosticCollector
+from lib.host_team_utils import (
+    VALID_BOOTSTRAP_ASSET_FORMATS,
+    VALID_BOOTSTRAP_SCOPES,
+    VALID_HOST_GLOBAL_ADAPTER_TYPES,
+    VALID_HOST_CAPABILITY_KINDS,
+    VALID_RUNTIME_CAPABILITIES,
+    VALID_TEAM_JOIN_POLICIES,
+    agent_team_enabled,
+    ensure_relative_bootstrap_output,
+    runtime_capabilities_from_contract,
+    string_list,
+)
 from lib.spec_utils import stage_slot_id_map
 from lib.yaml_utils import load_yaml_mapping
 
@@ -29,6 +43,12 @@ REQUIRED_TOP_KEYS = {
     "runtime_contract",
     "generated_runtime_contract",
     "test_contract",
+}
+OPTIONAL_TOP_KEYS = {
+    "capability_discovery",
+    "host_capabilities",
+    "agent_team_contract",
+    "workflow_graph",
 }
 
 REQUIRED_META_KEYS = {
@@ -55,6 +75,15 @@ VALID_PATTERNS = {
 VALID_TERMINALS = {"abort", "end", "done", "complete", "stop", "finish"}
 VALID_VERDICT = {"PASS", "WARN", "FAIL", "ENVIRONMENT-SKIP"}
 VALID_STAGE_STATUS = {"running", "blocked", "failed", "done"}
+VALID_WORKFLOW_GRAPH_GATES = {
+    "none",
+    "user_approval",
+    "auto_approval",
+    "manual_review",
+    "quality_gate",
+    "test_gate",
+    "done",
+}
 REQUIRED_FAILURE_KINDS = {"none", "design", "implementation", "environment", "conflict"}
 VALID_ENV_SKIP_CHECKS = {
     "runtime_host_available",
@@ -75,9 +104,19 @@ REQUIRED_GENERATED_RUNTIME_KEYS = {
     "runtime_manifest",
     "run_root_dir",
     "mode",
+    "runtime_capabilities",
 }
 VALID_ENTRY_TYPES = {"slash_command", "natural_language", "hybrid"}
 RUNTIME_REF_PATTERN = re.compile(r"^runtime_contract\.([A-Za-z_][A-Za-z0-9_]*)$")
+SAFE_RELATIVE_PATH_RE = re.compile(r"^(?!/)(?!.*(?:^|/)\.\.(?:/|$)).+$")
+REGISTRY_FILE_PREFIXES = {
+    "commands": ".claude/commands/",
+    "skills": ".claude/skills/",
+    "agents": ".claude/agents/",
+    "hooks": ".claude/hooks/",
+    # registry.runtime_assets declares target-side control-plane assets.
+    "runtime_assets": ".workflowprogram/runtime/",
+}
 
 
 def parse_args() -> argparse.Namespace:
@@ -125,7 +164,7 @@ def validate_top_level(spec: Dict[str, Any], errors: List[str], warnings: List[s
     missing = sorted(REQUIRED_TOP_KEYS - set(spec.keys()))
     for key in missing:
         add_error(errors, f"Missing top-level key: {key}")
-    extra = sorted(set(spec.keys()) - REQUIRED_TOP_KEYS)
+    extra = sorted(set(spec.keys()) - REQUIRED_TOP_KEYS - OPTIONAL_TOP_KEYS)
     if extra:
         add_warn(warnings, f"Extra top-level keys: {', '.join(extra)}")
 
@@ -293,28 +332,259 @@ def validate_skills(skills: List[Any], errors: List[str]) -> None:
 def validate_registry(registry: Dict[str, Any], errors: List[str]) -> None:
     """校验 spec 中声明的目标 `.claude` registry 条目。"""
 
-    commands = require_list(registry.get("commands", []), "registry.commands", errors)
-    skills = require_list(registry.get("skills", []), "registry.skills", errors)
+    for section, expected_prefix in REGISTRY_FILE_PREFIXES.items():
+        entries = require_list(registry.get(section, []), f"registry.{section}", errors)
+        seen_names: Set[str] = set()
+        seen_files: Set[str] = set()
+        for idx, item in enumerate(entries):
+            prefix = f"registry.{section}[{idx}]"
+            entry = require_mapping(item, prefix, errors)
+            name = str(entry.get("name", "")).strip()
+            file_path = str(entry.get("file", "")).strip()
+            if not name:
+                add_error(errors, f"{prefix}.name is required")
+            elif name in seen_names:
+                add_error(errors, f"Duplicate registry.{section} name: {name}")
+            else:
+                seen_names.add(name)
+            if not file_path:
+                add_error(errors, f"{prefix}.file is required")
+            elif not file_path.startswith(expected_prefix):
+                add_error(errors, f"{prefix}.file must start with {expected_prefix}")
+            elif not SAFE_RELATIVE_PATH_RE.match(file_path):
+                add_error(errors, f"{prefix}.file must be a safe relative path")
+            elif file_path in seen_files:
+                add_error(errors, f"Duplicate registry.{section} file: {file_path}")
+            else:
+                seen_files.add(file_path)
 
-    for idx, item in enumerate(commands):
-        prefix = f"registry.commands[{idx}]"
-        cmd = require_mapping(item, prefix, errors)
-        name = str(cmd.get("name", "")).strip()
-        file_path = str(cmd.get("file", "")).strip()
+
+def collect_registry_names(registry: Dict[str, Any], sections: Set[str] | None = None) -> Set[str]:
+    """收集 registry 中声明的 name。"""
+
+    selected_sections = sections or set(REGISTRY_FILE_PREFIXES)
+    names: Set[str] = set()
+    for section in selected_sections:
+        items = registry.get(section, []) if isinstance(registry, dict) else []
+        if not isinstance(items, list):
+            continue
+        for item in items:
+            if isinstance(item, dict):
+                name = str(item.get("name", "")).strip()
+            else:
+                name = str(item).strip()
+            if name:
+                names.add(name)
+    return names
+
+
+def collect_registry_files(registry: Dict[str, Any]) -> Set[str]:
+    """收集 registry 中声明的目标资产路径。"""
+
+    files: Set[str] = set()
+    for section in REGISTRY_FILE_PREFIXES:
+        items = registry.get(section, []) if isinstance(registry, dict) else []
+        if not isinstance(items, list):
+            continue
+        for item in items:
+            if isinstance(item, dict):
+                file_path = str(item.get("file", "")).strip()
+                if file_path:
+                    files.add(file_path)
+    return files
+
+
+def declared_deliverable_patterns(test_contract: Dict[str, Any]) -> Set[str]:
+    """收集 test_contract.artifacts 中声明的交付物 pattern。"""
+
+    artifacts = test_contract.get("artifacts", {}) if isinstance(test_contract, dict) else {}
+    if not isinstance(artifacts, dict):
+        return set()
+    values: Set[str] = set()
+    for key in ("deliverables", "optional_outputs"):
+        raw_items = artifacts.get(key, [])
+        if not isinstance(raw_items, list):
+            continue
+        values.update(str(item).strip() for item in raw_items if str(item).strip())
+    return values
+
+
+def is_declared_target_asset(path: str, registry_files: Set[str], deliverables: Set[str]) -> bool:
+    """判断一个目标资产路径是否已由 registry 或 test_contract 声明。"""
+
+    if path in registry_files or path in deliverables:
+        return True
+    return any(fnmatch.fnmatch(path, pattern) for pattern in deliverables)
+
+
+def graph_target_output_refs(output_refs: List[str]) -> List[str]:
+    """只提取会落到 TARGET_ROOT 的 graph output refs。"""
+
+    return [
+        ref
+        for ref in output_refs
+        if ref.startswith(".claude/")
+        or ref.startswith(".workflowprogram/design/")
+        or ref.startswith(".workflowprogram/runtime/")
+    ]
+
+
+def validate_workflow_graph(
+    workflow_graph: Dict[str, Any],
+    registry: Dict[str, Any],
+    test_contract: Dict[str, Any],
+    errors: List[str],
+    warnings: List[str],
+) -> None:
+    """校验目标工作流自己的可变图契约。
+
+    `stages` 与 `intent_flows` 描述 WorkflowProgram 自身 S0..S6 控制面；
+    `workflow_graph` 描述生成后的目标工作流，允许使用请求特定节点，而不是强制套用 S1..S6。
+    """
+
+    if not workflow_graph:
+        return
+
+    for field in ("schema_version", "entrypoints", "nodes", "transitions", "templates_used"):
+        if field not in workflow_graph:
+            add_error(errors, f"workflow_graph.{field} is required when workflow_graph is declared")
+
+    schema_version = workflow_graph.get("schema_version")
+    if not isinstance(schema_version, int) or schema_version <= 0:
+        add_error(errors, "workflow_graph.schema_version must be a positive integer")
+
+    templates_used = workflow_graph.get("templates_used", [])
+    if not isinstance(templates_used, list) or not templates_used:
+        add_error(errors, "workflow_graph.templates_used must be a non-empty list")
+        template_values: Set[str] = set()
+    else:
+        template_values = {str(item).strip() for item in templates_used if str(item).strip()}
+        if len(template_values) != len([item for item in templates_used if str(item).strip()]):
+            add_error(errors, "workflow_graph.templates_used contains duplicate or empty values")
+
+    nodes = workflow_graph.get("nodes", [])
+    if not isinstance(nodes, list) or not nodes:
+        add_error(errors, "workflow_graph.nodes must be a non-empty list")
+        nodes = []
+    node_ids: Set[str] = set()
+    adjacency: Dict[str, Set[str]] = {}
+    registry_files = collect_registry_files(registry)
+    deliverables = declared_deliverable_patterns(test_contract)
+
+    for idx, raw_node in enumerate(nodes):
+        prefix = f"workflow_graph.nodes[{idx}]"
+        node = require_mapping(raw_node, prefix, errors)
+        node_id = str(node.get("id", "")).strip()
+        role = str(node.get("role", "")).strip()
+        template = str(node.get("template", "")).strip()
+        gate = str(node.get("gate", "")).strip()
+        owner = str(node.get("owner", "")).strip()
+        input_refs = node.get("input_refs")
+        output_refs = node.get("output_refs")
+
+        if not node_id:
+            add_error(errors, f"{prefix}.id is required")
+        elif not re.match(r"^[A-Za-z0-9_-]+$", node_id):
+            add_error(errors, f"{prefix}.id has invalid format: {node_id}")
+        elif node_id in node_ids:
+            add_error(errors, f"Duplicate workflow_graph node id: {node_id}")
+        else:
+            node_ids.add(node_id)
+            adjacency[node_id] = set()
+        if not role:
+            add_error(errors, f"{prefix}.role is required")
+        if not template:
+            add_error(errors, f"{prefix}.template is required")
+        elif template_values and template not in template_values:
+            add_error(errors, f"{prefix}.template must be listed in workflow_graph.templates_used")
+        if gate and gate not in VALID_WORKFLOW_GRAPH_GATES:
+            add_error(errors, f"{prefix}.gate must be one of {sorted(VALID_WORKFLOW_GRAPH_GATES)}")
+        if not owner:
+            add_error(errors, f"{prefix}.owner is required")
+        if not isinstance(input_refs, list):
+            add_error(errors, f"{prefix}.input_refs must be a list")
+        if not isinstance(output_refs, list) or not output_refs:
+            add_error(errors, f"{prefix}.output_refs must be a non-empty list")
+            output_values: List[str] = []
+        else:
+            output_values = [str(item).strip() for item in output_refs if str(item).strip()]
+            if len(output_values) != len(output_refs):
+                add_error(errors, f"{prefix}.output_refs must not contain empty values")
+        for output_idx, output_ref in enumerate(output_values):
+            if output_ref.startswith("/") or not SAFE_RELATIVE_PATH_RE.match(output_ref):
+                add_error(errors, f"{prefix}.output_refs[{output_idx}] must be a safe relative path or logical ref")
+            if output_ref in graph_target_output_refs([output_ref]) and not is_declared_target_asset(output_ref, registry_files, deliverables):
+                add_error(
+                    errors,
+                    f"{prefix}.output_refs[{output_idx}] target asset must be declared in registry or test_contract.artifacts: {output_ref}",
+                )
+
+    transitions = workflow_graph.get("transitions", [])
+    if transitions is None:
+        transitions = []
+    if not isinstance(transitions, list):
+        add_error(errors, "workflow_graph.transitions must be a list")
+        transitions = []
+    terminal_targets = set(VALID_TERMINALS) | {"success", "failure"}
+    for idx, raw_transition in enumerate(transitions):
+        prefix = f"workflow_graph.transitions[{idx}]"
+        transition = require_mapping(raw_transition, prefix, errors)
+        source = str(transition.get("from", "")).strip()
+        target = str(transition.get("to", "")).strip()
+        if not source:
+            add_error(errors, f"{prefix}.from is required")
+        elif source not in node_ids:
+            add_error(errors, f"{prefix}.from references unknown node: {source}")
+        if not target:
+            add_error(errors, f"{prefix}.to is required")
+        elif target not in node_ids and target not in terminal_targets:
+            add_error(errors, f"{prefix}.to references unknown node or terminal: {target}")
+        if source in adjacency and target in node_ids:
+            adjacency[source].add(target)
+        condition = transition.get("condition")
+        if condition is not None and not str(condition).strip():
+            add_error(errors, f"{prefix}.condition must not be empty when provided")
+
+    entrypoints = workflow_graph.get("entrypoints", [])
+    if not isinstance(entrypoints, list) or not entrypoints:
+        add_error(errors, "workflow_graph.entrypoints must be a non-empty list")
+        entrypoints = []
+    registered_entrypoints = collect_registry_names(registry, {"commands", "skills"})
+    entry_nodes: Set[str] = set()
+    seen_entry_names: Set[str] = set()
+    for idx, raw_entry in enumerate(entrypoints):
+        prefix = f"workflow_graph.entrypoints[{idx}]"
+        entry = require_mapping(raw_entry, prefix, errors)
+        name = str(entry.get("name", "")).strip()
+        node_id = str(entry.get("node", "")).strip()
         if not name:
             add_error(errors, f"{prefix}.name is required")
-        if not file_path or not file_path.startswith(".claude/commands/"):
-            add_error(errors, f"{prefix}.file must start with .claude/commands/")
+        elif name in seen_entry_names:
+            add_error(errors, f"Duplicate workflow_graph entrypoint name: {name}")
+        else:
+            seen_entry_names.add(name)
+        if name and name not in registered_entrypoints:
+            add_error(errors, f"{prefix}.name must resolve to registry.commands or registry.skills: {name}")
+        if not node_id:
+            add_error(errors, f"{prefix}.node is required")
+        elif node_id not in node_ids:
+            add_error(errors, f"{prefix}.node references unknown node: {node_id}")
+        else:
+            entry_nodes.add(node_id)
 
-    for idx, item in enumerate(skills):
-        prefix = f"registry.skills[{idx}]"
-        skill = require_mapping(item, prefix, errors)
-        name = str(skill.get("name", "")).strip()
-        file_path = str(skill.get("file", "")).strip()
-        if not name:
-            add_error(errors, f"{prefix}.name is required")
-        if not file_path or not file_path.startswith(".claude/skills/"):
-            add_error(errors, f"{prefix}.file must start with .claude/skills/")
+    reachable: Set[str] = set()
+    queue = list(entry_nodes)
+    while queue:
+        node_id = queue.pop(0)
+        if node_id in reachable:
+            continue
+        reachable.add(node_id)
+        queue.extend(sorted(adjacency.get(node_id, set()) - reachable))
+    unreachable = sorted(node_ids - reachable)
+    if unreachable and entry_nodes:
+        add_error(errors, f"workflow_graph contains unreachable nodes from entrypoints: {', '.join(unreachable)}")
+    if not transitions and len(node_ids) > 1:
+        add_warn(warnings, "workflow_graph has multiple nodes but no transitions")
 
 
 def validate_intent_flows(intent_flows: Dict[str, Any], slot_map: Dict[str, str], errors: List[str]) -> None:
@@ -727,11 +997,117 @@ def parse_stage_outputs(output: Any) -> List[str]:
     return [text]
 
 
+def validate_capability_discovery(
+    capability_discovery: Dict[str, Any],
+    errors: List[str],
+    warnings: List[str],
+) -> Dict[str, Any]:
+    """校验可选的能力搜索与推荐契约。"""
+
+    if not capability_discovery:
+        return {}
+    if "enabled" not in capability_discovery:
+        add_error(errors, "capability_discovery.enabled is required when capability_discovery is declared")
+        return capability_discovery
+    enabled = capability_discovery.get("enabled")
+    if not isinstance(enabled, bool):
+        add_error(errors, "capability_discovery.enabled must be boolean")
+        return capability_discovery
+    if not enabled:
+        return capability_discovery
+
+    domains = capability_discovery.get("domains", [])
+    if domains is not None and not isinstance(domains, list):
+        add_error(errors, "capability_discovery.domains must be a list when provided")
+        domains = []
+    normalized_domains = [str(item).strip() for item in domains if str(item).strip()] if isinstance(domains, list) else []
+    infer_from_request = capability_discovery.get("infer_from_request", True)
+    include_local = capability_discovery.get("include_local_installed", True)
+    include_curated = capability_discovery.get("include_curated_profiles", True)
+    for field_name, field_value in (
+        ("infer_from_request", infer_from_request),
+        ("include_local_installed", include_local),
+        ("include_curated_profiles", include_curated),
+    ):
+        if field_name in capability_discovery and not isinstance(field_value, bool):
+            add_error(errors, f"capability_discovery.{field_name} must be boolean when provided")
+
+    profile_overrides = capability_discovery.get("profile_overrides", {})
+    if profile_overrides not in ({}, None) and not isinstance(profile_overrides, dict):
+        add_error(errors, "capability_discovery.profile_overrides must be an object when provided")
+        profile_overrides = {}
+    if isinstance(profile_overrides, dict) and profile_overrides:
+        exclude_capability_ids = profile_overrides.get("exclude_capability_ids", [])
+        if exclude_capability_ids is not None and not isinstance(exclude_capability_ids, list):
+            add_error(errors, "capability_discovery.profile_overrides.exclude_capability_ids must be a list when provided")
+        elif isinstance(exclude_capability_ids, list):
+            for idx, capability_id in enumerate(exclude_capability_ids):
+                text = str(capability_id).strip()
+                if not text:
+                    add_error(errors, f"capability_discovery.profile_overrides.exclude_capability_ids[{idx}] must not be empty")
+                elif not re.match(r"^[a-z0-9_]+$", text):
+                    add_error(errors, f"capability_discovery.profile_overrides.exclude_capability_ids[{idx}] must use lowercase slug format")
+
+        disable_team_default = profile_overrides.get("disable_team_default")
+        if disable_team_default is not None and not isinstance(disable_team_default, bool):
+            add_error(errors, "capability_discovery.profile_overrides.disable_team_default must be boolean when provided")
+
+        replace_capabilities = profile_overrides.get("replace_capabilities", [])
+        if replace_capabilities is not None and not isinstance(replace_capabilities, list):
+            add_error(errors, "capability_discovery.profile_overrides.replace_capabilities must be a list when provided")
+        elif isinstance(replace_capabilities, list):
+            for idx, raw in enumerate(replace_capabilities):
+                prefix = f"capability_discovery.profile_overrides.replace_capabilities[{idx}]"
+                replacement = require_mapping(raw, prefix, errors)
+                for field in ("replaces", "id", "kind", "name", "probe"):
+                    if field not in replacement:
+                        add_error(errors, f"{prefix}.{field} is required")
+                replaces_id = str(replacement.get("replaces", "")).strip()
+                replacement_id = str(replacement.get("id", "")).strip()
+                if not replaces_id:
+                    add_error(errors, f"{prefix}.replaces must not be empty")
+                elif not re.match(r"^[a-z0-9_]+$", replaces_id):
+                    add_error(errors, f"{prefix}.replaces must use lowercase slug format")
+                if not replacement_id:
+                    add_error(errors, f"{prefix}.id must not be empty")
+                elif not re.match(r"^[a-z0-9_]+$", replacement_id):
+                    add_error(errors, f"{prefix}.id must use lowercase slug format")
+                kind = str(replacement.get("kind", "")).strip()
+                if kind and kind not in VALID_HOST_CAPABILITY_KINDS:
+                    add_error(errors, f"{prefix}.kind must be one of {sorted(VALID_HOST_CAPABILITY_KINDS)}")
+                if not str(replacement.get("name", "")).strip():
+                    add_error(errors, f"{prefix}.name must not be empty")
+                probe = replacement.get("probe", {})
+                if not isinstance(probe, dict):
+                    add_error(errors, f"{prefix}.probe must be an object")
+                elif kind == "external_binary" and not str(probe.get("binary", "")).strip():
+                    add_error(errors, f"{prefix}.probe.binary is required for external_binary")
+                elif kind == "mcp_server" and not str(probe.get("server_name", "")).strip():
+                    add_error(errors, f"{prefix}.probe.server_name is required for mcp_server")
+                elif kind in {"codex_skill", "claude_skill"} and not str(probe.get("skill_name", "")).strip():
+                    add_error(errors, f"{prefix}.probe.skill_name is required for {kind}")
+
+    if not normalized_domains and infer_from_request is not True:
+        add_error(errors, "capability_discovery requires domains or infer_from_request=true")
+    for idx, domain in enumerate(normalized_domains):
+        if not re.match(r"^[a-z0-9_]+$", domain):
+            add_error(errors, f"capability_discovery.domains[{idx}] must use lowercase slug format")
+        elif domain not in KNOWN_CAPABILITY_DISCOVERY_DOMAINS:
+            add_warn(
+                warnings,
+                f"capability_discovery.domains[{idx}] uses unknown curated profile '{domain}'; discovery may rely only on request inference or future profiles",
+            )
+    return capability_discovery
+
+
 def validate_generated_runtime_contract(
     generated_runtime_contract: Dict[str, Any],
     stages: List[Any],
     intent_flows: Dict[str, Any],
     test_contract: Dict[str, Any],
+    capability_discovery: Dict[str, Any],
+    host_capabilities: List[Dict[str, Any]],
+    agent_team_contract: Dict[str, Any],
     errors: List[str],
     warnings: List[str],
 ) -> None:
@@ -743,6 +1119,8 @@ def validate_generated_runtime_contract(
 
     normalized: Dict[str, str] = {}
     for key in REQUIRED_GENERATED_RUNTIME_KEYS:
+        if key == "runtime_capabilities":
+            continue
         value = str(generated_runtime_contract.get(key, "")).strip()
         if not value:
             add_error(errors, f"generated_runtime_contract.{key} must not be empty")
@@ -754,6 +1132,35 @@ def validate_generated_runtime_contract(
     mode = normalized.get("mode", "")
     if mode and mode != "shared-control-plane-wrapper":
         add_warn(warnings, f"generated_runtime_contract.mode is uncommon: {mode}")
+    runtime_capabilities = runtime_capabilities_from_contract(generated_runtime_contract)
+    if not runtime_capabilities:
+        add_error(errors, "generated_runtime_contract.runtime_capabilities must be a non-empty list")
+    else:
+        for idx, capability in enumerate(runtime_capabilities):
+            if capability not in VALID_RUNTIME_CAPABILITIES:
+                add_error(
+                    errors,
+                    f"generated_runtime_contract.runtime_capabilities[{idx}] must be one of {sorted(VALID_RUNTIME_CAPABILITIES)}",
+                )
+        if "state_transitions" not in runtime_capabilities:
+            add_error(errors, "generated_runtime_contract.runtime_capabilities must include state_transitions")
+        if "run_state_validation" not in runtime_capabilities:
+            add_error(errors, "generated_runtime_contract.runtime_capabilities must include run_state_validation")
+        if capability_discovery.get("enabled") is True and "capability_discovery" not in runtime_capabilities:
+            add_error(
+                errors,
+                "generated_runtime_contract.runtime_capabilities must include capability_discovery when capability_discovery.enabled=true",
+            )
+        if host_capabilities and "host_capability_probe" not in runtime_capabilities:
+            add_error(
+                errors,
+                "generated_runtime_contract.runtime_capabilities must include host_capability_probe when host_capabilities is declared",
+            )
+        if agent_team_enabled(agent_team_contract) and "team_orchestration" not in runtime_capabilities:
+            add_error(
+                errors,
+                "generated_runtime_contract.runtime_capabilities must include team_orchestration when agent_team_contract.enabled=true",
+            )
 
     develop_flow = intent_flows.get("develop", {}) if isinstance(intent_flows, dict) else {}
     required_slots = develop_flow.get("required_stage_slots", []) if isinstance(develop_flow, dict) else []
@@ -792,6 +1199,256 @@ def validate_generated_runtime_contract(
             add_error(errors, f"test_contract.artifacts.deliverables must include generated runtime asset: {item}")
 
 
+def validate_host_capabilities(
+    host_capabilities: List[Any],
+    errors: List[str],
+    warnings: List[str],
+) -> List[Dict[str, Any]]:
+    """校验可选的宿主能力契约。"""
+
+    normalized: List[Dict[str, Any]] = []
+    seen_ids: Set[str] = set()
+    for idx, raw in enumerate(host_capabilities):
+        prefix = f"host_capabilities[{idx}]"
+        capability = require_mapping(raw, prefix, errors)
+        normalized.append(capability)
+        for field in ("id", "kind", "name", "required", "probe", "approval_required"):
+            if field not in capability:
+                add_error(errors, f"{prefix}.{field} is required")
+
+        capability_id = str(capability.get("id", "")).strip()
+        kind = str(capability.get("kind", "")).strip()
+        if not capability_id:
+            add_error(errors, f"{prefix}.id must not be empty")
+        elif capability_id in seen_ids:
+            add_error(errors, f"Duplicate host capability id: {capability_id}")
+        else:
+            seen_ids.add(capability_id)
+
+        if kind not in VALID_HOST_CAPABILITY_KINDS:
+            add_error(errors, f"{prefix}.kind must be one of {sorted(VALID_HOST_CAPABILITY_KINDS)}")
+
+        if not str(capability.get("name", "")).strip():
+            add_error(errors, f"{prefix}.name must not be empty")
+        if not isinstance(capability.get("required"), bool):
+            add_error(errors, f"{prefix}.required must be boolean")
+        if not isinstance(capability.get("approval_required"), bool):
+            add_error(errors, f"{prefix}.approval_required must be boolean")
+
+        probe = require_mapping(capability.get("probe", {}), f"{prefix}.probe", errors)
+        if kind == "external_binary":
+            if not str(probe.get("binary", "")).strip():
+                add_error(errors, f"{prefix}.probe.binary is required for external_binary")
+            args = probe.get("args")
+            if args is not None and not isinstance(args, list):
+                add_error(errors, f"{prefix}.probe.args must be a list when provided")
+        elif kind == "mcp_server":
+            if not str(probe.get("server_name", "")).strip():
+                add_error(errors, f"{prefix}.probe.server_name is required for mcp_server")
+        elif kind in {"codex_skill", "claude_skill"}:
+            if not str(probe.get("skill_name", "")).strip():
+                add_error(errors, f"{prefix}.probe.skill_name is required for {kind}")
+
+        bootstrap = require_mapping(capability.get("bootstrap", {}), f"{prefix}.bootstrap", errors)
+        scope = str(bootstrap.get("scope", "")).strip()
+        if scope and scope not in VALID_BOOTSTRAP_SCOPES:
+            add_error(errors, f"{prefix}.bootstrap.scope must be one of {sorted(VALID_BOOTSTRAP_SCOPES)}")
+        if not scope:
+            add_warn(warnings, f"{prefix}.bootstrap.scope is missing; bootstrap defaults to manual-only behavior")
+        if scope == "host_global" and capability.get("approval_required") is not True:
+            add_error(errors, f"{prefix}.approval_required must be true when bootstrap.scope=host_global")
+        adapter = bootstrap.get("adapter", {})
+        if adapter is not None and not isinstance(adapter, dict):
+            add_error(errors, f"{prefix}.bootstrap.adapter must be an object when provided")
+            adapter = {}
+        adapter_type = str(adapter.get("type", "")).strip() if isinstance(adapter, dict) else ""
+        if scope != "host_global" and adapter_type:
+            add_error(errors, f"{prefix}.bootstrap.adapter is only allowed for bootstrap.scope=host_global")
+        if scope == "host_global":
+            if not adapter_type:
+                add_warn(warnings, f"{prefix}.bootstrap.adapter is missing; host-global bootstrap remains plan-only")
+            elif adapter_type not in VALID_HOST_GLOBAL_ADAPTER_TYPES:
+                add_error(errors, f"{prefix}.bootstrap.adapter.type must be one of {sorted(VALID_HOST_GLOBAL_ADAPTER_TYPES)}")
+            elif adapter_type == "symlink_binary":
+                source_binary = str(adapter.get("source_binary", "")).strip()
+                target_path = str(adapter.get("target_path", "")).strip()
+                if not source_binary:
+                    add_error(errors, f"{prefix}.bootstrap.adapter.source_binary is required for symlink_binary")
+                if not target_path:
+                    add_error(errors, f"{prefix}.bootstrap.adapter.target_path is required for symlink_binary")
+                elif not target_path.startswith("/"):
+                    add_error(errors, f"{prefix}.bootstrap.adapter.target_path must be an absolute path for symlink_binary")
+            elif adapter_type in {"uv_tool", "pipx_install", "npm_global"}:
+                package_name = str(adapter.get("package", "")).strip()
+                if not package_name:
+                    add_error(errors, f"{prefix}.bootstrap.adapter.package is required for {adapter_type}")
+                extra_args = adapter.get("extra_args")
+                if extra_args is not None and not isinstance(extra_args, list):
+                    add_error(errors, f"{prefix}.bootstrap.adapter.extra_args must be a list when provided")
+
+        project_outputs = bootstrap.get("project_local_outputs", [])
+        if project_outputs is not None and not isinstance(project_outputs, list):
+            add_error(errors, f"{prefix}.bootstrap.project_local_outputs must be a list when provided")
+            project_outputs = []
+        if scope != "project_local" and string_list(project_outputs):
+            add_error(errors, f"{prefix}.bootstrap.project_local_outputs is only allowed for bootstrap.scope=project_local")
+        normalized_outputs = string_list(project_outputs)
+        for output_idx, item in enumerate(string_list(project_outputs)):
+            rel_path = ensure_relative_bootstrap_output(item)
+            if rel_path.startswith("/") or rel_path.startswith(".."):
+                add_error(errors, f"{prefix}.bootstrap.project_local_outputs[{output_idx}] must be a safe relative path")
+                continue
+            if not rel_path.startswith(".workflowprogram/bootstrap/"):
+                add_error(
+                    errors,
+                    f"{prefix}.bootstrap.project_local_outputs[{output_idx}] must stay under .workflowprogram/bootstrap/: {rel_path}",
+                )
+        assets = bootstrap.get("assets", [])
+        if assets is not None and not isinstance(assets, list):
+            add_error(errors, f"{prefix}.bootstrap.assets must be a list when provided")
+            assets = []
+        if scope != "project_local" and isinstance(assets, list) and assets:
+            add_error(errors, f"{prefix}.bootstrap.assets is only allowed for bootstrap.scope=project_local")
+        seen_asset_paths: Set[str] = set()
+        for asset_idx, raw_asset in enumerate(assets if isinstance(assets, list) else []):
+            asset_prefix = f"{prefix}.bootstrap.assets[{asset_idx}]"
+            asset = require_mapping(raw_asset, asset_prefix, errors)
+            asset_path = ensure_relative_bootstrap_output(str(asset.get("path", "")).strip())
+            asset_format = str(asset.get("format", "")).strip()
+            if not asset_path:
+                add_error(errors, f"{asset_prefix}.path is required")
+            elif asset_path.startswith("/") or asset_path.startswith(".."):
+                add_error(errors, f"{asset_prefix}.path must be a safe relative path")
+            elif not asset_path.startswith(".workflowprogram/bootstrap/"):
+                add_error(errors, f"{asset_prefix}.path must stay under .workflowprogram/bootstrap/: {asset_path}")
+            elif asset_path in seen_asset_paths:
+                add_error(errors, f"Duplicate project-local bootstrap asset path: {asset_path}")
+            else:
+                seen_asset_paths.add(asset_path)
+
+            if asset_format not in VALID_BOOTSTRAP_ASSET_FORMATS:
+                add_error(errors, f"{asset_prefix}.format must be one of {sorted(VALID_BOOTSTRAP_ASSET_FORMATS)}")
+            if "content" not in asset:
+                add_error(errors, f"{asset_prefix}.content is required")
+            elif asset_format == "json":
+                if asset.get("content") is None:
+                    add_error(errors, f"{asset_prefix}.content must not be null for json assets")
+            elif not isinstance(asset.get("content"), str):
+                add_error(errors, f"{asset_prefix}.content must be a string for {asset_format or 'non-json'} assets")
+
+            executable = asset.get("executable")
+            if executable is not None and not isinstance(executable, bool):
+                add_error(errors, f"{asset_prefix}.executable must be boolean when provided")
+            if executable is True and asset_format != "shell":
+                add_error(errors, f"{asset_prefix}.executable=true is only allowed when format=shell")
+
+        if scope == "project_local" and not normalized_outputs and not seen_asset_paths:
+            add_error(errors, f"{prefix}.bootstrap must declare project_local_outputs or bootstrap.assets when scope=project_local")
+    return normalized
+
+
+def validate_agent_team_contract(
+    agent_team_contract: Dict[str, Any],
+    errors: List[str],
+    warnings: List[str],
+) -> None:
+    """校验可选的 agent team orchestration 契约。"""
+
+    if not agent_team_contract:
+        return
+    enabled = agent_team_enabled(agent_team_contract)
+    if "enabled" not in agent_team_contract:
+        add_error(errors, "agent_team_contract.enabled is required when agent_team_contract is declared")
+        return
+    if not isinstance(agent_team_contract.get("enabled"), bool):
+        add_error(errors, "agent_team_contract.enabled must be boolean")
+        return
+    if not enabled:
+        return
+
+    for field in ("max_fan_out", "join_policy", "roles", "execution"):
+        if field not in agent_team_contract:
+            add_error(errors, f"agent_team_contract.{field} is required when enabled=true")
+
+    max_fan_out = agent_team_contract.get("max_fan_out")
+    if not isinstance(max_fan_out, int) or max_fan_out <= 0:
+        add_error(errors, "agent_team_contract.max_fan_out must be a positive integer")
+        max_fan_out = 0
+    elif max_fan_out > 4:
+        add_error(errors, "agent_team_contract.max_fan_out must be <= 4")
+
+    join_policy = str(agent_team_contract.get("join_policy", "")).strip()
+    if join_policy not in VALID_TEAM_JOIN_POLICIES:
+        add_error(errors, f"agent_team_contract.join_policy must be one of {sorted(VALID_TEAM_JOIN_POLICIES)}")
+
+    roles = agent_team_contract.get("roles", [])
+    if not isinstance(roles, list) or not roles:
+        add_error(errors, "agent_team_contract.roles must be a non-empty list when enabled=true")
+        roles = []
+    role_ids: Set[str] = set()
+    ownership_map: Dict[str, Set[str]] = {}
+    for idx, raw_role in enumerate(roles):
+        prefix = f"agent_team_contract.roles[{idx}]"
+        role = require_mapping(raw_role, prefix, errors)
+        role_id = str(role.get("id", "")).strip()
+        if not role_id:
+            add_error(errors, f"{prefix}.id is required")
+        elif role_id in role_ids:
+            add_error(errors, f"Duplicate agent team role id: {role_id}")
+        else:
+            role_ids.add(role_id)
+        if not str(role.get("responsibility", "")).strip():
+            add_error(errors, f"{prefix}.responsibility is required")
+        if not isinstance(role.get("required"), bool):
+            add_error(errors, f"{prefix}.required must be boolean")
+        output_patterns = role.get("output_patterns")
+        if not isinstance(output_patterns, list) or not output_patterns:
+            add_error(errors, f"{prefix}.output_patterns must be a non-empty list")
+        ownership = role.get("ownership_stage_slots")
+        if not isinstance(ownership, list) or not ownership:
+            add_error(errors, f"{prefix}.ownership_stage_slots must be a non-empty list")
+            ownership_values: List[str] = []
+        else:
+            ownership_values = [str(item).strip() for item in ownership if str(item).strip()]
+            for slot_idx, slot in enumerate(ownership_values):
+                if slot not in VALID_STAGE_SLOTS:
+                    add_error(errors, f"{prefix}.ownership_stage_slots[{slot_idx}] must be one of {REQUIRED_STAGE_SLOT_ORDER}")
+        if role_id:
+            ownership_map[role_id] = set(ownership_values)
+
+    execution = agent_team_contract.get("execution", [])
+    if not isinstance(execution, list) or not execution:
+        add_error(errors, "agent_team_contract.execution must be a non-empty list when enabled=true")
+        execution = []
+    for idx, raw_exec in enumerate(execution):
+        prefix = f"agent_team_contract.execution[{idx}]"
+        item = require_mapping(raw_exec, prefix, errors)
+        stage_slot = str(item.get("stage_slot", "")).strip()
+        if stage_slot not in VALID_STAGE_SLOTS:
+            add_error(errors, f"{prefix}.stage_slot must be one of {REQUIRED_STAGE_SLOT_ORDER}")
+        role_list = item.get("role_ids")
+        if not isinstance(role_list, list) or not role_list:
+            add_error(errors, f"{prefix}.role_ids must be a non-empty list")
+            role_values: List[str] = []
+        else:
+            role_values = [str(role).strip() for role in role_list if str(role).strip()]
+            if max_fan_out and len(role_values) > max_fan_out:
+                add_error(errors, f"{prefix}.role_ids exceeds max_fan_out={max_fan_out}")
+        join_role = str(item.get("join_role", "")).strip()
+        if not join_role:
+            add_error(errors, f"{prefix}.join_role is required")
+        elif join_role not in role_ids:
+            add_error(errors, f"{prefix}.join_role references unknown role: {join_role}")
+        for role_id in role_values:
+            if role_id not in role_ids:
+                add_error(errors, f"{prefix}.role_ids references unknown role: {role_id}")
+                continue
+            if stage_slot and stage_slot not in ownership_map.get(role_id, set()):
+                add_error(errors, f"{prefix}.role_ids includes role '{role_id}' that does not own stage_slot {stage_slot}")
+    if not execution:
+        add_warn(warnings, "agent_team_contract.enabled=true without execution rules leaves team orchestration inert")
+
+
 def validate_spec(spec: Dict[str, Any]) -> Dict[str, Any]:
     """运行完整 workflow-spec 校验器，并返回结构化报告。"""
 
@@ -818,15 +1475,10 @@ def validate_spec(spec: Dict[str, Any]) -> Dict[str, Any]:
 
     registry = require_mapping(spec.get("registry", {}), "registry", errors)
     validate_registry(registry, errors)
-    registered_entries: Set[str] = set()
-    for collection in ("commands", "skills"):
-        items = registry.get(collection, [])
-        if isinstance(items, list):
-            for item in items:
-                if isinstance(item, dict):
-                    name = str(item.get("name", "")).strip()
-                    if name:
-                        registered_entries.add(name)
+    registered_entries = collect_registry_names(registry, {"commands", "skills"})
+
+    workflow_graph = require_mapping(spec.get("workflow_graph", {}), "workflow_graph", errors) if "workflow_graph" in spec else {}
+    validate_workflow_graph(workflow_graph, registry, spec.get("test_contract", {}), errors, warnings)
 
     constraints = require_mapping(spec.get("constraints", {}), "constraints", errors)
     validate_constraints(constraints, errors, warnings)
@@ -837,8 +1489,27 @@ def validate_spec(spec: Dict[str, Any]) -> Dict[str, Any]:
     runtime_contract = require_mapping(spec.get("runtime_contract", {}), "runtime_contract", errors)
     validate_runtime_contract(runtime_contract, errors, warnings)
 
+    capability_discovery = require_mapping(spec.get("capability_discovery", {}), "capability_discovery", errors) if "capability_discovery" in spec else {}
+    validate_capability_discovery(capability_discovery, errors, warnings)
+
+    host_capabilities = require_list(spec.get("host_capabilities", []), "host_capabilities", errors) if "host_capabilities" in spec else []
+    normalized_host_capabilities = validate_host_capabilities(host_capabilities, errors, warnings)
+
+    agent_team_contract = require_mapping(spec.get("agent_team_contract", {}), "agent_team_contract", errors) if "agent_team_contract" in spec else {}
+    validate_agent_team_contract(agent_team_contract, errors, warnings)
+
     generated_runtime_contract = require_mapping(spec.get("generated_runtime_contract", {}), "generated_runtime_contract", errors)
-    validate_generated_runtime_contract(generated_runtime_contract, stages, intent_flows, spec.get("test_contract", {}), errors, warnings)
+    validate_generated_runtime_contract(
+        generated_runtime_contract,
+        stages,
+        intent_flows,
+        spec.get("test_contract", {}),
+        capability_discovery,
+        normalized_host_capabilities,
+        agent_team_contract,
+        errors,
+        warnings,
+    )
 
     test_contract = require_mapping(spec.get("test_contract", {}), "test_contract", errors)
     validate_test_contract(test_contract, runtime_contract, stage_ids, slot_map, intent_flows, registered_entries, errors, warnings)

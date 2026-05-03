@@ -21,6 +21,29 @@
 
 - 抽取独立工作流仓时，继续加强“格式契约”和“工作区写边界”提示。
 
+## 2026-04-18 - 控制面脚本调用硬化（stage-progress）
+
+### Context
+- `stage-progress.py` 作为严格枚举参数的控制面脚本，仍然在 active docs 中被描述成模型应手工拼接的 CLI 步骤。
+- 实际使用中，这会让模型频繁因为 `stage/event/status/approval-status` 参数不精确而失败。
+
+### What Worked
+- 把 progress 事件继续保留为 `stage-progress.py update ...` 的兼容 CLI，便于调试和手工恢复。
+- 用 runner 内部的 control-plane helper 包装 CLI 组装后，进展证据语义不需要改变。
+
+### What Did Not Work
+- 让模型直接拼高约束控制面脚本的 CLI，本质上是脆弱接口暴露，不是提示词质量问题。
+- 仅依赖 lessons / prompt 演进，不能阻止相同的结构性失败重复出现。
+
+### Constraints To Extract
+- ALWAYS 通过 control-plane helper 调用高约束控制面脚本，而不是让模型手工拼 CLI。
+- ALWAYS 将 `stage-progress.py` 这类脚本描述为 runner / control-plane 内部动作。
+- NEVER 把严格参数词表的控制面脚本暴露成模型主路径。
+
+### Follow-Ups
+- 将约束沉淀到 `.claude/rules/constraints.md`。
+- 为 active docs 和仓库级 validator 增加 anti-regression 检查。
+
 ## 2026-03-23 - /develop
 
 ### Context

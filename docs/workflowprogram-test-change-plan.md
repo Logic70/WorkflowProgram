@@ -18,6 +18,9 @@
 | C12 | 完成平台侧补验证 | 暂缓 | `powershell.exe -ExecutionPolicy Bypass -File .claude/scripts/validate-workflow.ps1` | 当前范围暂不考虑 Windows 平台；Python 校验器、runner 和 smoke 已完成非 Windows 复验。 |
 | C13 | 将 S1/S6 质量门槛与真实宿主 smoke 标准化 | 已完成 | `.claude/scripts/validate-workflow-draft.py`<br>`.claude/scripts/validate-lessons-delta.py`<br>`tools/runtime_smoke_matrix.py`<br>`tools/runtime_smoke.py` | `workflow-spec.md` 与 `s6-lessons-delta.md` 已有确定性 validator；`runtime_smoke` 会在 skip/error 路径补齐最小 progress 证据；`runtime_smoke_matrix.py` 已统一 `command_adapter / fixture_host / claude_cli` 的复验入口。 |
 | C14 | 收口产品入口确定性编排与能力矩阵校验 | 已完成 | `.claude/scripts/workflow-entry.py`<br>`docs/workflowprogram-capability-matrix.json`<br>`docs/workflowprogram-design-status.md`<br>`.claude/scripts/validate-workflow.py` | develop 主链已有单一脚本入口串起 `validate-workflow-spec -> generate-view -> managed-assets -> workflow-runner -> validate-run-state`，仓库级 validator 也会按 capability matrix 与文档状态索引检查 HighLevel / LowLevel / 模板 / 脚本同步性。 |
+| C15 | 让生成工作流交付目标侧 deterministic runtime control plane | 已完成 | `.claude/scripts/generate-target-runtime.py`<br>`.claude/scripts/validate-generated-runtime.py`<br>`.claude/scripts/workflow-entry.py`<br>`docs/workflowprogram-stage-highlevel-design.md` | 目标工作流现在会持久化 `.workflowprogram/runtime/*`，模式固定为 `shared-control-plane-wrapper`，并通过 generated runtime validator 和 S5 judge 受控验证。 |
+| C16 | 增加宿主能力契约、探测与分级 bootstrap | 已完成 | `.claude/scripts/probe-host-capabilities.py`<br>`.claude/scripts/apply-host-bootstrap.py`<br>`.claude/scripts/workflow-entry.py`<br>`.claude/scripts/workflow-s5-judge.py` | `host_capabilities` 已成为机器可读契约；required 缺失会导致最终 `FAIL/environment`，但 runner 与 S5 证据链仍完整保留；V1 只自动执行 `project_local + approval_required=false`，`host_global/manual_only` 只生成 plan 与人工处理指引。 |
+| C17 | 增加显式 agent team orchestration 契约与证据模型 | 已完成 | `.claude/scripts/validate-workflow-spec.py`<br>`.claude/scripts/workflow-s5-judge.py`<br>`tools/mock_runtime_host.py`<br>`tools/runtime_smoke_matrix.py` | `agent_team_contract` 已支持 role / ownership / fan-out / join policy / evidence；确定性 provider 会执行 full orchestration 并产出 team evidence，`claude_cli` 第一版只做契约与证据校验。 |
 
 ## 当前判断
 
@@ -28,6 +31,8 @@
 | 基础动态测试能力 | 已完成 | 已具备 provider-agnostic 的 PASS/FAIL smoke、固定负例矩阵、S5 judge 摘要与契约分项报告。 |
 | S1 / S6 质量门槛 | 已完成 | `workflow-spec.md` 与 `s6-lessons-delta.md` 已从提示词要求升级为确定性校验规则。 |
 | 历史文档治理 | 已完成 | 已新增 `workflowprogram-design-status.md` 标记活文档/支持文档/历史文档边界，并在关键历史设计文档顶部补充状态说明。 |
+| 生成工作流 runtime control plane | 已完成 | 目标工作流现在会交付 `.workflowprogram/runtime/*` 并沿用 shared-control-plane-wrapper 模式。 |
+| 宿主能力与 team 契约 | 已完成 | `host_capabilities` 与 `agent_team_contract` 已进入模板、validator、judge、smoke 和 OpenSpec 审计链。 |
 
 ## 建议优先级
 

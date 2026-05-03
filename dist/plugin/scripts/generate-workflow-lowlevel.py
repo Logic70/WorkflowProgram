@@ -128,6 +128,42 @@ def render_intent_flows(spec: Dict[str, Any]) -> List[str]:
     return lines
 
 
+def render_workflow_graph_guide(spec: Dict[str, Any]) -> List[str]:
+    graph = spec.get("workflow_graph", {})
+    lines: List[str] = ["## Target Workflow Graph Contract", ""]
+    if not isinstance(graph, dict) or not graph:
+        return lines + [
+            "- None",
+            "",
+            "维护规则：若目标工作流的业务节点不等同于 WorkflowProgram 的 S1-S6 控制面，必须在 `workflow-spec.yaml.workflow_graph` 中声明目标节点、入口、转移与输出资产。",
+            "",
+        ]
+    lines.extend(
+        [
+            f"- schema_version: `{format_value(graph.get('schema_version'))}`",
+            f"- templates_used: `{format_value(graph.get('templates_used', []))}`",
+            "",
+            "维护规则：`workflow_graph` 是生成后目标工作流的业务图；`stages` 和 `intent_flows` 仍然只描述 WorkflowProgram 自身的开发/审计/迭代/验证控制面。",
+            "维护规则：任何会影响目标工作流入口、节点转移、输出资产或 gate 的调整，都必须先改 `workflow-spec.yaml.workflow_graph`，再重生成 view/lowlevel。",
+            "维护规则：目标资产输出必须能回到 `registry` 或 `test_contract.artifacts`，避免模型生成未声明文件。",
+            "",
+        ]
+    )
+    nodes = graph.get("nodes", [])
+    if isinstance(nodes, list) and nodes:
+        lines.append("### Graph Nodes")
+        lines.append("")
+        for node in nodes:
+            if not isinstance(node, dict):
+                continue
+            lines.append(
+                f"- `{format_value(node.get('id'))}` role=`{format_value(node.get('role'))}` "
+                f"owner=`{format_value(node.get('owner'))}` outputs=`{format_value(node.get('output_refs', []))}`"
+            )
+        lines.append("")
+    return lines
+
+
 def render_stage_guidance(stages: List[Dict[str, Any]]) -> List[str]:
     lines: List[str] = ["## Stage Contracts", ""]
     for stage in stages:
@@ -179,10 +215,65 @@ def render_contract_guide(spec: Dict[str, Any]) -> List[str]:
         f"- state_validator_script: `{format_value(generated_runtime_contract.get('state_validator_script', '-'))}`",
         f"- runtime_manifest: `{format_value(generated_runtime_contract.get('runtime_manifest', '-'))}`",
         f"- run_root_dir: `{format_value(generated_runtime_contract.get('run_root_dir', '-'))}`",
+        f"- runtime_capabilities: `{format_value(generated_runtime_contract.get('runtime_capabilities', []))}`",
         "",
         "维护规则：若目标工作流声明了阶段流与 test_contract，则必须同时交付 `.workflowprogram/runtime/` 下的 deterministic runtime 资产，不得只保留命令和设计文档。",
         "",
     ]
+
+
+def render_host_capability_guide(spec: Dict[str, Any]) -> List[str]:
+    host_capabilities = spec.get("host_capabilities", [])
+    lines = ["## Host Capability Contract", ""]
+    if not isinstance(host_capabilities, list) or not host_capabilities:
+        return lines + ["- None", "", "维护规则：若工作流依赖专业工具、MCP 或宿主 skill，应先在 `workflow-spec.yaml.host_capabilities` 中声明，再通过 probe/bootstrap 证据验证可用性。", ""]
+    for item in host_capabilities:
+        if not isinstance(item, dict):
+            continue
+        bootstrap = item.get("bootstrap", {}) if isinstance(item.get("bootstrap"), dict) else {}
+        outputs = bootstrap.get("project_local_outputs", []) if isinstance(bootstrap.get("project_local_outputs"), list) else []
+        assets = bootstrap.get("assets", []) if isinstance(bootstrap.get("assets"), list) else []
+        lines.append(
+            f"- `{item.get('id', 'unknown')}` kind=`{item.get('kind', '-')}` required=`{item.get('required', False)}` "
+            f"scope=`{bootstrap.get('scope', '-')}` approval_required=`{item.get('approval_required', False)}` "
+            f"project_local_outputs=`{format_value(outputs)}` assets=`{len(assets)}`"
+        )
+    lines.extend(
+        [
+            "",
+            "维护规则：host capability 只影响宿主可用性，不是 TARGET_ROOT 业务资产。探测报告和 bootstrap plan 必须写入 RUN_ROOT，只有 project-local bootstrap 可以写入 `TARGET_ROOT/.workflowprogram/bootstrap/**`。",
+            "若声明 `bootstrap.assets`，则这些资产必须是可复用的配置、wrapper 或 marker 文件，并在 apply 证据与 target bootstrap manifest 中同时留下记录。",
+            "",
+        ]
+    )
+    return lines
+
+
+def render_agent_team_guide(spec: Dict[str, Any]) -> List[str]:
+    contract = spec.get("agent_team_contract", {})
+    lines = ["## Agent Team Contract", ""]
+    if not isinstance(contract, dict) or not contract:
+        return lines + ["- None", "", "维护规则：普通 subagent 并不等于 agent team。只有声明了 `agent_team_contract.enabled=true` 的 workflow 才应产出 team evidence。", ""]
+    lines.append(
+        f"- enabled=`{format_value(contract.get('enabled'))}` max_fan_out=`{format_value(contract.get('max_fan_out'))}` "
+        f"join_policy=`{format_value(contract.get('join_policy'))}`"
+    )
+    roles = contract.get("roles", [])
+    if isinstance(roles, list) and roles:
+        for role in roles:
+            if not isinstance(role, dict):
+                continue
+            lines.append(
+                f"- role `{role.get('id', 'unknown')}` stages=`{format_value(role.get('ownership_stage_slots', []))}` outputs=`{format_value(role.get('output_patterns', []))}`"
+            )
+    lines.extend(
+        [
+            "",
+            "维护规则：team orchestration 的 join/fan-out 语义以 YAML 契约为准；LowLevel 只负责解释如何维护和审计 team 证据，不得单独扩展执行规则。",
+            "",
+        ]
+    )
+    return lines
 
 
 def render_delivery_rules() -> List[str]:
@@ -229,8 +320,11 @@ def render_lowlevel(spec: Dict[str, Any], spec_sha256: str, generated_at: str | 
     lines.extend(render_truth_hierarchy())
     lines.extend(render_meta(spec.get("meta", {})))
     lines.extend(render_intent_flows(spec))
+    lines.extend(render_workflow_graph_guide(spec))
     lines.extend(render_stage_guidance(spec.get("stages", [])))
     lines.extend(render_contract_guide(spec))
+    lines.extend(render_host_capability_guide(spec))
+    lines.extend(render_agent_team_guide(spec))
     lines.extend(render_delivery_rules())
     lines.extend(render_maintenance_rules())
     return "\n".join(lines).rstrip() + "\n"

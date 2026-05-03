@@ -32,6 +32,7 @@ disable-model-invocation: true
 - `workflow-spec.yaml` 必须包含 `runtime_contract`，且至少声明：`write_boundaries`、`required_evidence`、`failure_kinds`、`environment_skip`。
 - `workflow-spec.yaml` 必须包含 `test_contract`，且至少声明：`entry`、`boundary`、`flow`、`artifacts`、`failure`。
 - `workflow-spec.yaml` 必须包含 `generated_runtime_contract`，且 `mode` 当前固定为 `shared-control-plane-wrapper`。
+- 若目标工作流需要请求特定业务节点图，则 `workflow-spec.yaml` 必须声明 `workflow_graph`；它描述目标工作流自身节点，不要求套用 WorkflowProgram 的 `S1..S6`。
 - 若 workflow 需要先发现候选专业能力，则 `workflow-spec.yaml` 还必须声明 `capability_discovery`，并同步扩展 `generated_runtime_contract.runtime_capabilities`。
 - 若 workflow 依赖宿主专业能力或显式 team，则 `workflow-spec.yaml` 还必须声明 `host_capabilities`、`agent_team_contract`，并同步扩展 `generated_runtime_contract.runtime_capabilities`。
 - 若 `host_capabilities.bootstrap.scope=project_local`，优先用声明式 `bootstrap.assets` 生成复用配置 / wrapper / marker 资产，而不是只留下占位输出。
@@ -57,7 +58,7 @@ disable-model-invocation: true
 
 1. 用统一规格模板整理需求。
 2. 每轮只提出当前最关键的 1-3 个未决问题，并根据用户回答继续追问，直到诉求、目的和成功标准清楚为止。
-3. 在 `workflow-spec.md` 中显式整理 `User Intent`、`Clarification Summary`、`Open Questions`、`Assumptions and Boundaries`、`Readback Confirmation`。
+3. 在 `workflow-spec.md` 中显式整理 `User Intent`、`Clarification Summary`、`Open Questions`、`Assumptions and Boundaries`、`Target Workflow Graph Readback`、`File Plan`、`Readback Confirmation`。
 4. 调用 `${CLAUDE_PLUGIN_ROOT}/scripts/generate-clarification-package.py`，生成 S1 结构化澄清包。
 5. 调用 `${CLAUDE_PLUGIN_ROOT}/scripts/generate-clarification-review.py`，生成 challenge/handoff/evidence 三份审阅产物。
 6. 约束：`requirement-clarification-lead` 是唯一与用户直接对话的角色；`scenario-extractor`、`assumption-auditor`、`constraint-reviewer` 只能在内部 challenge 中提出补问与 handoff 建议，不得直接触达用户。

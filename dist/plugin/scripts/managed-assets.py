@@ -24,6 +24,7 @@ from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional
 
 from lib.io_utils import iso_now, write_json
+from lib.reporting import redact_text, with_report_fields
 
 
 ALLOWED_MANAGED_PREFIXES = (".claude/", ".workflowprogram/design/", ".workflowprogram/runtime/")
@@ -306,6 +307,7 @@ def plan_payload(target_root: Path, source_root: Path, run_root: Path, producer_
 
     manifest = load_manifest(manifest_path_for(target_root))
     decisions = decide_candidates(target_root, source_root, manifest)
+    summary = summarize(decisions)
     payload = {
         "generated_at": iso_now(),
         "target_root": str(target_root),
@@ -313,10 +315,23 @@ def plan_payload(target_root: Path, source_root: Path, run_root: Path, producer_
         "run_root": str(run_root),
         "manifest_path": str(manifest_path_for(target_root)),
         "producer_version": producer_version,
-        "summary": summarize(decisions),
+        "summary": summary,
         "entries": [item.to_dict() for item in decisions],
     }
-    return payload
+    return with_report_fields(
+        payload,
+        schema_name="managed-change-plan",
+        error_code="CONFLICT" if summary["conflict"] else None,
+        failure_kind="conflict" if summary["conflict"] else "none",
+        remediation=[
+            {
+                "code": "RESOLVE_MANAGED_CONFLICTS",
+                "summary": "Review conflict copies under RUN_ROOT/outputs/conflicts and either accept the candidate or keep the target file unchanged.",
+            }
+        ]
+        if summary["conflict"]
+        else [],
+    )
 
 
 def emit(run_root: Path, event_type: str, status: str, message: str, **extra: Any) -> None:
@@ -343,6 +358,21 @@ def copy_candidate_for_conflict(run_root: Path, relative_path: str, source_path:
     conflict_path.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy2(source_path, conflict_path)
     return str(conflict_path)
+
+
+def copy_before_snapshot(run_root: Path, relative_path: str, target_path: Path) -> Optional[Dict[str, Any]]:
+    """保存更新前快照，供后续人工恢复或安全 rollback 使用。"""
+
+    if not target_path.exists():
+        return None
+    snapshot_path = run_root / "outputs" / "managed-before" / relative_path
+    snapshot_path.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(target_path, snapshot_path)
+    return {
+        "relative_path": relative_path,
+        "snapshot_path": str(snapshot_path),
+        "snapshot_sha256": sha256_file(snapshot_path),
+    }
 
 
 def update_manifest_entries(
@@ -394,7 +424,105 @@ def write_markdown_summary(path: Path, result: Dict[str, Any]) -> None:
             lines.append(f"- `{item['relative_path']}`: {item['decision']} ({item['reason']})")
     else:
         lines.append("- None")
-    write_text(path, "\n".join(lines) + "\n")
+    write_text(path, redact_text("\n".join(lines) + "\n"))
+
+
+def build_rollback_manifest(
+    target_root: Path,
+    run_root: Path,
+    applied: List[Dict[str, Any]],
+    conflicts: List[Dict[str, Any]],
+) -> Dict[str, Any]:
+    """构建只读 rollback manifest；实际回滚必须再次检查 current hash。"""
+
+    entries: List[Dict[str, Any]] = []
+    for item in applied:
+        action = str(item.get("action", "")).strip()
+        applied_sha = str(item.get("applied_sha256", "")).strip()
+        before_snapshot = item.get("before_snapshot") if isinstance(item.get("before_snapshot"), dict) else None
+        if action == "create":
+            rollback_action = "delete_created_file"
+            safety_rule = "Only delete if current file hash still equals applied_sha256."
+        else:
+            rollback_action = "restore_before_snapshot"
+            safety_rule = "Only restore if current file hash still equals applied_sha256; otherwise require manual merge."
+        entries.append(
+            {
+                "relative_path": item.get("relative_path"),
+                "target_path": item.get("target_path"),
+                "action": action,
+                "rollback_action": rollback_action,
+                "safe_if_current_sha256_equals": applied_sha,
+                "before_sha256": item.get("before_sha256"),
+                "before_snapshot_path": before_snapshot.get("snapshot_path") if before_snapshot else None,
+                "before_snapshot_sha256": before_snapshot.get("snapshot_sha256") if before_snapshot else None,
+                "safety_rule": safety_rule,
+            }
+        )
+    for item in conflicts:
+        entries.append(
+            {
+                "relative_path": item.get("relative_path"),
+                "target_path": item.get("target_path"),
+                "action": "conflict",
+                "rollback_action": "none",
+                "conflict_copy": item.get("conflict_copy"),
+                "safety_rule": "No target file was modified; compare conflict_copy with target file before applying manually.",
+            }
+        )
+    payload = {
+        "generated_at": iso_now(),
+        "target_root": str(target_root),
+        "run_root": str(run_root),
+        "entries": entries,
+    }
+    return with_report_fields(
+        payload,
+        schema_name="managed-rollback-manifest",
+        error_code="CONFLICT" if conflicts else None,
+        failure_kind="conflict" if conflicts else "none",
+        remediation=[
+            {
+                "code": "MANUAL_CONFLICT_REVIEW",
+                "summary": "Target file was not overwritten. Review conflict_copy and choose whether to merge it.",
+            }
+        ]
+        if conflicts
+        else [],
+    )
+
+
+def write_recover_instructions(path: Path, rollback_manifest: Dict[str, Any]) -> None:
+    """输出面向用户的恢复说明，并确保可分享内容不泄露常见 secret 值。"""
+
+    lines = [
+        "# Managed Asset Recovery Instructions",
+        "",
+        f"- Generated at: `{rollback_manifest.get('generated_at', '-')}`",
+        f"- Rollback manifest: `outputs/managed-rollback-manifest.json`",
+        "",
+        "## Safety Rules",
+        "",
+        "- Created files may be deleted only when the current hash still equals `applied_sha256`.",
+        "- Updated files may be restored only when the current hash still equals `applied_sha256`.",
+        "- If the current hash differs, stop and manually merge because the user or another tool modified the file after apply.",
+        "- Conflict entries did not modify TARGET_ROOT; compare their `conflict_copy` with the target file before applying manually.",
+        "",
+        "## Entries",
+        "",
+    ]
+    entries = rollback_manifest.get("entries", [])
+    if isinstance(entries, list) and entries:
+        for item in entries:
+            if not isinstance(item, dict):
+                continue
+            lines.append(
+                f"- `{item.get('relative_path', '<unknown>')}` action=`{item.get('action', '-')}` "
+                f"rollback=`{item.get('rollback_action', '-')}`"
+            )
+    else:
+        lines.append("- None")
+    write_text(path, redact_text("\n".join(lines) + "\n"))
 
 
 def command_plan(args: argparse.Namespace) -> int:
@@ -440,6 +568,7 @@ def command_apply_staged(args: argparse.Namespace) -> int:
         source_path = Path(item["source_path"])
         target_path = Path(item["target_path"])
         if item["decision"] in {"create", "update"}:
+            before_snapshot = copy_before_snapshot(run_root, item["relative_path"], target_path) if item["decision"] == "update" else None
             target_path.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(source_path, target_path)
             applied_item = {
@@ -447,6 +576,9 @@ def command_apply_staged(args: argparse.Namespace) -> int:
                 "action": item["decision"],
                 "target_path": item["target_path"],
                 "applied_sha256": sha256_file(target_path),
+                "before_exists": item["target_exists"],
+                "before_sha256": item["target_sha256"],
+                "before_snapshot": before_snapshot,
                 "run_id": Path(run_root).name,
             }
             applied.append(applied_item)
@@ -464,6 +596,7 @@ def command_apply_staged(args: argparse.Namespace) -> int:
     manifest = update_manifest_entries(manifest, applied, producer_version)
     save_manifest(manifest_path, manifest)
 
+    result_summary = plan["summary"]
     result = {
         "generated_at": iso_now(),
         "target_root": str(target_root),
@@ -471,13 +604,30 @@ def command_apply_staged(args: argparse.Namespace) -> int:
         "run_root": str(run_root),
         "manifest_path": str(manifest_path),
         "producer_version": producer_version,
-        "summary": plan["summary"],
+        "summary": result_summary,
         "applied": applied,
         "conflicts": conflicts,
     }
+    result = with_report_fields(
+        result,
+        schema_name="managed-change-result",
+        error_code="CONFLICT" if conflicts else None,
+        failure_kind="conflict" if conflicts else "none",
+        remediation=[
+            {
+                "code": "REVIEW_MANAGED_CONFLICTS",
+                "summary": "Resolve conflicts using RUN_ROOT/outputs/conflicts and the recovery instructions.",
+            }
+        ]
+        if conflicts
+        else [],
+    )
+    rollback_manifest = build_rollback_manifest(target_root, run_root, applied, conflicts)
     write_json(run_root / "outputs" / "managed-change-plan.json", plan)
     write_json(run_root / "outputs" / "managed-change-result.json", result)
+    write_json(run_root / "outputs" / "managed-rollback-manifest.json", rollback_manifest)
     write_markdown_summary(run_root / "outputs" / "managed-change-summary.md", result)
+    write_recover_instructions(run_root / "outputs" / "managed-recover-instructions.md", rollback_manifest)
 
     if args.json:
         print(json.dumps(result, ensure_ascii=False, indent=2))

@@ -23,6 +23,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 import yaml
+from lib.control_plane import emit_stage_progress
 from lib.io_utils import utc_now, write_json
 from lib.spec_utils import path_matches_any, require_stage_slot, resolve_required_stage_slots, stage_slot_object_map
 from lib.yaml_utils import load_yaml_mapping
@@ -53,6 +54,16 @@ VALID_KIND = {
     "managed_plan",
     "managed_result",
     "build_manifest",
+    "host_capability_report",
+    "host_bootstrap_plan",
+    "host_bootstrap_apply",
+    "host_bootstrap_execution",
+    "host_bootstrap_manifest",
+    "host_capability_candidates",
+    "host_bootstrap_instructions",
+    "team_plan",
+    "team_result",
+    "team_join",
 }
 TERMINALS = {"abort", "end", "done", "complete", "stop", "finish"}
 DEFAULT_STAGE_SLOT_ORDER = ["S1", "S2", "S3", "S4", "S5", "S6"]
@@ -326,37 +337,21 @@ def call_stage_progress(
 ) -> None:
     """把 runner 里程碑同步到共享 progress 产物。"""
 
-    cmd = [
-        sys.executable,
-        str(script_dir() / "stage-progress.py"),
-        "update",
-        "--run-root",
-        str(ctx.run_root),
-        "--stage",
-        stage,
-        "--node",
-        node,
-        "--event",
-        event,
-        "--status",
-        status,
-        "--percent",
-        str(percent),
-        "--result",
-        result,
-        "--next-action",
-        next_action,
-    ]
-    if verdict:
-        cmd.extend(["--verdict", verdict])
-    if approval_status:
-        cmd.extend(["--approval-status", approval_status])
-    for ref in artifact_refs or []:
-        cmd.extend(["--artifact-ref", ref])
-
-    completed = subprocess.run(cmd, capture_output=True, text=True, check=False)
-    if completed.returncode != 0:
-        raise RuntimeError(f"stage-progress failed: {completed.stderr.strip() or completed.stdout.strip()}")
+    emit_stage_progress(
+        python_executable=sys.executable,
+        stage_progress_script=script_dir() / "stage-progress.py",
+        run_root=ctx.run_root,
+        stage=stage,
+        node=node,
+        event=event,
+        status=status,
+        percent=percent,
+        result=result,
+        next_action=next_action,
+        artifact_refs=artifact_refs,
+        verdict=verdict,
+        approval_status=approval_status,
+    )
 
 
 def append_event(ctx: RunnerContext, event_type: str, stage: str, status: str, message: str, **extra: Any) -> None:
@@ -459,6 +454,26 @@ def infer_kind(path: str) -> str:
         return "managed_result"
     if cleaned.endswith("build-manifest.json"):
         return "build_manifest"
+    if cleaned.endswith("host-capability-report.json"):
+        return "host_capability_report"
+    if cleaned.endswith("host-capability-candidates.json"):
+        return "host_capability_candidates"
+    if cleaned.endswith("host-bootstrap-instructions.md"):
+        return "host_bootstrap_instructions"
+    if cleaned.endswith("host-bootstrap-plan.json"):
+        return "host_bootstrap_plan"
+    if cleaned.endswith("host-bootstrap-apply.json"):
+        return "host_bootstrap_apply"
+    if cleaned.endswith("host-bootstrap-execution.json"):
+        return "host_bootstrap_execution"
+    if cleaned.endswith("bootstrap-assets-manifest.json"):
+        return "host_bootstrap_manifest"
+    if cleaned.endswith("team-plan.json"):
+        return "team_plan"
+    if cleaned.endswith("team-results.json"):
+        return "team_result"
+    if cleaned.endswith("team-join-summary.json"):
+        return "team_join"
     return "report"
 
 
@@ -872,6 +887,8 @@ def persist_state(ctx: RunnerContext, loop_result: Dict[str, Any]) -> Path:
     """把规范 runner 状态快照持久化到 RUN_ROOT/state.json。"""
 
     state = {
+        "schema_version": 1,
+        "schema_name": "workflow-run-state",
         "values": {
             "request_id": ctx.run_id,
             "intent": ctx.intent,

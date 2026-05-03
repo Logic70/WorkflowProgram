@@ -265,7 +265,7 @@ def discover_host_capabilities(plugin_root: Path, spec_path: Path, target_root: 
         raise RuntimeError("discover-host-capabilities.py did not return a report object")
     return report
 
-def apply_host_bootstrap(plugin_root: Path, spec_path: Path, target_root: Path, run_root: Path, *, allow_host_global: bool) -> Dict[str, Any]:
+def apply_host_bootstrap(plugin_root: Path, spec_path: Path, target_root: Path, run_root: Path) -> Dict[str, Any]:
     cmd = [
         str(plugin_python(plugin_root)),
         str(plugin_root / "scripts" / APPLY_HOST_BOOTSTRAP_SCRIPT),
@@ -277,8 +277,6 @@ def apply_host_bootstrap(plugin_root: Path, spec_path: Path, target_root: Path, 
         str(run_root),
         "--json",
     ]
-    if allow_host_global:
-        cmd.append("--allow-host-global")
     return run_required_json_command(APPLY_HOST_BOOTSTRAP_SCRIPT, cmd)
 
 
@@ -318,7 +316,7 @@ def parse_args() -> argparse.Namespace:
     run.add_argument("--provider-command", default="", help="Provider command for command_adapter")
     run.add_argument("--claude-bin", default="claude", help="Claude binary for claude_cli")
     run.add_argument("--auto-approve", action="store_true", help="Resolve approval gate automatically")
-    run.add_argument("--approve-host-global-bootstrap", action="store_true", help="Allow approved host-global bootstrap adapters")
+    run.add_argument("--approve-host-global-bootstrap", action="store_true", help="Deprecated no-op; host-global bootstrap is plan-only")
     run.add_argument("--approval-status", default="", choices=["approved"], help="Resolve approval gate as manually approved")
     run.add_argument("--json", action="store_true", help="Print JSON summary")
     return parser.parse_args()
@@ -365,20 +363,12 @@ def main() -> int:
         and str(item.get("scope", "")).strip() == "project_local"
         and bool(item.get("approval_required", False)) is False
     ] if isinstance(host_report.get("bootstrap_plan", []), list) else []
-    approved_host_global = [
-        item
-        for item in host_report.get("bootstrap_plan", [])
-        if isinstance(item, dict)
-        and str(item.get("scope", "")).strip() == "host_global"
-        and bool(item.get("approval_required", False)) is True
-    ] if isinstance(host_report.get("bootstrap_plan", []), list) else []
-    if auto_project_local or (approved_host_global and args.approve_host_global_bootstrap):
+    if auto_project_local:
         host_bootstrap = apply_host_bootstrap(
             plugin_root,
             spec_path,
             target_root,
             run_root,
-            allow_host_global=bool(args.approve_host_global_bootstrap),
         )
         host_report = probe_host_capabilities(plugin_root, spec_path, target_root, run_root)
     if isinstance(host_report.get("capabilities", []), list):

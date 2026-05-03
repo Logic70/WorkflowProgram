@@ -171,8 +171,6 @@ def validate_generated_runtime(spec_path: Path, target_root: Path) -> Dict[str, 
                 errors.append("entry wrapper is missing probe-host-capabilities.py integration marker")
             if declared_host_capabilities and "ENVIRONMENT_REMEDIATION_SCRIPT = \"generate-environment-remediation.py\"" not in entry_text:
                 errors.append("entry wrapper is missing generate-environment-remediation.py integration marker")
-            if host_global_adapter_declared and "--approve-host-global-bootstrap" not in entry_text:
-                errors.append("entry wrapper is missing approve-host-global-bootstrap integration marker")
             if agent_team_enabled(declared_agent_team) and "TEAM_ORCHESTRATION_ENABLED = True" not in entry_text:
                 errors.append("entry wrapper is missing TEAM_ORCHESTRATION_ENABLED marker")
 

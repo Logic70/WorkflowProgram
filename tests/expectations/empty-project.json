@@ -12,6 +12,13 @@
     "events.jsonl",
     "transcript.md",
     "validation-runtime-report.md",
+    "outputs/stages/clarification-record.json",
+    "outputs/stages/open-questions.json",
+    "outputs/stages/assumption-log.md",
+    "outputs/stages/design-readiness-report.json",
+    "outputs/stages/clarification-challenge-report.json",
+    "outputs/stages/clarification-handoff.json",
+    "outputs/stages/clarification-evidence.json",
     "outputs/progress/current-progress.json",
     "outputs/progress/milestones.jsonl",
     "outputs/progress/user-progress.md"

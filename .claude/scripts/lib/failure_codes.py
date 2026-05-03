@@ -10,9 +10,13 @@ FAILURE_KIND_BY_CODE = {
     "RUNTIME_HOST_NOT_READY": "environment",
     "RUNTIME_HOST_MISSING": "environment",
     "TARGET_NOT_WRITABLE": "environment",
+    "HOST_CAPABILITY_MISSING": "environment",
+    "HOST_CAPABILITY_DEGRADED": "environment",
     "STRUCTURE_FAILURE": "design",
     "MISSING_ARGUMENT": "design",
     "INPUT_FAILURE": "design",
+    "TEAM_CONTRACT_FAILURE": "design",
+    "TEAM_ORCHESTRATION_FAILURE": "implementation",
     "RUNTIME_FAILURE": "implementation",
     "EVIDENCE_FAILURE": "implementation",
 }

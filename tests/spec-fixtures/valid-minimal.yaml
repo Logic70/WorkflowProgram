@@ -135,6 +135,39 @@ intent_flows:
     optional_stage_slots:
       - S6
 
+workflow_graph:
+  schema_version: 1
+  templates_used:
+    - flexible-target-graph
+  entrypoints:
+    - name: example
+      node: intake
+  nodes:
+    - id: intake
+      role: requirement_intake
+      template: flexible-target-graph
+      input_refs:
+        - "$ARGUMENTS"
+      output_refs:
+        - outputs/target-workflow/intake-summary.md
+      gate: none
+      owner: example-skill
+    - id: implement
+      role: target_workflow_implementation
+      template: flexible-target-graph
+      input_refs:
+        - outputs/target-workflow/intake-summary.md
+      output_refs:
+        - .claude/skills/example/SKILL.md
+      gate: user_approval
+      owner: example-skill
+  transitions:
+    - from: intake
+      to: implement
+      condition: ready
+    - from: implement
+      to: done
+
 # Agent 引用列表（指向 .claude/agents/*.md）
 agent_refs:
   - requirement_analyst
@@ -160,6 +193,17 @@ registry:
   skills:
     - name: example-skill
       file: .claude/skills/example/SKILL.md
+    - name: generated-smoke
+      file: .claude/skills/generated-smoke/SKILL.md
+  agents:
+    - name: example-agent
+      file: .claude/agents/example-agent.md
+  hooks:
+    - name: example-hook
+      file: .claude/hooks/example-hook.json
+  runtime_assets:
+    - name: workflow-entry
+      file: .workflowprogram/runtime/workflow-entry.py
 
 # 约束规则（将写入 constraints.md）
 constraints:
@@ -241,6 +285,9 @@ generated_runtime_contract:
   runtime_manifest: .workflowprogram/runtime/runtime-manifest.json
   run_root_dir: .workflowprogram/runs
   mode: shared-control-plane-wrapper
+  runtime_capabilities:
+    - state_transitions
+    - run_state_validation
 
 # 测试契约（支撑基础运行测试判定；引用 runtime_contract，不复制执行约束）
 test_contract:

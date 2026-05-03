@@ -31,11 +31,13 @@
 
 1. 识别意图和目标目录
 2. 生成 `workflow-spec.md` 和 `workflow-spec.yaml`
-3. 把候选 `.claude/` 资产先写到 `RUN_ROOT/outputs/candidate/.claude/`
-4. 通过 managed apply 决定哪些文件可以安全落到 `TARGET_ROOT/.claude/`
-5. 用 runner 落盘 `state.json`、`events.jsonl` 等控制面证据
-6. 用 `workflowprogram-validate` 给出 workflow 级验证结论
-7. 把 lessons、约束候选和下一轮建议写回 S6 闭环
+3. 生成 `workflow-view.md`、`workflow-lowlevel.md` 和目标侧 runtime 包装层
+4. 把候选 `.claude/` 与 `.workflowprogram/` 资产先写到 `RUN_ROOT/outputs/candidate/`
+5. 通过 managed apply 决定哪些文件可以安全落到 `TARGET_ROOT`
+6. 若声明外部能力依赖，先做能力发现、宿主探测、bootstrap 与环境修复指引
+7. 用 runner 落盘 `state.json`、`events.jsonl` 等控制面证据
+8. 用 `workflowprogram-validate` 给出 workflow 级验证结论
+9. 把 lessons、约束候选和下一轮建议写回 S6 闭环
 
 这就是 `WorkflowProgram` 的核心设计哲学：**workflow 不是一次性生成物，而是一条有控制面、有证据链、有迭代闭环的产品流水线。**
 
@@ -57,6 +59,8 @@
 | 失败后无法定位问题层 | 不知道是设计、执行还是验证出了错 | 把设计、执行、判定、补证据拆层 |
 | 没有结构化证据 | 只能看聊天记录，无法自动复盘 | 固定留下上下文、状态、事件和报告 |
 | 验证只看命令退出码 | “执行成功”不等于“按约束执行成功” | 把运行约束、测试约束和最终判定拆开 |
+| 工作流依赖外部能力，但运行前没人确认 | 缺 skill、MCP、CLI 时直接在中途失败 | 先做能力发现，再做宿主探测和环境修复指引 |
+| 并行协作只停留在口头约定 | 多个 agent 同时工作但没有结构化 fan-out / join 证据 | 用显式 team 契约声明 fan-out、join 和证据 |
 | 经验不会回流 | 下一轮继续重复踩坑 | 把单次总结和长期规则分开管理 |
 | 自然语言入口不稳定 | 同类请求路由到不同技能，行为漂移 | 先做入口识别和意图路由 |
 
@@ -71,9 +75,14 @@
 | `RUN_ROOT` | 这次运行的证据放哪 | `TARGET_ROOT/.workflowprogram/runs/<run-id>/` |
 | `workflowprogram-orchestrate` | 自然语言到底该路由到哪个主入口 | `route-intent.py` + `workflowprogram-orchestrate` |
 | `workflow-spec.yaml` | 机器可读真源在哪 | S3 产出的控制面 spec |
+| `intent_flows` | 不同意图至少应经过哪些逻辑阶段 | spec 中的意图到阶段流真源 |
 | `workflow-entry.py` | 主入口如何变成固定脚本链 | 产品入口确定性 wrapper |
 | `workflow-runner.py` | 谁负责状态转移和硬约束 | 控制面 runner |
 | `workflowprogram-validate` | 谁给最终 workflow 级 verdict | S5 主 judge |
+| `workflow-lowlevel.md` | 维护与迭代说明从哪来 | 由 YAML 单向渲染的维护指导 |
+| `runtime-manifest.json` | 目标侧 runtime 是否真的交付了 | `.workflowprogram/runtime/` 的机器契约 |
+| `capability_discovery` / `host_capabilities` | 外部能力怎么发现、探测和修复 | 能力候选、宿主报告、修复指引 |
+| `agent_team_contract` | Team 编排何时算显式开启 | fan-out / join / evidence 契约 |
 | `lessons.md` / `constraints.md` | 经验如何积累并影响下一轮 | S6 闭环 |
 
 它们的关系可以先这么理解：
@@ -270,6 +279,12 @@ TARGET_ROOT/.workflowprogram/runs/<run-id>/
 - `S5` 负责 workflow 级 verdict
 - `S6` 负责 lessons 和约束候选
 
+另外：
+
+- 所有入口都会先经过 `S0` 路由。
+- `workflow-spec.yaml.intent_flows` 负责声明 `S1-S6` 的最小逻辑阶段需求。
+- 默认模板中 `develop` 走 `S1-S6`，`audit` 走 `S5-S6`，`validate` 走 `S5`（可选 `S6`），`iterate` 走 `S6`（可选 `S5`）。
+
 这解决了很多 workflow 常见混乱：
 
 - “生成成功”不等于“验证通过”
@@ -323,9 +338,14 @@ TARGET_ROOT/.workflowprogram/runs/<run-id>/
 
 1. `validate-workflow-spec.py`
 2. `generate-workflow-view.py`
-3. `managed-assets.py plan/apply-staged`
-4. `workflow-runner.py run`
-5. `validate-run-state.py`
+3. `generate-workflow-lowlevel.py`
+4. `generate-target-runtime.py`
+5. `managed-assets.py plan/apply-staged`
+6. `discover-host-capabilities.py`（按契约启用）
+7. `probe-host-capabilities.py` / `apply-host-bootstrap.py`
+8. `generate-environment-remediation.py`
+9. `workflow-runner.py run`
+10. `validate-run-state.py`
 
 也就是说，`workflowprogram-develop` 不再只是“提示模型去做这些事”，而是有一个确定性的产品入口。
 
@@ -438,6 +458,13 @@ AI -> candidate -> managed plan -> apply-staged -> TARGET_ROOT/.claude/*
   - 动态 harness
   - 补运行态证据，不替代主 judge
 
+如果 workflow 还声明了外部能力或显式 team，S5 还会额外消费：
+
+- `host-capability-candidates.json`
+- `host-capability-report.json`
+- `environment-remediation-report.json`
+- `team-plan.json` / `team-results.json` / `team-join-summary.json`
+
 这一层的核心结论文件是：
 
 - `RUN_ROOT/validation-runtime-report.md`
@@ -533,15 +560,16 @@ AI -> candidate -> managed plan -> apply-staged -> TARGET_ROOT/.claude/*
 2. `workflowprogram-orchestrate` 或显式入口确定这是 `develop`
 3. `S1` 产出 `workflow-spec.md`
 4. `S3` 产出 `workflow-spec.yaml`
-5. `workflow-entry.py` 驱动固定脚本链
-6. `S4` 把候选 `.claude/` 通过 managed apply 落到目标项目
-7. `S5` 给出 workflow 级 verdict
-8. `S6` 记录 lessons 和约束候选
+5. `workflow-entry.py` 驱动固定脚本链，生成 view / lowlevel / target runtime
+6. 若 workflow 依赖外部能力，先做发现、探测、bootstrap 与环境修复
+7. `S4` 把候选 `.claude/` 和 `.workflowprogram/` 通过 managed apply 落到目标项目
+8. `S5` 给出 workflow 级 verdict
+9. `S6` 记录 lessons 和约束候选
 
 如果你只想抓主干，可以把它记成：
 
 ```text
-需求 -> spec -> candidate -> managed apply -> runner evidence -> validate -> lessons
+需求 -> spec -> candidate -> managed apply -> capability check -> runner evidence -> validate -> lessons
 ```
 
 ## 8.2 你最应该读的几个文件

@@ -18,9 +18,11 @@
 - ALWAYS 将可复用的失败经验或上下文缺口记录到 `lessons.md`。
 - ALWAYS 在 `/develop` Stage 3 完成后，向用户展示设计文档并获得明确批准，再进入 Stage 4 文件生成。
 - ALWAYS 在命令设计中考虑非交互（CI/CD）模式下 gate 的行为：支持通过 prompt 参数或环境变量预批准。
+- ALWAYS 通过 control-plane helper 调用高约束控制面脚本，不要让模型手工拼严格 CLI 参数。
 - NEVER 在单个 fan-out 阶段中超过 4 个并行代理。
 - NEVER 让子代理运行时依赖外部 agent 文件，只要可以内联提示词就必须内联。
 - NEVER 在未经验证的情况下声明工作流"创建完成"。
+- NEVER 把 `stage-progress.py` 这类严格参数词表的控制面脚本暴露成模型主路径。
 
 ## 技能与 Agent 设计
 

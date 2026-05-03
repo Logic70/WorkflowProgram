@@ -40,15 +40,32 @@
       "checks": [
         {
           "file": "docs/workflowprogram-stage-highlevel-design.md",
-          "markers": ["workflow-spec.md", "TBD/待补", "触发方式/输入/输出/质量门禁四段", "User Intent", "Clarification Summary"]
+          "markers": ["workflow-spec.md", "TBD/待补", "触发方式", "输入输出", "质量门禁", "User Intent", "Clarification Summary", "design-readiness-report.json", "clarification-handoff.json", "clarification-evidence.json", "requirement-clarification-lead"]
         },
         {
           "file": ".claude/scripts/validate-workflow-draft.py",
-          "markers": ["User Intent", "Clarification Summary", "Trigger Model", "澄清轮次"]
+          "markers": ["User Intent", "Clarification Summary", "Trigger Model", "Open Questions", "Readback Confirmation", "澄清轮次", "clarification-challenge-report.json", "clarification-handoff.json", "clarification-evidence.json", "challenge_rounds"]
         },
         {
           "file": ".claude/skills/workflowprogram-develop/SKILL.md",
-          "markers": ["validate-workflow-draft.py", "workflow-entry.py", "多轮用户对话"]
+          "markers": ["validate-workflow-draft.py", "workflow-entry.py", "多轮用户对话", "generate-clarification-review.py", "requirement-clarification-lead"]
+        }
+      ]
+    },
+    {
+      "id": "workflow-s1-review-integration",
+      "checks": [
+        {
+          "file": "docs/workflowprogram-stage-lowlevel-design.md",
+          "markers": ["generate_clarification_review", "clarification-challenge-report.json", "clarification-handoff.json", "clarification-evidence.json", "scenario-extractor", "assumption-auditor", "constraint-reviewer"]
+        },
+        {
+          "file": ".claude/commands/develop.md",
+          "markers": ["generate-clarification-review.py", "clarification-handoff.json", "clarification-evidence.json", "scenario-extractor", "assumption-auditor", "constraint-reviewer"]
+        },
+        {
+          "file": ".claude/scripts/generate-clarification-review.py",
+          "markers": ["clarification-challenge-report.json", "clarification-handoff.json", "clarification-evidence.json", "ready_for_handoff", "challenge_backlog_size"]
         }
       ]
     },
@@ -57,7 +74,7 @@
       "checks": [
         {
           "file": ".claude/scripts/workflow-entry.py",
-          "markers": ["managed-assets.py", "generate-workflow-lowlevel.py", "workflow-runner.py", "validate-run-state.py", "entry-orchestration-summary.json"]
+          "markers": ["managed-assets.py", "generate-workflow-lowlevel.py", "generate-target-runtime.py", "discover-host-capabilities.py", "probe-host-capabilities.py", "apply-host-bootstrap.py", "generate-environment-remediation.py", "workflow-runner.py", "validate-run-state.py", "entry-orchestration-summary.json"]
         },
         {
           "file": ".claude/commands/develop.md",
@@ -66,6 +83,170 @@
         {
           "file": ".claude/skills/workflowprogram-develop/SKILL.md",
           "markers": ["workflow-entry.py run", ".workflowprogram/design/", "managed-assets.py", "workflow-runner.py", "validate-run-state.py"]
+        }
+      ]
+    },
+    {
+      "id": "workflow-generated-runtime-orchestration",
+      "checks": [
+        {
+          "file": "docs/workflowprogram-stage-highlevel-design.md",
+          "markers": ["generated_runtime_contract", "shared-control-plane-wrapper", ".workflowprogram/runtime/"]
+        },
+        {
+          "file": "docs/workflowprogram-stage-lowlevel-design.md",
+          "markers": ["generated_runtime_contract", "shared-control-plane-wrapper", "validate-generated-runtime.py"]
+        },
+        {
+          "file": ".claude/scripts/generate-target-runtime.py",
+          "markers": ["runtime_capabilities", "DISCOVER_HOST_SCRIPT", "PROBE_HOST_SCRIPT", "TEAM_ORCHESTRATION_ENABLED"]
+        },
+        {
+          "file": ".claude/scripts/validate-generated-runtime.py",
+          "markers": ["runtime_capabilities", "capability_discovery_enabled", "host_capabilities_declared", "agent_team_enabled"]
+        }
+      ]
+    },
+    {
+      "id": "workflow-target-graph-contract",
+      "checks": [
+        {
+          "file": "docs/workflowprogram-stage-highlevel-design.md",
+          "markers": ["workflow_graph", "目标工作流不强制套用", "workflow-spec.yaml"]
+        },
+        {
+          "file": "docs/workflowprogram-stage-lowlevel-design.md",
+          "markers": ["workflow_graph", "entrypoints", "transitions", "目标资产类"]
+        },
+        {
+          "file": ".claude/scripts/validate-workflow-spec.py",
+          "markers": ["validate_workflow_graph", "workflow_graph.entrypoints", "registry.runtime_assets"]
+        },
+        {
+          "file": ".claude/skills/workflow-spec-support/yaml-spec-template.md",
+          "markers": ["workflow_graph", "templates_used", "registry", "runtime_assets"]
+        }
+      ]
+    },
+    {
+      "id": "workflow-managed-recovery-and-report-schema",
+      "checks": [
+        {
+          "file": "docs/workflowprogram-stage-highlevel-design.md",
+          "markers": ["managed-rollback-manifest.json", "managed-recover-instructions.md", "schema_version"]
+        },
+        {
+          "file": "docs/workflowprogram-stage-lowlevel-design.md",
+          "markers": ["managed-rollback-manifest.json", "before snapshot", "schema_version"]
+        },
+        {
+          "file": ".claude/scripts/managed-assets.py",
+          "markers": ["managed-rollback-manifest.json", "managed-recover-instructions.md", "before_snapshot"]
+        },
+        {
+          "file": ".claude/scripts/workflow-s5-judge.py",
+          "markers": ["managed_recovery_evidence_present", "managed_target_assets_declared", "report_schema_errors"]
+        }
+      ]
+    },
+    {
+      "id": "workflow-host-capability-bootstrap",
+      "checks": [
+        {
+          "file": "docs/workflowprogram-stage-highlevel-design.md",
+          "markers": ["host_capabilities", "host-capability-report.json", "failure_kind = environment"]
+        },
+        {
+          "file": "docs/workflowprogram-stage-lowlevel-design.md",
+          "markers": ["host_capabilities", "probe-host-capabilities.py", "apply-host-bootstrap.py"]
+        },
+        {
+          "file": ".claude/scripts/probe-host-capabilities.py",
+          "markers": ["host-capability-report.json", "host-bootstrap-plan.json", "all_required_ready"]
+        },
+        {
+          "file": ".claude/scripts/workflow-entry.py",
+          "markers": ["probe_host_capabilities", "apply_host_bootstrap", "generate_environment_remediation", "required_host_capability_missing"]
+        }
+      ]
+    },
+    {
+      "id": "workflow-capability-discovery-and-recommendation",
+      "checks": [
+        {
+          "file": "docs/workflowprogram-stage-highlevel-design.md",
+          "markers": ["capability_discovery", "host-capability-candidates.json", "host-bootstrap-instructions.md"]
+        },
+        {
+          "file": "docs/workflowprogram-stage-lowlevel-design.md",
+          "markers": ["capability_discovery", "discover-host-capabilities.py", "host-bootstrap-instructions.md"]
+        },
+        {
+          "file": ".claude/scripts/discover-host-capabilities.py",
+          "markers": ["host-capability-candidates.json", "host-bootstrap-instructions.md", "expected_outputs", "recheck_hint"]
+        },
+        {
+          "file": ".claude/scripts/workflow-s5-judge.py",
+          "markers": ["capability_discovery_report_present", "capability_discovery_instructions_present", "capability_discovery_candidates_status"]
+        }
+      ]
+    },
+    {
+      "id": "workflow-bootstrap-automation",
+      "checks": [
+        {
+          "file": "docs/workflowprogram-stage-lowlevel-design.md",
+          "markers": ["project_local", "host_global", "manual_only", ".workflowprogram/bootstrap/**", "bootstrap.assets"]
+        },
+        {
+          "file": ".claude/scripts/apply-host-bootstrap.py",
+          "markers": ["project_local", "unsafe bootstrap output path", "host-bootstrap-apply.json", "bootstrap-assets-manifest.json", "ready_after_apply"]
+        },
+        {
+          "file": ".claude/scripts/discover-host-capabilities.py",
+          "markers": ["manual_steps", "expected_outputs", "recheck_hint"]
+        }
+      ]
+    },
+    {
+      "id": "workflow-environment-remediation-loop",
+      "checks": [
+        {
+          "file": "docs/workflowprogram-stage-highlevel-design.md",
+          "markers": ["environment-remediation-report.json", "environment-remediation-guide.md", "重复失败"]
+        },
+        {
+          "file": "docs/workflowprogram-stage-lowlevel-design.md",
+          "markers": ["generate-environment-remediation.py", "environment-remediation-report.json", "environment-remediation-guide.md"]
+        },
+        {
+          "file": ".claude/scripts/generate-environment-remediation.py",
+          "markers": ["repeated_missing_capabilities", "user_followups", "environment-remediation-guide.md"]
+        },
+        {
+          "file": ".claude/scripts/validate-lessons-delta.py",
+          "markers": ["environment-remediation-report.json", "bootstrap", "recheck"]
+        }
+      ]
+    },
+    {
+      "id": "workflow-agent-team-orchestration",
+      "checks": [
+        {
+          "file": "docs/workflowprogram-stage-highlevel-design.md",
+          "markers": ["agent_team_contract", "team-plan.json", "team-join-summary.json"]
+        },
+        {
+          "file": "docs/workflowprogram-stage-lowlevel-design.md",
+          "markers": ["agent_team_contract", "TeamFanOutStart", "team-join-summary.json"]
+        },
+        {
+          "file": ".claude/scripts/workflow-s5-judge.py",
+          "markers": ["team_evidence_present", "team_fan_out_within_limit", "team_join_policy_satisfied"]
+        },
+        {
+          "file": "tools/mock_runtime_host.py",
+          "markers": ["TeamFanOutStart", "team-plan.json", "team-join-summary.json"]
         }
       ]
     },

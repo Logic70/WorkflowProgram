@@ -136,6 +136,42 @@ intent_flows:
     optional_stage_slots:
       - S6
 
+# 目标工作流图：描述“生成出来的目标工作流”自己的节点与转移。
+# 注意：上面的 stages/intent_flows 属于 WorkflowProgram 自身 S0-S6 控制面；
+# workflow_graph 不要求套用 S1-S6，可按用户需求使用任意业务节点 id。
+workflow_graph:
+  schema_version: 1
+  templates_used:
+    - clarify-design-generate-validate
+  entrypoints:
+    - name: example
+      node: collect_input
+  nodes:
+    - id: collect_input
+      role: intake
+      template: clarify-design-generate-validate
+      input_refs:
+        - "$ARGUMENTS"
+      output_refs:
+        - outputs/target-workflow/intake-summary.md
+      gate: none
+      owner: example-skill
+    - id: produce_result
+      role: implementation
+      template: clarify-design-generate-validate
+      input_refs:
+        - outputs/target-workflow/intake-summary.md
+      output_refs:
+        - .claude/skills/example/SKILL.md
+      gate: user_approval
+      owner: example-skill
+  transitions:
+    - from: collect_input
+      to: produce_result
+      condition: input_ready
+    - from: produce_result
+      to: done
+
 # Agent 引用列表（指向 .claude/agents/*.md）
 agent_refs:
   - requirement_analyst
@@ -162,6 +198,15 @@ registry:
   skills:
     - name: example-skill
       file: .claude/skills/example/SKILL.md
+  agents:
+    - name: example-agent
+      file: .claude/agents/example-agent.md
+  hooks:
+    - name: example-hook
+      file: .claude/hooks/example-hook.json
+  runtime_assets:
+    - name: workflow-entry
+      file: .workflowprogram/runtime/workflow-entry.py
 
 # 约束规则（将写入 constraints.md）
 constraints:
@@ -287,7 +332,7 @@ generated_runtime_contract:
 #       scope: host_global
 #       summary: Install and configure Ghidra MCP
 #       project_local_outputs: []
-#       # 若 scope=host_global，可选声明审批后的受限 adapter
+#       # 若 scope=host_global，WorkflowProgram 只生成 plan；不会自动执行宿主全局变更
 #       # adapter:
 #       #   type: symlink_binary   # symlink_binary | uv_tool | pipx_install | npm_global
 #       #   source_binary: workflowprogram-python

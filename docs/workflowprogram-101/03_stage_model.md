@@ -16,6 +16,18 @@
 
 这不是为了好看，而是为了让每一段都能被验证、回退和复盘。
 
+还有一个容易混淆的点：
+
+- `S0` 是所有入口都会先经过的统一路由层。
+- 具体某种意图从 `S1-S6` 中至少要走哪些阶段，则由 `workflow-spec.yaml.intent_flows` 声明。
+
+当前默认模板中：
+
+- `develop`：必需 `S1-S6`
+- `audit`：必需 `S5-S6`
+- `validate`：必需 `S5`，可选 `S6`
+- `iterate`：必需 `S6`，可选 `S5`
+
 ## 3.2 当前实现为什么这样拆
 
 这一套设计最关键的价值，在于把 3 件经常被混在一起的事情拆开：
@@ -29,6 +41,7 @@
 - 生成成功不等于验证通过
 - 验证失败不等于这次运行没价值
 - 有 lessons 不等于规则已经更新
+- 若 workflow 依赖外部能力或显式 team，`S4/S5` 还会多出 discovery / probe / remediation / team evidence 这类附加证据
 
 ## 3.3 HighLevel 和 LowLevel 分工
 
@@ -71,4 +84,3 @@
 ## 下一章
 
 继续看 [Ch4: 编排主链](./04_entry_and_runner.md)。
-

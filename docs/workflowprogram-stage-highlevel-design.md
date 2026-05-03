@@ -24,6 +24,7 @@
 - 运行证据统一写入 `TARGET_ROOT/.workflowprogram/runs/<run-id>/`。
 - 若工作流启用 `capability_discovery`，则在 `host_capabilities` 最终定稿前，必须先生成候选能力推荐与结构化人工指引。
 - 若工作流依赖宿主专业能力或显式 agent team，则必须分别通过 `host_capabilities` 与 `agent_team_contract` 在 `workflow-spec.yaml` 中声明。
+- 生成后的目标工作流若需要自己的业务节点图，必须在 `workflow-spec.yaml.workflow_graph` 中声明；目标工作流不强制套用 WorkflowProgram 自身的 `S1..S6` 模板。
 
 ### 2.2 冲突收敛决策
 
@@ -37,6 +38,9 @@
 - 决策 D8：`test_contract` 只能通过 `runtime_contract.<field>` 引用执行约束，禁止复制或削弱 runner 已声明的执行语义。
 - 决策 D9：逻辑阶段模型与执行阶段列表分离。`S0..S6` 用于统一描述职责与证据归属，具体执行链可由 `workflow-spec.yaml.stages` 承载；其中 `workflowprogram-validate` 负责 S5 判定，`runtime_smoke.py` 负责补充运行态证据，`learn` 负责 S6 闭环。
 - 决策 D10：`workflow-spec.yaml.intent_flows` 作为“意图到逻辑阶段流”的机器可读真源；`test_contract.flow` 默认表达 `develop` 主链，其他意图流由 `intent_flows` 解释。
+- 决策 D11：`workflow-spec.yaml.workflow_graph` 作为目标工作流业务图的机器可读真源；`workflow-view.md` 与 `workflow-lowlevel.md` 只能从 YAML 派生展示，不得反向定义新的执行语义。
+- 决策 D12：managed apply 必须同时产出 `managed-rollback-manifest.json` 与 `managed-recover-instructions.md`，用于覆盖 created / updated / conflicted / user-modified 文件的恢复边界。
+- 决策 D13：面向用户或跨阶段消费的 JSON 报告必须带 `schema_version`、`error_code`、`failure_kind` 与 `remediation` 字段，并对 token/password/key-like 内容做脱敏。
 
 ## 3. 项目结构（高层）
 
@@ -159,6 +163,7 @@ TARGET_ROOT/
   - `runtime_contract`（内嵌于 `workflow-spec.yaml`，定义写入边界、证据集、失败枚举、环境 skip）
 - `test_contract`（内嵌于 `workflow-spec.yaml`，定义入口/边界/流程/产物/失败五类基础测试判定）
   - `generated_runtime_contract`（内嵌于 `workflow-spec.yaml`，定义目标侧 runtime 包装层的交付路径与 `runtime_capabilities`）
+  - 可选 `workflow_graph`（目标工作流自己的业务节点、入口、转移、输出、gate 与 owner；不要求套用 `S1..S6`）
   - 可选 `capability_discovery`（能力发现与推荐契约）
   - 可选 `host_capabilities`（宿主专业能力契约）
   - 可选 `agent_team_contract`（显式 team 拓扑契约）
@@ -174,6 +179,8 @@ TARGET_ROOT/
   - 当声明 `host_capabilities` 时，`generated_runtime_contract.runtime_capabilities` 必须包含 `host_capability_probe`。
   - 当声明 `agent_team_contract.enabled=true` 时，`generated_runtime_contract.runtime_capabilities` 必须包含 `team_orchestration`。
   - 领域画像可选地推荐默认 `agent_team_contract`，但推荐值必须保持可编辑，且不得覆盖用户显式选择。
+  - `workflow-spec.md` 是用户回读确认材料；真正进入脚本、validator、runner、judge 的语义必须全部落在 `workflow-spec.yaml`。
+  - 若存在 `workflow_graph`，S3 readback 必须列出 graph summary、目标资产清单、启用/关闭能力与 managed apply policy。
 
 ### S4 资产生成与受控写入阶段（Generate + Managed Apply）
 
@@ -183,6 +190,8 @@ TARGET_ROOT/
   - `RUN_ROOT/outputs/candidate/.workflowprogram/design/*`
   - `RUN_ROOT/outputs/candidate/.workflowprogram/runtime/*`
   - `managed-change-plan/result/summary`
+  - `managed-rollback-manifest.json`
+  - `managed-recover-instructions.md`
   - `TARGET_ROOT/.workflowprogram/managed-files.json`
   - 应用后的 `TARGET_ROOT/.claude/*`（无冲突场景）
   - 应用后的 `TARGET_ROOT/.workflowprogram/design/{workflow-spec.yaml,workflow-view.md,workflow-lowlevel.md}`（无冲突场景）
@@ -191,7 +200,8 @@ TARGET_ROOT/
   - 目标侧 runtime 继续采用 `shared-control-plane-wrapper`，通过 wrapper 调共享控制面，不复制独立引擎。
   - 若声明 `capability_discovery`，产品入口与目标侧 runtime 入口都必须先生成 `host-capability-candidates.json` 与 `host-bootstrap-instructions.md`，再进入 host probe / runner。
   - 若能力发现启用领域画像，则 `host-capability-candidates.json` 必须保留画像来源、被排除能力、被替换能力，以及是否推荐默认 team 拓扑。
-  - 若声明 `host_capabilities`，产品入口与目标侧 runtime 入口都必须在 runner 前执行宿主探测；允许自动执行 `project_local + approval_required=false` 的 bootstrap，并仅在显式审批后执行受支持的 `host_global` adapter。
+  - 若声明 `host_capabilities`，产品入口与目标侧 runtime 入口都必须在 runner 前执行宿主探测；只允许自动执行 `project_local + approval_required=false` 的 bootstrap，`host_global/manual_only` 只生成 plan 与人工处理指引。
+  - managed plan/result/rollback 等用户可分享报告必须带公共 schema 字段并脱敏 secret-like 内容。
 
 ### S5 验证阶段（Validate）
 
@@ -271,7 +281,7 @@ TARGET_ROOT/
   - `managed-assets.py plan/apply-staged`
   - `discover-host-capabilities.py`
   - `probe-host-capabilities.py`
-  - `apply-host-bootstrap.py`（自动执行 `project_local + approval_required=false`，并在显式审批后执行受支持的 `host_global` adapter）
+  - `apply-host-bootstrap.py`（只自动执行 `project_local + approval_required=false`，`host_global/manual_only` 只记录 skipped 和处理指引）
   - `generate-environment-remediation.py`
   - `workflow-runner.py run`
   - `validate-run-state.py`

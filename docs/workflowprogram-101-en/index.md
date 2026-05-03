@@ -41,6 +41,8 @@ If you have built workflows before, you have probably already hit some of these 
 | Prompts run, but there is no single truth source | Semantics live in skill text, chats, and tribal knowledge | Converge first on a machine-readable truth source |
 | Step order depends on model memory | One run designs first, another jumps straight to writing files | Move key sequencing into deterministic programs |
 | Target project files are overwritten directly | A broken `.claude/` tree is hard to recover | Write to an isolated candidate area first, then apply changes in a managed way |
+| The workflow depends on external capabilities, but no one checks readiness first | Missing skills, MCP servers, or CLIs cause mid-run failure | Discover capabilities first, then probe the host and generate remediation guidance |
+| Parallel collaboration stays implicit | Multiple agents work at once, but there is no structured fan-out or join evidence | Use an explicit team contract to declare fan-out, join policy, and evidence |
 | Failure cannot be localized | You only know that "it failed" | Separate design, execution, judgment, and evidence capture |
 | Runtime evidence is incomplete | You cannot see state, events, or reports afterward | Persist structured evidence for every run |
 | Multi-run iteration has no memory | The same mistakes repeat every time | Feed per-run lessons into long-lived rules |
@@ -56,6 +58,12 @@ If you are reading source code along the way, these files are the best anchors:
 5. [workflow-entry.py](/mnt/d/Code/WorkflowProgram-CN/.claude/scripts/workflow-entry.py)
 6. [workflow-runner.py](/mnt/d/Code/WorkflowProgram-CN/.claude/scripts/workflow-runner.py)
 7. [workflow-s5-judge.py](/mnt/d/Code/WorkflowProgram-CN/.claude/scripts/workflow-s5-judge.py)
+
+If your workflow also depends on external tools, MCP servers, host skills, or explicit team orchestration, add these files to the reading list:
+
+8. [discover-host-capabilities.py](/mnt/d/Code/WorkflowProgram-CN/.claude/scripts/discover-host-capabilities.py)
+9. [probe-host-capabilities.py](/mnt/d/Code/WorkflowProgram-CN/.claude/scripts/probe-host-capabilities.py)
+10. [generate-environment-remediation.py](/mnt/d/Code/WorkflowProgram-CN/.claude/scripts/generate-environment-remediation.py)
 
 ## The Goal Of This Guide
 

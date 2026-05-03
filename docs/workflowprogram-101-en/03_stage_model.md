@@ -16,6 +16,18 @@ WorkflowProgram uses `S0..S6` to describe a workflow lifecycle:
 
 This is not decorative. It exists so each segment can be validated, replayed, and rolled back.
 
+One detail matters here:
+
+- `S0` is the universal route layer that every entry passes first.
+- The minimum required path through `S1-S6` is declared by `workflow-spec.yaml.intent_flows`.
+
+In the default template:
+
+- `develop`: required `S1-S6`
+- `audit`: required `S5-S6`
+- `validate`: required `S5`, optional `S6`
+- `iterate`: required `S6`, optional `S5`
+
 ## Why It Is Split This Way
 
 The value of the stage model is that it separates three concerns that are often mixed together:
@@ -29,6 +41,7 @@ So:
 - generation success does not equal validation success
 - validation failure does not mean the run produced no value
 - having lessons does not mean the rules have already been updated
+- when a workflow depends on external capabilities or explicit teams, `S4/S5` also carry discovery, probe, remediation, and team evidence
 
 ## HighLevel vs LowLevel
 

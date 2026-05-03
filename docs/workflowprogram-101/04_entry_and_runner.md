@@ -48,11 +48,21 @@
 
 1. `validate-workflow-spec.py`
 2. `generate-workflow-view.py`
-3. `managed-assets.py plan/apply-staged`
-4. `workflow-runner.py run`
-5. `validate-run-state.py`
+3. `generate-workflow-lowlevel.py`
+4. `generate-target-runtime.py`
+5. `managed-assets.py plan/apply-staged`
+6. `discover-host-capabilities.py`（按契约启用）
+7. `probe-host-capabilities.py` / `apply-host-bootstrap.py`
+8. `generate-environment-remediation.py`
+9. `workflow-runner.py run`
+10. `validate-run-state.py`
 
 这意味着主入口已经不再依赖“模型记得下一步该做什么”。
+
+其中有两个新边界值得记住：
+
+- 入口层不只负责 `.claude/` 候选资产，还会把 `workflow-view.md`、`workflow-lowlevel.md` 和目标侧 runtime 包一起准备好。
+- 如果 workflow 依赖外部能力，入口层还要先完成“能力发现 -> 宿主探测 -> bootstrap -> 环境修复指引”，再进入 runner。
 
 ## 4.4 当前实现的价值
 

@@ -300,10 +300,10 @@
           </p>
 
           <div class="intent-boxes">
-            <div class="intent-card"><span>develop</span><code>S1 &rarr; S2 &rarr; S3 &rarr; S4 &rarr; S5 &rarr; S6</code><p style="color:var(--muted);font-size:0.88em;margin:8px 0 0">从需求到交付的完整链路</p></div>
-            <div class="intent-card"><span>audit</span><code>S5 &rarr; S6</code><p style="color:var(--muted);font-size:0.88em;margin:8px 0 0">对已有 workflow 做结构审计</p></div>
-            <div class="intent-card"><span>validate</span><code>S5</code><p style="color:var(--muted);font-size:0.88em;margin:8px 0 0">只做一次验证判定</p></div>
-            <div class="intent-card"><span>iterate</span><code>S6</code><p style="color:var(--muted);font-size:0.88em;margin:8px 0 0">从 lessons 中提炼改进</p></div>
+            <div class="intent-card"><span>develop</span><code>S1 &rarr; S2 &rarr; S3 &rarr; S4 &rarr; S5 &rarr; S6</code><p style="color:var(--muted);font-size:0.88em;margin:8px 0 0">默认主链；所有入口前面都还有统一的 S0 路由</p></div>
+            <div class="intent-card"><span>audit</span><code>S5 &rarr; S6</code><p style="color:var(--muted);font-size:0.88em;margin:8px 0 0">默认审计链；S1-S4 不必重复执行</p></div>
+            <div class="intent-card"><span>validate</span><code>S5</code><p style="color:var(--muted);font-size:0.88em;margin:8px 0 0">默认只做判定；是否追加 S6 由 intent_flows 决定</p></div>
+            <div class="intent-card"><span>iterate</span><code>S6</code><p style="color:var(--muted);font-size:0.88em;margin:8px 0 0">默认从 lessons 提案；是否追加 S5 由 intent_flows 决定</p></div>
           </div>
 
           <div class="note-strip">
@@ -351,11 +351,12 @@
                 <path d="M760 76 H795" class="svg-arrow"></path>
                 <rect x="60" y="170" width="860" height="130" rx="24" class="strip-box"></rect>
                 <text x="90" y="206" class="svg-title">workflow-entry.py 固定脚本链</text>
-                <text x="90" y="240" class="svg-line">1. validate-workflow-spec.py &mdash; 校验 spec 结构</text>
-                <text x="90" y="262" class="svg-line">2. generate-workflow-view.py &mdash; 生成人类可读视图</text>
-                <text x="550" y="240" class="svg-line">3. managed-assets.py &mdash; 候选写入</text>
-                <text x="550" y="262" class="svg-line">4. workflow-runner.py &mdash; 控制面执行</text>
-                <text x="90" y="284" class="svg-line">5. validate-run-state.py &mdash; 运行后状态校验</text>
+                <text x="90" y="236" class="svg-line">1. spec / view / lowlevel / runtime 渲染</text>
+                <text x="90" y="260" class="svg-line">2. managed-assets.py &mdash; 候选写入与受控应用</text>
+                <text x="90" y="284" class="svg-line">3. capability discovery / host probe / bootstrap</text>
+                <text x="550" y="236" class="svg-line">4. environment remediation &mdash; 生成环境修复指引</text>
+                <text x="550" y="260" class="svg-line">5. workflow-runner.py &mdash; 控制面执行</text>
+                <text x="550" y="284" class="svg-line">6. validate-run-state.py &mdash; 运行后状态校验</text>
               </svg>
             </div>
           </div>
@@ -541,6 +542,7 @@
                 <li>运行 transcript</li>
                 <li>验证报告</li>
                 <li>机器可读判定摘要</li>
+                <li>外部能力 / Team 的附加证据（如声明）</li>
               </ul>
             </div>
           </div>
@@ -587,6 +589,11 @@
           <div class="note-strip">
             <strong>换句话说：</strong>
             <span>测试不是在问“有没有跑完”，而是在问“设计是否自洽、执行是否合规、结论是否可信、真实场景下是否稳定”。</span>
+          </div>
+
+          <div class="note-strip">
+            <strong>如果 workflow 依赖外部能力或显式 Team：</strong>
+            <span>测试还会继续检查能力发现报告、宿主探测结果、环境修复指引，以及 Team fan-out / join 证据，而不只看基础 verdict。</span>
           </div>
 
           <div class="compare-grid">
@@ -656,6 +663,8 @@ python3 tools/runtime_smoke_matrix.py --json</code></pre>
             <div class="file-item"><code>.claude/commands/</code><span>源码层命令入口</span></div>
             <div class="file-item"><code>.claude/skills/</code><span>源码层 skills 与模板</span></div>
             <div class="file-item"><code>.claude/scripts/</code><span>确定性脚本链与校验器</span></div>
+            <div class="file-item"><code>TARGET_ROOT/.workflowprogram/design/</code><span>spec / view / lowlevel 的目标侧持久化包</span></div>
+            <div class="file-item"><code>TARGET_ROOT/.workflowprogram/runtime/</code><span>目标侧 deterministic runtime 包装层</span></div>
             <div class="file-item"><code>dist/plugin/</code><span>构建后的运行时载荷</span></div>
             <div class="file-item"><code>tests/</code><span>fixtures、expectations、transcripts</span></div>
             <div class="file-item"><code>docs/</code><span>HighLevel、LowLevel、教程和状态索引</span></div>
@@ -686,6 +695,8 @@ python3 tools/runtime_smoke_matrix.py --json</code></pre>
             <div class="check-card">4. 写入边界和冲突处理怎么定义？（怎么做 managed apply）</div>
             <div class="check-card">5. 最终 verdict 由谁给出？（runner 还是独立 judge）</div>
             <div class="check-card">6. 失败经验如何进入下一轮约束？（lessons &rarr; constraints）</div>
+            <div class="check-card">7. 如果依赖外部能力，谁负责发现、探测、bootstrap 和修复指引？</div>
+            <div class="check-card">8. 是否真的需要显式 Team，而不是普通 subagent？</div>
           </div>
 
           <div class="note-strip">

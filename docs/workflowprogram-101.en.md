@@ -34,11 +34,13 @@ Behind that single entry, the current implementation does all of this:
 
 1. identify the intent and the target directory
 2. generate `workflow-spec.md` and `workflow-spec.yaml`
-3. write candidate `.claude/` assets into `RUN_ROOT/outputs/candidate/.claude/`
-4. use managed apply to decide what may safely land in `TARGET_ROOT/.claude/`
-5. persist control-plane evidence such as `state.json` and `events.jsonl`
-6. run `workflowprogram-validate` to produce a workflow-level verdict
-7. write lessons, constraint candidates, and next-step suggestions back into the S6 loop
+3. generate `workflow-view.md`, `workflow-lowlevel.md`, and the target-side runtime wrapper bundle
+4. write candidate `.claude/` and `.workflowprogram/` assets into `RUN_ROOT/outputs/candidate/`
+5. use managed apply to decide what may safely land in `TARGET_ROOT`
+6. if external capabilities are declared, run capability discovery, host probing, bootstrap, and remediation guidance first
+7. persist control-plane evidence such as `state.json` and `events.jsonl`
+8. run `workflowprogram-validate` to produce a workflow-level verdict
+9. write lessons, constraint candidates, and next-step suggestions back into the S6 loop
 
 That is the core design philosophy of WorkflowProgram: **a workflow is not a one-shot generated artifact. It is a product pipeline with a control plane, evidence chain, and feedback loop**.
 
@@ -58,6 +60,8 @@ That is the core design philosophy of WorkflowProgram: **a workflow is not a one
 | Failures are hard to localize | You cannot tell design from execution issues | Separate design, execution, judgment, and evidence capture |
 | Evidence is weak | You can only inspect chat logs | Persist context, state, events, and reports |
 | Validation only checks exit codes | "Finished" is confused with "correct" | Separate runtime constraints, test constraints, and final verdict |
+| External dependencies are not checked before the run | Missing skills, MCP servers, or CLIs cause mid-run failure | Discover capabilities first, then probe the host and generate remediation guidance |
+| Parallel collaboration stays implicit | Multiple agents work at once, but there is no structured fan-out or join evidence | Use an explicit team contract to declare fan-out, join policy, and evidence |
 | Lessons never flow back | The same failures repeat | Separate per-run lessons from long-lived rules |
 | Natural-language entry is unstable | Similar requests route into different flows | Detect intent and route before entering the main flow |
 
@@ -72,9 +76,14 @@ So WorkflowProgram is not about adding more skills. It is about systematically t
 | `RUN_ROOT` | Where runtime evidence lives | `TARGET_ROOT/.workflowprogram/runs/<run-id>/` |
 | `workflowprogram-orchestrate` | How natural-language requests route into the right flow | `route-intent.py` + orchestrate skill |
 | `workflow-spec.yaml` | Where the machine-readable truth source lives | the control-plane spec produced in S3 |
+| `intent_flows` | Which logical stages each intent must pass through | the intent-to-stage truth source inside the spec |
 | `workflow-entry.py` | How the main path becomes deterministic | product entry wrapper |
 | `workflow-runner.py` | Who owns transitions and runtime constraints | control-plane runner |
 | `workflowprogram-validate` | Who produces the workflow-level verdict | S5 judge entry |
+| `workflow-lowlevel.md` | Where maintenance and iteration guidance comes from | a one-way render from YAML |
+| `runtime-manifest.json` | Whether the target-side runtime was really delivered | the machine contract inside `.workflowprogram/runtime/` |
+| `capability_discovery` / `host_capabilities` | How external capabilities are discovered, probed, and repaired | candidate reports, host reports, remediation guidance |
+| `agent_team_contract` | When Team orchestration is explicitly enabled | fan-out / join / evidence contract |
 | `lessons.md` / `constraints.md` | How experience survives into the next run | S6 feedback loop |
 
 The relationship looks like this:

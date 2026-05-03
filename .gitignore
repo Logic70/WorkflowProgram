@@ -5,6 +5,11 @@
 .codex/
 openspec/
 **/*.local.json
+.mcp.json
+.vscode/
+.zread/
+dist/plugin/.plugin-data/
+tests/transcripts/20*/
 
 # Environment Variables
 .env

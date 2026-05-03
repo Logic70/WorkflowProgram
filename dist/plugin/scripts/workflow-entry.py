@@ -50,6 +50,7 @@ def parse_args() -> argparse.Namespace:
     run.add_argument("--candidate-root", default="", help="Candidate .claude root for develop flows")
     run.add_argument("--plugin-root", default="", help="Explicit PLUGIN_ROOT path")
     run.add_argument("--auto-approve", action="store_true", help="Resolve approval gates automatically")
+    run.add_argument("--approve-host-global-bootstrap", action="store_true", help="Deprecated no-op; host-global bootstrap is plan-only")
     run.add_argument(
         "--approval-status",
         default="",
@@ -440,6 +441,95 @@ def validate_run_state(run_root: Path) -> Dict[str, Any]:
     return payload
 
 
+def discover_host_capabilities(spec_path: Path, target_root: Path, run_root: Path, request: str) -> Dict[str, Any]:
+    """执行能力搜索与推荐，并返回结构化候选报告。"""
+
+    payload = run_required_json_command(
+        "discover-host-capabilities.py",
+        [
+            sys.executable,
+            str(script_dir() / "discover-host-capabilities.py"),
+            "--spec",
+            str(spec_path),
+            "--target-root",
+            str(target_root),
+            "--run-root",
+            str(run_root),
+            "--request",
+            request,
+            "--json",
+        ],
+    )
+    report = payload.get("report", {})
+    if not isinstance(report, dict):
+        raise RuntimeError("discover-host-capabilities.py did not return a report object")
+    return report
+
+
+def probe_host_capabilities(spec_path: Path, target_root: Path, run_root: Path) -> Dict[str, Any]:
+    """执行宿主能力探测，并返回结构化报告。"""
+
+    payload = run_required_json_command(
+        "probe-host-capabilities.py",
+        [
+            sys.executable,
+            str(script_dir() / "probe-host-capabilities.py"),
+            "--spec",
+            str(spec_path),
+            "--target-root",
+            str(target_root),
+            "--run-root",
+            str(run_root),
+            "--json",
+        ],
+    )
+    report = payload.get("report", {})
+    if not isinstance(report, dict):
+        raise RuntimeError("probe-host-capabilities.py did not return a report object")
+    return report
+
+
+def apply_host_bootstrap(spec_path: Path, target_root: Path, run_root: Path) -> Dict[str, Any]:
+    """执行允许自动化的 project-local host bootstrap。"""
+
+    cmd = [
+        sys.executable,
+        str(script_dir() / "apply-host-bootstrap.py"),
+        "--spec",
+        str(spec_path),
+        "--target-root",
+        str(target_root),
+        "--run-root",
+        str(run_root),
+        "--json",
+    ]
+    payload = run_required_json_command("apply-host-bootstrap.py", cmd)
+    return payload
+
+
+def generate_environment_remediation(spec_path: Path, target_root: Path, run_root: Path) -> Dict[str, Any]:
+    """根据当前 host 证据和历史运行生成环境修复提案。"""
+
+    payload = run_required_json_command(
+        "generate-environment-remediation.py",
+        [
+            sys.executable,
+            str(script_dir() / "generate-environment-remediation.py"),
+            "--spec",
+            str(spec_path),
+            "--target-root",
+            str(target_root),
+            "--run-root",
+            str(run_root),
+            "--json",
+        ],
+    )
+    report = payload.get("report", {})
+    if not isinstance(report, dict):
+        raise RuntimeError("generate-environment-remediation.py did not return a report object")
+    return report
+
+
 def command_run(args: argparse.Namespace) -> int:
     """执行确定性的 WorkflowProgram 产品入口流水线。
 
@@ -477,6 +567,10 @@ def command_run(args: argparse.Namespace) -> int:
 
     managed_plan: Dict[str, Any] | None = None
     managed_result: Dict[str, Any] | None = None
+    capability_discovery_report: Dict[str, Any] | None = None
+    host_capability_report: Dict[str, Any] | None = None
+    host_bootstrap_result: Dict[str, Any] | None = None
+    environment_remediation_report: Dict[str, Any] | None = None
     runner_code: int | None = None
     runner_summary: Dict[str, Any] | None = None
     state_validation: Dict[str, Any] | None = None
@@ -512,6 +606,24 @@ def command_run(args: argparse.Namespace) -> int:
             stopped_before_runner = True
             final_status = "CONFLICT"
         else:
+            capability_discovery_report = discover_host_capabilities(spec_path, target_root, run_root, args.request)
+            host_capability_report = probe_host_capabilities(spec_path, target_root, run_root)
+            auto_project_local = [
+                item
+                for item in host_capability_report.get("bootstrap_plan", [])
+                if isinstance(item, dict)
+                and str(item.get("scope", "")).strip() == "project_local"
+                and bool(item.get("approval_required", False)) is False
+            ]
+            if auto_project_local:
+                host_bootstrap_result = apply_host_bootstrap(
+                    spec_path,
+                    target_root,
+                    run_root,
+                )
+                host_capability_report = probe_host_capabilities(spec_path, target_root, run_root)
+            if isinstance(host_capability_report, dict) and isinstance(host_capability_report.get("capabilities"), list):
+                environment_remediation_report = generate_environment_remediation(spec_path, target_root, run_root)
             runner_code, runner_summary = run_runner(
                 spec_path=spec_path,
                 run_root=run_root,
@@ -529,6 +641,24 @@ def command_run(args: argparse.Namespace) -> int:
             )
             state_validation = validate_run_state(run_root)
     else:
+        capability_discovery_report = discover_host_capabilities(spec_path, target_root, run_root, args.request)
+        host_capability_report = probe_host_capabilities(spec_path, target_root, run_root)
+        auto_project_local = [
+            item
+            for item in host_capability_report.get("bootstrap_plan", [])
+            if isinstance(item, dict)
+            and str(item.get("scope", "")).strip() == "project_local"
+            and bool(item.get("approval_required", False)) is False
+        ]
+        if auto_project_local:
+            host_bootstrap_result = apply_host_bootstrap(
+                spec_path,
+                target_root,
+                run_root,
+            )
+            host_capability_report = probe_host_capabilities(spec_path, target_root, run_root)
+        if isinstance(host_capability_report, dict) and isinstance(host_capability_report.get("capabilities"), list):
+            environment_remediation_report = generate_environment_remediation(spec_path, target_root, run_root)
         runner_code, runner_summary = run_runner(
             spec_path=spec_path,
             run_root=run_root,
@@ -550,6 +680,17 @@ def command_run(args: argparse.Namespace) -> int:
     # 否则保留进入 runner 之前的编排状态，例如 managed conflict。
     if runner_summary is not None:
         final_status = str(runner_summary.get("status", "PASS")).strip() or final_status
+    required_host_missing = False
+    if isinstance(host_capability_report, dict):
+        required_host_missing = any(
+            isinstance(item, dict)
+            and bool(item.get("required", False))
+            and str(item.get("status", "")).strip() != "ready"
+            for item in host_capability_report.get("capabilities", [])
+            if isinstance(host_capability_report.get("capabilities", []), list)
+        )
+        if required_host_missing and final_status not in {"CONFLICT", "BLOCKED"}:
+            final_status = "FAIL"
 
     summary = {
         "generated_at": utc_now(),
@@ -579,6 +720,11 @@ def command_run(args: argparse.Namespace) -> int:
         "managed_plan_path": str(run_root / "outputs" / "managed-change-plan.json") if managed_plan else None,
         "managed_result_path": str(run_root / "outputs" / "managed-change-result.json") if managed_result else None,
         "managed_conflict_count": len(managed_result.get("conflicts", [])) if managed_result else 0,
+        "capability_discovery_report": capability_discovery_report,
+        "host_capability_report": host_capability_report,
+        "host_bootstrap_result": host_bootstrap_result,
+        "environment_remediation_report": environment_remediation_report,
+        "required_host_capability_missing": required_host_missing,
         "runner_status_code": runner_code,
         "runner_summary": runner_summary,
         "state_validation": state_validation,
@@ -600,6 +746,8 @@ def command_run(args: argparse.Namespace) -> int:
         return 2
     if final_status == "BLOCKED":
         return 2
+    if final_status == "FAIL":
+        return 1
     if final_status == "ENVIRONMENT-SKIP":
         return 3
     return 0

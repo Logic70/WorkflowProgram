@@ -71,6 +71,72 @@ FIXTURE_PRESETS: Dict[str, Dict[str, str]] = {
         "request": "触发 managed-conflict 验证路径",
         "contract_categories": "boundary,artifacts,failure",
     },
+    "capability-discovery-reverse-engineering": {
+        "workspace_fixture": "empty-project",
+        "entry_skill": "workflowprogram-develop",
+        "request": "为当前项目设计一个逆向分析 workflow，并识别需要的 skill、MCP 和 CLI 能力",
+        "contract_categories": "artifacts,failure",
+    },
+    "host-capability-missing-develop": {
+        "workspace_fixture": "empty-project",
+        "entry_skill": "workflowprogram-develop",
+        "request": "触发 host capability 缺失验证路径",
+        "contract_categories": "artifacts,failure",
+    },
+    "host-capability-project-local-bootstrap": {
+        "workspace_fixture": "empty-project",
+        "entry_skill": "workflowprogram-develop",
+        "request": "触发 project-local host bootstrap 验证路径",
+        "contract_categories": "artifacts,failure",
+    },
+    "host-capability-host-global-bootstrap": {
+        "workspace_fixture": "empty-project",
+        "entry_skill": "workflowprogram-develop",
+        "request": "触发 host-global plan-only bootstrap 验证路径",
+        "contract_categories": "artifacts,failure",
+    },
+    "host-capability-validate": {
+        "workspace_fixture": "existing-workflow",
+        "entry_skill": "workflowprogram-validate",
+        "request": "验证目标工作流的宿主能力就绪状态",
+        "contract_categories": "artifacts,failure",
+    },
+    "host-capability-audit": {
+        "workspace_fixture": "existing-workflow",
+        "entry_skill": "workflowprogram-audit",
+        "request": "审计目标工作流的宿主能力声明与就绪状态",
+        "contract_categories": "artifacts,failure",
+    },
+    "host-capability-iterate": {
+        "workspace_fixture": "existing-workflow",
+        "entry_skill": "workflowprogram-iterate",
+        "request": "基于环境失败提炼宿主能力改进建议",
+        "contract_categories": "artifacts,failure",
+    },
+    "agent-team-develop-pass": {
+        "workspace_fixture": "empty-project",
+        "entry_skill": "workflowprogram-develop",
+        "request": "触发 deterministic agent team orchestration PASS 路径",
+        "contract_categories": "flow,artifacts,failure",
+    },
+    "agent-team-fanout-fail": {
+        "workspace_fixture": "empty-project",
+        "entry_skill": "workflowprogram-develop",
+        "request": "触发 deterministic agent team fan-out 失败路径",
+        "contract_categories": "flow,artifacts,failure",
+    },
+    "agent-team-validate": {
+        "workspace_fixture": "existing-workflow",
+        "entry_skill": "workflowprogram-validate",
+        "request": "验证目标工作流的 agent team orchestration 证据",
+        "contract_categories": "flow,artifacts,failure",
+    },
+    "agent-team-audit": {
+        "workspace_fixture": "existing-workflow",
+        "entry_skill": "workflowprogram-audit",
+        "request": "审计目标工作流的 agent team orchestration 契约",
+        "contract_categories": "flow,artifacts,failure",
+    },
 }
 
 
@@ -124,6 +190,7 @@ def evaluate_expectation(
     final_result: str,
     final_category: Optional[str],
     run_root: Path,
+    target_root: Path,
     transcript_text: str,
     report_text: str,
     stdout_text: str,
@@ -157,6 +224,13 @@ def evaluate_expectation(
             rel_path = str(item).strip()
             if rel_path and not (run_root / rel_path).exists():
                 mismatches.append(f"required file missing: {rel_path}")
+
+    required_target_files = expectation.get("required_target_files", [])
+    if isinstance(required_target_files, list):
+        for item in required_target_files:
+            rel_path = str(item).strip()
+            if rel_path and not (target_root / rel_path).exists():
+                mismatches.append(f"required target file missing: {rel_path}")
 
     forbidden_patterns = expectation.get("forbidden_patterns", [])
     if isinstance(forbidden_patterns, list):
@@ -306,6 +380,8 @@ def update_state(state_path: Path, **changes: Any) -> Dict[str, Any]:
         state = json.loads(state_path.read_text(encoding="utf-8"))
     else:
         state = {}
+    state.setdefault("schema_version", 1)
+    state.setdefault("schema_name", "runtime-smoke-state")
     state.update(changes)
     state["updated_at"] = iso_now()
     write_json(state_path, state)
@@ -789,7 +865,23 @@ def main() -> int:
             "outputs/managed-change-plan.json",
             "outputs/managed-change-result.json",
             "outputs/managed-change-summary.md",
+            "outputs/managed-rollback-manifest.json",
+            "outputs/managed-recover-instructions.md",
             "outputs/mock-runtime-host.log",
+            "outputs/stages/clarification-record.json",
+            "outputs/stages/open-questions.json",
+            "outputs/stages/assumption-log.md",
+            "outputs/stages/design-readiness-report.json",
+            "outputs/stages/clarification-challenge-report.json",
+            "outputs/stages/clarification-handoff.json",
+            "outputs/stages/clarification-evidence.json",
+            "outputs/stages/host-capability-report.json",
+            "outputs/stages/host-capability-probe.json",
+            "outputs/stages/host-bootstrap-plan.json",
+            "outputs/stages/host-bootstrap-apply.json",
+            "outputs/stages/team-plan.json",
+            "outputs/stages/team-results.json",
+            "outputs/stages/team-join-summary.json",
             "workflow-spec.md",
             "outputs/stages/s6-lessons-delta.md",
         ):
@@ -832,6 +924,7 @@ def main() -> int:
                 final_result=final_result,
                 final_category=final_failure_code if final_failure_code != "none" else None,
                 run_root=run_root,
+                target_root=target_root,
                 transcript_text=transcript_text,
                 report_text=report_text,
                 stdout_text=invocation.stdout,
@@ -940,6 +1033,7 @@ def main() -> int:
                 final_result=final_result,
                 final_category=final_failure_code if final_failure_code != "none" else None,
                 run_root=run_root,
+                target_root=target_root,
                 transcript_text=transcript_text,
                 report_text=report_text,
                 stdout_text="",

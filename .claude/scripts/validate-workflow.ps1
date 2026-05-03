@@ -55,18 +55,24 @@ $forbiddenLegacyPaths = @(
 )
 
 $activeDesignDocs = @{
-    "docs\workflowprogram-stage-highlevel-design.md" = @("runtime_contract", "test_contract", "workflow-entry.py", "workflowprogram-validate", "runtime_smoke.py", "validation-runtime-report.md", "s5-validation-summary.json")
-    "docs\workflowprogram-stage-lowlevel-design.md" = @("runtime_contract", "test_contract", "workflow-entry.py", "runtime_contract.<field>", "implemented_now", "runner 只负责控制面", "workflowprogram-validate", "runtime_smoke.py", "validation-runtime-report.md", "s5-validation-summary.json")
+    "docs\workflowprogram-stage-highlevel-design.md" = @("runtime_contract", "test_contract", "generated_runtime_contract", "shared-control-plane-wrapper", "capability_discovery", "host-capability-candidates.json", "host-bootstrap-instructions.md", "host_capabilities", "agent_team_contract", "workflow-entry.py", "workflowprogram-validate", "runtime_smoke.py", "validation-runtime-report.md", "s5-validation-summary.json")
+    "docs\workflowprogram-stage-lowlevel-design.md" = @("runtime_contract", "test_contract", "generated_runtime_contract", "runtime_capabilities", "capability_discovery", "host_capabilities", "agent_team_contract", "discover-host-capabilities.py", "probe-host-capabilities.py", "apply-host-bootstrap.py", "control-plane helper", "workflow-entry.py", "runtime_contract.<field>", "implemented_now", "runner 只负责控制面", "workflowprogram-validate", "runtime_smoke.py", "validation-runtime-report.md", "s5-validation-summary.json")
     "docs\workflowprogram-stage-consistency-check.md" = @("runtime_contract", "test_contract", "当前无显式冲突")
 }
 
 $activeEntryDocs = @{
-    ".claude\commands\develop.md" = @("runtime_contract", "test_contract", "workflow-entry.py", "runtime_contract.<field>", "workflowprogram-validate", "runtime_smoke.py", "s5-validation-summary.json")
-    ".claude\skills\workflowprogram-develop\SKILL.md" = @("runtime_contract", "test_contract", "workflow-entry.py", "implemented_now", "workflowprogram-validate", "runtime_smoke.py", "s5-validation-summary.json")
+    ".claude\commands\develop.md" = @("runtime_contract", "test_contract", "generated_runtime_contract", ".workflowprogram/runtime/", "generate-target-runtime.py", "discover-host-capabilities.py", "probe-host-capabilities.py", "apply-host-bootstrap.py", "control-plane helper", "workflow-entry.py", "runtime_contract.<field>", "workflowprogram-validate", "runtime_smoke.py", "s5-validation-summary.json")
+    ".claude\skills\workflowprogram-develop\SKILL.md" = @("runtime_contract", "test_contract", "generated_runtime_contract", ".workflowprogram/runtime/", "generate-target-runtime.py", "discover-host-capabilities.py", "probe-host-capabilities.py", "apply-host-bootstrap.py", "control-plane helper", "workflow-entry.py", "implemented_now", "workflowprogram-validate", "runtime_smoke.py", "s5-validation-summary.json")
+}
+
+$forbiddenActiveDocSnippets = @{
+    ".claude\commands\develop.md" = @("python3 `${CLAUDE_PLUGIN_ROOT}/scripts/stage-progress.py update ...")
+    ".claude\skills\workflowprogram-develop\SKILL.md" = @("执行过程中必须通过 `${CLAUDE_PLUGIN_ROOT}/scripts/stage-progress.py` 写入进展与关键节点结果。")
+    "docs\workflowprogram-stage-lowlevel-design.md" = @("python3 `${CLAUDE_PLUGIN_ROOT}/scripts/stage-progress.py update ...")
 }
 
 $activeTemplateDocs = @{
-    ".claude\skills\develop\yaml-spec-template.md" = @("stage_slot: S5", "workflowprogram-validate", "validation-runtime-report.md", "test_contract")
+    ".claude\skills\workflow-spec-support\yaml-spec-template.md" = @("stage_slot: S5", "generated_runtime_contract", "runtime_capabilities", "capability_discovery", "host_capabilities", "agent_team_contract", "workflowprogram-validate", "validation-runtime-report.md", "test_contract")
 }
 
 $activePlanDocs = @{
@@ -74,7 +80,7 @@ $activePlanDocs = @{
 }
 
 $activeStatusDocs = @{
-    "docs\workflowprogram-design-status.md" = @("当前生效设计真源", "历史追溯文档", "已关闭决策", "workflow-entry.py")
+    "docs\workflowprogram-design-status.md" = @("当前生效设计真源", "历史追溯文档", "已关闭决策", "workflow-entry.py", "shared-control-plane-wrapper", "capability_discovery")
 }
 
 $requiredPaths = @(
@@ -89,8 +95,16 @@ $requiredPaths = @(
     ".claude\scripts\managed-assets.py",
     ".claude\scripts\route-intent.py",
     ".claude\scripts\runtime_host.py",
+    ".claude\scripts\generate-target-runtime.py",
     ".claude\scripts\generate-workflow-view.py",
+    ".claude\scripts\generate-workflow-lowlevel.py",
+    ".claude\scripts\probe-host-capabilities.py",
+    ".claude\scripts\discover-host-capabilities.py",
+    ".claude\scripts\apply-host-bootstrap.py",
+    ".claude\scripts\lib\control_plane.py",
+    ".claude\scripts\validate-generated-runtime.py",
     ".claude\scripts\stage-progress.py",
+    ".claude\scripts\validate-workflow-lowlevel.py",
     ".claude\scripts\validate-lessons-delta.py",
     ".claude\scripts\validate-run-state.py",
     ".claude\scripts\validate-workflow-draft.py",
@@ -117,7 +131,7 @@ $requiredPaths = @(
     "docs\workflowprogram-design-status.md",
     "docs\workflowprogram-capability-matrix.json",
     "docs\phase-07-implementation-plan.md",
-    ".claude\skills\develop\yaml-spec-template.md"
+    ".claude\skills\workflow-spec-support\yaml-spec-template.md"
 )
 
 foreach ($relativePath in $requiredPaths) {
@@ -231,6 +245,24 @@ foreach ($docPath in $activeTemplateDocs.Keys) {
         }
         else {
             Add-Error "Active template doc '$docPath' is missing '$marker'"
+        }
+    }
+}
+
+foreach ($docPath in $forbiddenActiveDocSnippets.Keys) {
+    $fullPath = Join-Path $Root $docPath
+    if (-not (Test-Path $fullPath)) {
+        Add-Error "Missing active doc for anti-regression check: $docPath"
+        continue
+    }
+
+    $content = Get-Content -Raw -Path $fullPath
+    foreach ($snippet in $forbiddenActiveDocSnippets[$docPath]) {
+        if ($content -like "*$snippet*") {
+            Add-Error "Active doc '$docPath' re-exposes fragile progress CLI assembly: '$snippet'"
+        }
+        else {
+            Add-Pass "Active doc '$docPath' avoids fragile progress CLI snippet '$snippet'"
         }
     }
 }
@@ -407,8 +439,14 @@ if (Test-Path $distRoot) {
         "dist\plugin\scripts\managed-assets.py",
         "dist\plugin\scripts\route-intent.py",
         "dist\plugin\scripts\runtime_host.py",
+        "dist\plugin\scripts\generate-target-runtime.py",
         "dist\plugin\scripts\generate-workflow-view.py",
+        "dist\plugin\scripts\generate-workflow-lowlevel.py",
+        "dist\plugin\scripts\probe-host-capabilities.py",
+        "dist\plugin\scripts\apply-host-bootstrap.py",
         "dist\plugin\scripts\stage-progress.py",
+        "dist\plugin\scripts\validate-generated-runtime.py",
+        "dist\plugin\scripts\validate-workflow-lowlevel.py",
         "dist\plugin\scripts\validate-lessons-delta.py",
         "dist\plugin\scripts\validate-run-state.py",
         "dist\plugin\scripts\validate-workflow-draft.py",

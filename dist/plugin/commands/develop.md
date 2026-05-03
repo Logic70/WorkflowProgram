@@ -93,7 +93,7 @@ CI=true /develop "设计一个用于审计 Markdown 链接有效性的工作流"
    - `outputs/stages/clarification-handoff.json`
    - `outputs/stages/clarification-evidence.json`
    - 约束：`requirement-clarification-lead` 是唯一直接与用户对话的角色；`scenario-extractor`、`assumption-auditor`、`constraint-reviewer` 只允许在内部审阅并向 lead 提出补问/补证建议。
-7. **Verify**: 规格中的每个字段都有明确值，包含 `User Intent`、`Clarification Summary`、`Open Questions`、`Assumptions and Boundaries`、`Readback Confirmation`，`澄清轮次 >= 2`，`design-readiness-report.json` 判定为 `READY`，且 `clarification-handoff.json.ready=true`，可直接供 `S2/S3` 消费。
+7. **Verify**: 规格中的每个字段都有明确值，包含 `User Intent`、`Clarification Summary`、`Open Questions`、`Assumptions and Boundaries`、`Target Workflow Graph Readback`、`File Plan`、`Readback Confirmation`，`澄清轮次 >= 2`，`design-readiness-report.json` 判定为 `READY`，且 `clarification-handoff.json.ready=true`，可直接供 `S2/S3` 消费。
 
 **On failure**：把歧义点和所需补充信息记录到 `lessons.md`。
 
@@ -176,6 +176,7 @@ CI=true /develop "设计一个用于审计 Markdown 链接有效性的工作流"
 1. **`workflow-spec.yaml`** —— 机器可读的编排配置（源文件）
    - 包含：阶段定义、Agent 引用、转移条件、资源限额、运行契约（`runtime_contract`）、基础运行测试判定契约（`test_contract`）
    - 同时必须包含 `generated_runtime_contract`；若工作流需要先搜索候选能力，则声明 `capability_discovery`；若工作流依赖宿主能力或显式 team，则还必须声明 `host_capabilities`、`agent_team_contract`
+   - 若目标工作流需要请求特定业务节点图，则必须声明 `workflow_graph`；该图不强制套用 WorkflowProgram 自身 `S1..S6`
    - 必须同时声明 `intent_flows`，明确 `develop / audit / iterate / validate` 的逻辑阶段流
    - `runtime_contract` 必须显式定义：
      - `write_boundaries`（允许写入边界）

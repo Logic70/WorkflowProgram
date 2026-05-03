@@ -44,6 +44,13 @@ In the current implementation:
 
 This boundary is one of the most important design decisions in WorkflowProgram.
 
+If the workflow also declares external capabilities or explicit team orchestration, S5 consumes more than the base verdict:
+
+- capability discovery reports and manual guidance
+- host capability probe results
+- environment remediation reports and guides
+- team fan-out / join evidence
+
 ## Which Files Matter Most
 
 The most important outputs from this layer are:
@@ -58,6 +65,13 @@ The main control-plane evidence is:
 - `RUN_ROOT/events.jsonl`
 
 Do not mix those two categories together.
+
+When those optional layers are enabled, common additional evidence includes:
+
+- `RUN_ROOT/outputs/stages/host-capability-candidates.json`
+- `RUN_ROOT/outputs/stages/host-capability-report.json`
+- `RUN_ROOT/outputs/stages/environment-remediation-report.json`
+- `RUN_ROOT/outputs/stages/team-plan.json`
 
 ## Practical Template
 

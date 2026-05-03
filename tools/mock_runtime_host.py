@@ -21,6 +21,7 @@ if str(SCRIPT_ROOT) not in sys.path:
     sys.path.insert(0, str(SCRIPT_ROOT))
 
 from lib.io_utils import iso_now, write_json
+from lib.reporting import with_report_fields
 
 
 def write_text(path: Path, content: str) -> None:
@@ -49,6 +50,10 @@ def copy_runtime_spec(
     entry_skill: str,
     deliverables: List[str] | None = None,
     target_root_allow: List[str] | None = None,
+    host_capabilities: List[Dict[str, Any]] | None = None,
+    agent_team_contract: Dict[str, Any] | None = None,
+    capability_discovery: Dict[str, Any] | None = None,
+    runtime_capabilities: List[str] | None = None,
 ) -> None:
     """把 fixture workflow spec 复制到 RUN_ROOT，并按需打补丁。
 
@@ -79,11 +84,327 @@ def copy_runtime_spec(
                 if text and text not in merged:
                     merged.append(text)
             write_boundaries["target_root_allow"] = merged
+    generated_runtime_contract = payload.get("generated_runtime_contract", {})
+    if runtime_capabilities is not None and isinstance(generated_runtime_contract, dict):
+        generated_runtime_contract["runtime_capabilities"] = runtime_capabilities
+    if host_capabilities is not None:
+        payload["host_capabilities"] = host_capabilities
+        if isinstance(generated_runtime_contract, dict):
+            caps = generated_runtime_contract.get("runtime_capabilities", [])
+            if isinstance(caps, list) and "host_capability_probe" not in caps:
+                caps.append("host_capability_probe")
+                generated_runtime_contract["runtime_capabilities"] = caps
+    if agent_team_contract is not None:
+        payload["agent_team_contract"] = agent_team_contract
+        if isinstance(generated_runtime_contract, dict):
+            caps = generated_runtime_contract.get("runtime_capabilities", [])
+            if isinstance(caps, list) and "team_orchestration" not in caps:
+                caps.append("team_orchestration")
+                generated_runtime_contract["runtime_capabilities"] = caps
+    if capability_discovery is not None:
+        payload["capability_discovery"] = capability_discovery
+        if isinstance(generated_runtime_contract, dict):
+            caps = generated_runtime_contract.get("runtime_capabilities", [])
+            if isinstance(caps, list) and "capability_discovery" not in caps:
+                caps.append("capability_discovery")
+                generated_runtime_contract["runtime_capabilities"] = caps
     target_path.write_text(
         yaml.safe_dump(payload, allow_unicode=True, sort_keys=False),
         encoding="utf-8",
         newline="\n",
     )
+
+
+def host_capability_missing_contract() -> List[Dict[str, Any]]:
+    return [
+        {
+            "id": "missing_binary",
+            "kind": "external_binary",
+            "name": "Missing Binary",
+            "required": True,
+            "probe": {
+                "binary": "workflowprogram_missing_binary_xyz",
+                "args": ["--version"],
+            },
+            "bootstrap": {
+                "scope": "host_global",
+                "summary": "Install the missing binary globally",
+                "project_local_outputs": [],
+            },
+            "approval_required": True,
+        }
+    ]
+
+
+def host_capability_project_local_contract() -> List[Dict[str, Any]]:
+    return [
+        {
+            "id": "project_local_marker",
+            "kind": "external_binary",
+            "name": "Project Local Marker",
+            "required": True,
+            "probe": {
+                "binary": "workflowprogram_missing_binary_xyz",
+                "args": ["--version"],
+            },
+            "bootstrap": {
+                "scope": "project_local",
+                "summary": "Create reusable project-local bootstrap assets",
+                "assets": [
+                    {
+                        "path": ".workflowprogram/bootstrap/project-local-marker.json",
+                        "format": "json",
+                        "content": {
+                            "kind": "project_local_marker",
+                            "status": "ready",
+                        },
+                    },
+                    {
+                        "path": ".workflowprogram/bootstrap/config/tool-config.json",
+                        "format": "json",
+                        "content": {
+                            "binary": "workflowprogram_missing_binary_xyz",
+                            "mode": "project_local",
+                            "managed_by": "WorkflowProgram",
+                        },
+                    },
+                    {
+                        "path": ".workflowprogram/bootstrap/bin/project-local-wrapper.sh",
+                        "format": "shell",
+                        "executable": True,
+                        "content": "#!/usr/bin/env bash\nprintf 'project-local bootstrap ready\\n'\n",
+                    },
+                ],
+            },
+            "approval_required": False,
+        }
+    ]
+
+
+def host_capability_host_global_contract(target_root: Path) -> List[Dict[str, Any]]:
+    shim_dir = (target_root.parent / "host-global" / "bin").resolve()
+    shim_name = "workflowprogram_python3_host_global"
+    shim_path = (shim_dir / shim_name).resolve()
+    return [
+        {
+            "id": "host_global_python3_shim",
+            "kind": "external_binary",
+            "name": "Host Global Python 3 Shim",
+            "required": True,
+            "probe": {
+                "binary": shim_name,
+                "args": ["--version"],
+                "search_paths": [str(shim_dir)],
+            },
+            "bootstrap": {
+                "scope": "host_global",
+                "summary": "Create an approval-gated host-global shim for python3",
+                "project_local_outputs": [],
+                "adapter": {
+                    "type": "symlink_binary",
+                    "source_binary": "python3",
+                    "target_path": str(shim_path),
+                },
+            },
+            "approval_required": True,
+        }
+    ]
+
+
+def agent_team_contract_fixture(*, max_fan_out: int = 2) -> Dict[str, Any]:
+    return {
+        "enabled": True,
+        "max_fan_out": max_fan_out,
+        "join_policy": "all_must_pass",
+        "roles": [
+            {
+                "id": "reviewer",
+                "responsibility": "Review generated assets",
+                "ownership_stage_slots": ["S5"],
+                "output_patterns": ["outputs/stages/team/S5/reviewer/review-report.md"],
+                "required": True,
+            },
+            {
+                "id": "security_reviewer",
+                "responsibility": "Review security-sensitive outputs",
+                "ownership_stage_slots": ["S5"],
+                "output_patterns": ["outputs/stages/team/S5/security_reviewer/review-report.md"],
+                "required": True,
+            },
+            {
+                "id": "lead_reviewer",
+                "responsibility": "Join team review results",
+                "ownership_stage_slots": ["S5"],
+                "output_patterns": ["outputs/stages/team/S5/lead_reviewer/join-summary.md"],
+                "required": True,
+            },
+        ],
+        "execution": [
+            {
+                "stage_slot": "S5",
+                "role_ids": ["reviewer", "security_reviewer"],
+                "join_role": "lead_reviewer",
+            }
+        ],
+    }
+
+
+def capability_discovery_reverse_engineering() -> Dict[str, Any]:
+    return {
+        "enabled": True,
+        "domains": ["reverse_engineering"],
+        "include_local_installed": True,
+        "include_curated_profiles": True,
+        "infer_from_request": True,
+    }
+
+
+def run_json_script(repo_root: Path, script_name: str, *args: str) -> Dict[str, Any]:
+    completed = subprocess.run(
+        [sys.executable, str(repo_root / ".claude" / "scripts" / script_name), *args, "--json"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if completed.returncode != 0:
+        raise RuntimeError(completed.stderr.strip() or completed.stdout.strip() or f"{script_name} failed")
+    try:
+        payload = json.loads(completed.stdout)
+    except json.JSONDecodeError as exc:
+        raise RuntimeError(f"{script_name} returned invalid JSON: {exc}") from exc
+    if not isinstance(payload, dict):
+        raise RuntimeError(f"{script_name} must return a JSON object")
+    return payload
+
+
+def write_host_capability_outputs(
+    repo_root: Path,
+    run_root: Path,
+    target_root: Path,
+    *,
+    apply_project_local: bool,
+) -> Dict[str, Any]:
+    probe_payload = run_json_script(
+        repo_root,
+        "probe-host-capabilities.py",
+        "--spec",
+        str(run_root / "workflow-spec.yaml"),
+        "--target-root",
+        str(target_root),
+        "--run-root",
+        str(run_root),
+    )
+    bootstrap_payload: Dict[str, Any] | None = None
+    if apply_project_local:
+        bootstrap_args = [
+            "--spec",
+            str(run_root / "workflow-spec.yaml"),
+            "--target-root",
+            str(target_root),
+            "--run-root",
+            str(run_root),
+        ]
+        bootstrap_payload = run_json_script(
+            repo_root,
+            "apply-host-bootstrap.py",
+            *bootstrap_args,
+        )
+        probe_payload = run_json_script(
+            repo_root,
+            "probe-host-capabilities.py",
+            "--spec",
+            str(run_root / "workflow-spec.yaml"),
+            "--target-root",
+            str(target_root),
+            "--run-root",
+            str(run_root),
+        )
+    return {
+        "report": probe_payload.get("report", {}),
+        "bootstrap": bootstrap_payload,
+    }
+
+
+def seed_prior_host_capability_failure(target_root: Path, report: Dict[str, Any]) -> None:
+    """为 remediation loop 构造一条历史环境失败运行。"""
+
+    prior_run_root = target_root / ".workflowprogram" / "runs" / "prior-host-capability-failure"
+    prior_report = dict(report) if isinstance(report, dict) else {}
+    prior_report["run_root"] = str(prior_run_root)
+    prior_report["target_root"] = str(target_root)
+    write_json(prior_run_root / "state.json", {
+        "values": {
+            "request_id": "prior-host-capability-failure",
+            "failure_kind": "environment",
+        }
+    })
+    write_json(prior_run_root / "outputs" / "stages" / "host-capability-report.json", prior_report)
+
+
+def write_capability_discovery_outputs(repo_root: Path, run_root: Path, target_root: Path, request: str) -> Dict[str, Any]:
+    payload = run_json_script(
+        repo_root,
+        "discover-host-capabilities.py",
+        "--spec",
+        str(run_root / "workflow-spec.yaml"),
+        "--target-root",
+        str(target_root),
+        "--run-root",
+        str(run_root),
+        "--request",
+        request,
+    )
+    return {
+        "report": payload.get("report", {}),
+        "report_path": payload.get("report_path"),
+        "instructions_path": payload.get("instructions_path"),
+    }
+
+
+def write_team_evidence(
+    run_root: Path,
+    contract: Dict[str, Any],
+    *,
+    overflow: bool = False,
+    join_satisfied: bool = True,
+) -> None:
+    roles = contract.get("roles", []) if isinstance(contract.get("roles"), list) else []
+    execution = contract.get("execution", []) if isinstance(contract.get("execution"), list) else []
+    fanout_roles = ["reviewer", "security_reviewer"]
+    if overflow:
+        fanout_roles.append("lead_reviewer")
+    plan = {
+        "generated_at": iso_now(),
+        "execution": execution,
+        "fan_out_count": len(fanout_roles),
+        "roles": fanout_roles,
+        "max_fan_out": contract.get("max_fan_out"),
+    }
+    results = {
+        "generated_at": iso_now(),
+        "roles": [
+            {"id": role_id, "status": "PASS", "output": f"outputs/stages/team/S5/{role_id}/review-report.md"}
+            for role_id in fanout_roles
+        ],
+    }
+    join_summary = {
+        "generated_at": iso_now(),
+        "join_policy": contract.get("join_policy"),
+        "join_role": execution[0].get("join_role") if execution else "",
+        "satisfied": join_satisfied,
+        "fan_out_count": len(fanout_roles),
+    }
+    write_json(run_root / "outputs" / "stages" / "team-plan.json", plan)
+    write_json(run_root / "outputs" / "stages" / "team-results.json", results)
+    write_json(run_root / "outputs" / "stages" / "team-join-summary.json", join_summary)
+    for role_id in fanout_roles:
+        output_path = run_root / "outputs" / "stages" / "team" / "S5" / role_id / "review-report.md"
+        write_text(output_path, f"# Team Output\n\n- role: `{role_id}`\n- status: `PASS`\n")
+    append_jsonl(run_root / "events.jsonl", {"ts": iso_now(), "type": "TeamFanOutStart", "stage": "S5", "source": "mock-runtime-host", "status": "ok", "message": "Started team fan-out", "role_ids": fanout_roles})
+    for role_id in fanout_roles:
+        append_jsonl(run_root / "events.jsonl", {"ts": iso_now(), "type": "TeamRoleStarted", "stage": "S5", "source": "mock-runtime-host", "status": "running", "message": f"Started role {role_id}", "role_id": role_id})
+        append_jsonl(run_root / "events.jsonl", {"ts": iso_now(), "type": "TeamRoleCompleted", "stage": "S5", "source": "mock-runtime-host", "status": "ok", "message": f"Completed role {role_id}", "role_id": role_id})
+    append_jsonl(run_root / "events.jsonl", {"ts": iso_now(), "type": "TeamJoinCompleted", "stage": "S5", "source": "mock-runtime-host", "status": "ok" if join_satisfied else "error", "message": "Team join completed", "join_policy": contract.get("join_policy"), "satisfied": join_satisfied})
 
 
 def infer_intent(entry_skill: str) -> str:
@@ -144,8 +465,38 @@ def write_workflow_spec_draft(run_root: Path, entry_skill: str, request: str) ->
             "## Clarification Summary",
             "",
             "- 澄清轮次：2",
-            "- 已确认事项：触发方式、核心输入输出、质量门禁、目标交付物。",
-            "- 已消解歧义：用户诉求、最终目的和成功标准已经明确。",
+            "- 已确认事项：触发方式；核心输入输出；质量门禁；目标交付物；非目标边界。",
+            "- 已消解歧义：用户诉求；最终目的；成功标准；默认交付范围已经明确。",
+            "",
+            "## Open Questions",
+            "",
+            "- 阻塞未决问题：无",
+            "- 可延后问题：可在 S3 继续细化的命名与文档措辞",
+            "- 问题处理策略：阻塞问题必须在 S1 清零；可延后问题进入假设日志并在设计阶段追踪。",
+            "",
+            "## Assumptions and Boundaries",
+            "",
+            "- 当前假设：目标项目路径可访问；用户接受托管 workflow 资产；已有约束文件可读取。",
+            "- 外部依赖：当前仓库中的 workflow 设计文档；constraints；目标项目现有 `.claude` 资产（如存在）。",
+            "- 关键边界场景：审批未完成时不得进入 S4；目标资产冲突时不得静默覆盖；环境依赖缺失时必须显式失败或给出 remediation。",
+            "- 明确不做：不直接修改应用代码；不跳过 S5 验证；不绕过 managed apply 边界。",
+            "",
+            "## Target Workflow Graph Readback",
+            "",
+            "- 目标 workflow_graph 节点：entry -> generate-assets -> validate-assets",
+            "- 目标 workflow_graph 入口与转移：entry 从注册命令进入；entry -> generate-assets；generate-assets -> validate-assets。",
+            "- 目标输出是否已映射到 `registry` 或 `test_contract.artifacts`：是，`.claude/` 与 `.workflowprogram/` 交付物均由 registry 或 deliverables 声明。",
+            "",
+            "## File Plan",
+            "",
+            "- 需要创建的文件：`.claude/settings.json`；`.claude/commands/example.md`；`.workflowprogram/design/workflow-spec.yaml`；`.workflowprogram/runtime/workflow-entry.py`。",
+            "- 需要修改的文件：`.claude/rules/constraints.md`。",
+            "",
+            "## Readback Confirmation",
+            "",
+            "- 回读摘要：本工作流将围绕请求形成可验证的 Claude Code workflow 资产，明确交付物、质量门禁和非目标边界。",
+            "- 用户确认状态：confirmed",
+            "- 最近修正：无",
             "",
             "## Trigger Model",
             "",
@@ -175,7 +526,14 @@ def write_workflow_spec_draft(run_root: Path, entry_skill: str, request: str) ->
     write_text(run_root / "workflow-spec.md", draft + "\n")
 
 
-def write_lessons_delta(run_root: Path, intent: str, failure_kind: str, request: str) -> None:
+def write_lessons_delta(
+    run_root: Path,
+    intent: str,
+    failure_kind: str,
+    request: str,
+    *,
+    extra_candidates: List[str] | None = None,
+) -> None:
     """生成确定性的 S6 lessons delta 产物。"""
     run_id = run_root.name
     body = "\n".join(
@@ -194,6 +552,7 @@ def write_lessons_delta(run_root: Path, intent: str, failure_kind: str, request:
             "## Constraint Candidates",
             "",
             "- 继续将运行时证据限制在 RUN_ROOT，并只将托管产物写入 TARGET_ROOT/.claude。",
+            *[f"- {item}" for item in (extra_candidates or [])],
             "",
         ]
     )
@@ -436,28 +795,31 @@ def write_managed_outputs(run_root: Path, target_root: Path, conflict: bool) -> 
             "decision": "create",
         },
     ]
+    managed_summary = {
+        "create": 9,
+        "update": 0 if conflict else 1,
+        "conflict": 1 if conflict else 0,
+    }
     write_json(
         outputs / "managed-change-plan.json",
-        {
-            "generated_at": iso_now(),
-            "entries": plan_entries,
-            "summary": {
-                "create": 9,
-                "update": 0 if conflict else 1,
-                "conflict": 1 if conflict else 0,
+        with_report_fields(
+            {
+                "generated_at": iso_now(),
+                "entries": plan_entries,
+                "summary": managed_summary,
             },
-        },
+            schema_name="managed-change-plan",
+            error_code="CONFLICT" if conflict else None,
+            failure_kind="conflict" if conflict else "none",
+            remediation=[{"code": "RESOLVE_MANAGED_CONFLICTS", "summary": "Review conflict copies."}] if conflict else [],
+        ),
     )
     result_payload: Dict[str, Any] = {
         "generated_at": iso_now(),
         "target_root": str(target_root),
             "run_root": str(run_root),
             "manifest_path": str(manifest_path),
-            "summary": {
-                "create": 9,
-                "update": 0 if conflict else 1,
-                "conflict": 1 if conflict else 0,
-            },
+            "summary": managed_summary,
             "applied": [],
         "conflicts": [],
     }
@@ -481,6 +843,9 @@ def write_managed_outputs(run_root: Path, target_root: Path, conflict: bool) -> 
                     "relative_path": entry["relative_path"],
                     "action": entry["decision"],
                     "target_path": entry["target_path"],
+                    "applied_sha256": "mock-managed-applied-hash",
+                    "before_sha256": "mock-managed-before-hash" if entry["decision"] == "update" else None,
+                    "before_snapshot": None,
                     "run_id": run_root.name,
                 }
             )
@@ -567,21 +932,73 @@ def write_managed_outputs(run_root: Path, target_root: Path, conflict: bool) -> 
             ),
         },
     )
+    result_payload = with_report_fields(
+        result_payload,
+        schema_name="managed-change-result",
+        error_code="CONFLICT" if conflict else None,
+        failure_kind="conflict" if conflict else "none",
+        remediation=[{"code": "REVIEW_MANAGED_CONFLICTS", "summary": "Resolve conflicts before re-running."}] if conflict else [],
+    )
     write_json(outputs / "managed-change-result.json", result_payload)
+    rollback_entries: List[Dict[str, Any]] = []
+    for item in result_payload.get("applied", []) if isinstance(result_payload.get("applied"), list) else []:
+        rollback_entries.append(
+            {
+                "relative_path": item.get("relative_path"),
+                "target_path": item.get("target_path"),
+                "action": item.get("action"),
+                "rollback_action": "restore_before_snapshot" if item.get("action") == "update" else "delete_created_file",
+                "safe_if_current_sha256_equals": item.get("applied_sha256"),
+                "before_sha256": item.get("before_sha256"),
+            }
+        )
+    for item in result_payload.get("conflicts", []) if isinstance(result_payload.get("conflicts"), list) else []:
+        rollback_entries.append(
+            {
+                "relative_path": item.get("relative_path"),
+                "target_path": item.get("target_path"),
+                "action": "conflict",
+                "rollback_action": "none",
+                "conflict_copy": item.get("conflict_copy"),
+            }
+        )
+    write_json(
+        outputs / "managed-rollback-manifest.json",
+        with_report_fields(
+            {
+                "generated_at": iso_now(),
+                "target_root": str(target_root),
+                "run_root": str(run_root),
+                "entries": rollback_entries,
+            },
+            schema_name="managed-rollback-manifest",
+            error_code="CONFLICT" if conflict else None,
+            failure_kind="conflict" if conflict else "none",
+            remediation=[{"code": "MANUAL_CONFLICT_REVIEW", "summary": "Review conflict_copy before applying."}] if conflict else [],
+        ),
+    )
+    write_text(
+        outputs / "managed-recover-instructions.md",
+        "# Managed Asset Recovery Instructions\n\n"
+        "- Created files: delete only if current hash matches applied hash.\n"
+        "- Updated files: restore only if current hash matches applied hash.\n"
+        "- Conflicts: no target change was made; review conflict copies manually.\n",
+    )
 
 
-def create_target_outputs(run_root: Path, target_root: Path) -> List[str]:
-    """为 PASS 路径 smoke 测试创建一个最小可用的 managed 目标树。"""
+def create_target_outputs(run_root: Path, target_root: Path, *, include_claude_assets: bool = True) -> List[str]:
+    """为 PASS 路径 smoke 测试创建一个最小可用的目标树。"""
     files: List[str] = []
-    settings_path = target_root / ".claude" / "settings.json"
-    write_text(settings_path, '{\n  "commands": ["example"]\n}\n')
-    files.append(".claude/settings.json")
-    constraints_path = target_root / ".claude" / "rules" / "constraints.md"
-    write_text(constraints_path, "# Constraints\n\n- Keep workflow assets managed.\n")
-    files.append(".claude/rules/constraints.md")
-    command_path = target_root / ".claude" / "commands" / "example.md"
-    write_text(command_path, "## Usage\n\n1. Goal\n2. Verify\n")
-    files.append(".claude/commands/example.md")
+    if include_claude_assets:
+        settings_path = target_root / ".claude" / "settings.json"
+        write_text(settings_path, '{\n  "commands": ["example"]\n}\n')
+        files.append(".claude/settings.json")
+        constraints_path = target_root / ".claude" / "rules" / "constraints.md"
+        write_text(constraints_path, "# Constraints\n\n- Keep workflow assets managed.\n")
+        files.append(".claude/rules/constraints.md")
+        command_path = target_root / ".claude" / "commands" / "example.md"
+        write_text(command_path, "## Usage\n\n1. Goal\n2. Verify\n")
+        files.append(".claude/commands/example.md")
     design_root = target_root / ".workflowprogram" / "design"
     design_root.mkdir(parents=True, exist_ok=True)
     for name in ("workflow-spec.yaml", "workflow-view.md", "workflow-lowlevel.md"):
@@ -792,6 +1209,450 @@ def main() -> int:
                 "stage_status": "failed",
                 "current_stage": "generate",
                 "next_action": "resolve managed conflicts and rerun generate",
+                "generated_files": generated_files,
+            }
+        elif args.fixture == "host-capability-missing-develop":
+            copy_runtime_spec(
+                repo_root,
+                run_root,
+                "valid-minimal.yaml",
+                entry_skill=args.entry_skill,
+                host_capabilities=host_capability_missing_contract(),
+                runtime_capabilities=["state_transitions", "run_state_validation", "host_capability_probe"],
+            )
+            design_docs = generate_design_docs(repo_root, run_root)
+            candidate_root = run_root / "outputs" / "candidate"
+            write_text(candidate_root / ".claude" / "rules" / "constraints.md", "# Constraints\n\n- Keep workflow assets managed.\n")
+            write_text(candidate_root / ".claude" / "commands" / "example.md", "## Usage\n\n1. Goal\n2. Verify\n")
+            for source_name, target_name in (
+                ("workflow_spec", "workflow-spec.yaml"),
+                ("workflow_view", "workflow-view.md"),
+                ("workflow_lowlevel", "workflow-lowlevel.md"),
+            ):
+                destination = candidate_root / ".workflowprogram" / "design" / target_name
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                destination.write_text(design_docs[source_name].read_text(encoding="utf-8"), encoding="utf-8", newline="\n")
+            generate_target_runtime_assets(repo_root, run_root / "workflow-spec.yaml", candidate_root / ".workflowprogram" / "runtime")
+            generated_files = create_target_outputs(run_root, target_root)
+            write_managed_outputs(run_root, target_root, conflict=False)
+            host_outputs = write_host_capability_outputs(repo_root, run_root, target_root, apply_project_local=False)
+            if "requirement" in stage_history:
+                write_workflow_spec_draft(run_root, args.entry_skill, args.request)
+            if "lessons" in stage_history:
+                write_lessons_delta(
+                    run_root,
+                    intent,
+                    "environment",
+                    args.request,
+                    extra_candidates=["Add host_capability bootstrap guidance for missing_binary."],
+                )
+            write_progress_outputs(
+                run_root,
+                stage_history,
+                "FAIL",
+                "HOST_CAPABILITY_MISSING",
+                current_stage=stage_history[-1] if stage_history else "lessons",
+                next_action="resolve required host capabilities and rerun",
+            )
+            write_runner_evidence(run_root, target_root, intent, args.entry_skill, stage_history, "FAIL", "HOST_CAPABILITY_MISSING")
+            payload = {
+                "result": "FAIL",
+                "failure_code": "HOST_CAPABILITY_MISSING",
+                "message": "Mock host completed workflow generation, but required host capabilities are missing.",
+                "is_error": True,
+                "stage_history": stage_history,
+                "stage_status": "failed",
+                "current_stage": stage_history[-1] if stage_history else "lessons",
+                "next_action": "resolve required host capabilities and rerun",
+                "generated_files": generated_files,
+                "metadata": {"host_capability_report": host_outputs.get("report", {})},
+            }
+        elif args.fixture == "host-capability-project-local-bootstrap":
+            copy_runtime_spec(
+                repo_root,
+                run_root,
+                "valid-minimal.yaml",
+                entry_skill=args.entry_skill,
+                host_capabilities=host_capability_project_local_contract(),
+                runtime_capabilities=["state_transitions", "run_state_validation", "host_capability_probe"],
+            )
+            design_docs = generate_design_docs(repo_root, run_root)
+            candidate_root = run_root / "outputs" / "candidate"
+            write_text(candidate_root / ".claude" / "rules" / "constraints.md", "# Constraints\n\n- Keep workflow assets managed.\n")
+            write_text(candidate_root / ".claude" / "commands" / "example.md", "## Usage\n\n1. Goal\n2. Verify\n")
+            for source_name, target_name in (
+                ("workflow_spec", "workflow-spec.yaml"),
+                ("workflow_view", "workflow-view.md"),
+                ("workflow_lowlevel", "workflow-lowlevel.md"),
+            ):
+                destination = candidate_root / ".workflowprogram" / "design" / target_name
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                destination.write_text(design_docs[source_name].read_text(encoding="utf-8"), encoding="utf-8", newline="\n")
+            generate_target_runtime_assets(repo_root, run_root / "workflow-spec.yaml", candidate_root / ".workflowprogram" / "runtime")
+            generated_files = create_target_outputs(run_root, target_root)
+            write_managed_outputs(run_root, target_root, conflict=False)
+            host_outputs = write_host_capability_outputs(repo_root, run_root, target_root, apply_project_local=True)
+            if "requirement" in stage_history:
+                write_workflow_spec_draft(run_root, args.entry_skill, args.request)
+            if "lessons" in stage_history:
+                write_lessons_delta(run_root, intent, "none", args.request)
+            write_progress_outputs(
+                run_root,
+                stage_history,
+                "PASS",
+                "",
+                current_stage=stage_history[-1] if stage_history else "lessons",
+                next_action="complete",
+            )
+            write_runner_evidence(run_root, target_root, intent, args.entry_skill, stage_history, "PASS", "")
+            payload = {
+                "result": "PASS",
+                "failure_code": "",
+                "message": "Mock host applied project-local bootstrap and satisfied host capability requirements.",
+                "is_error": False,
+                "stage_history": stage_history,
+                "stage_status": "done",
+                "current_stage": stage_history[-1] if stage_history else "lessons",
+                "next_action": "complete",
+                "generated_files": generated_files,
+                "metadata": {"host_capability_report": host_outputs.get("report", {})},
+            }
+        elif args.fixture == "host-capability-host-global-bootstrap":
+            copy_runtime_spec(
+                repo_root,
+                run_root,
+                "valid-minimal.yaml",
+                entry_skill=args.entry_skill,
+                host_capabilities=host_capability_host_global_contract(target_root),
+                runtime_capabilities=["state_transitions", "run_state_validation", "host_capability_probe"],
+            )
+            design_docs = generate_design_docs(repo_root, run_root)
+            candidate_root = run_root / "outputs" / "candidate"
+            write_text(candidate_root / ".claude" / "rules" / "constraints.md", "# Constraints\n\n- Keep workflow assets managed.\n")
+            write_text(candidate_root / ".claude" / "commands" / "example.md", "## Usage\n\n1. Goal\n2. Verify\n")
+            for source_name, target_name in (
+                ("workflow_spec", "workflow-spec.yaml"),
+                ("workflow_view", "workflow-view.md"),
+                ("workflow_lowlevel", "workflow-lowlevel.md"),
+            ):
+                destination = candidate_root / ".workflowprogram" / "design" / target_name
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                destination.write_text(design_docs[source_name].read_text(encoding="utf-8"), encoding="utf-8", newline="\n")
+            generate_target_runtime_assets(repo_root, run_root / "workflow-spec.yaml", candidate_root / ".workflowprogram" / "runtime")
+            generated_files = create_target_outputs(run_root, target_root)
+            write_managed_outputs(run_root, target_root, conflict=False)
+            host_outputs = write_host_capability_outputs(
+                repo_root,
+                run_root,
+                target_root,
+                apply_project_local=False,
+            )
+            if "requirement" in stage_history:
+                write_workflow_spec_draft(run_root, args.entry_skill, args.request)
+            if "lessons" in stage_history:
+                write_lessons_delta(run_root, intent, "none", args.request)
+            write_progress_outputs(
+                run_root,
+                stage_history,
+                "PASS",
+                "",
+                current_stage=stage_history[-1] if stage_history else "lessons",
+                next_action="complete",
+            )
+            write_runner_evidence(run_root, target_root, intent, args.entry_skill, stage_history, "PASS", "")
+            payload = {
+                "result": "PASS",
+                "failure_code": "",
+                "message": "Mock host applied approved host-global bootstrap and satisfied host capability requirements.",
+                "is_error": False,
+                "stage_history": stage_history,
+                "stage_status": "done",
+                "current_stage": stage_history[-1] if stage_history else "lessons",
+                "next_action": "complete",
+                "generated_files": generated_files,
+                "metadata": {"host_capability_report": host_outputs.get("report", {})},
+            }
+        elif args.fixture == "capability-discovery-reverse-engineering":
+            copy_runtime_spec(
+                repo_root,
+                run_root,
+                "valid-minimal.yaml",
+                entry_skill=args.entry_skill,
+                capability_discovery=capability_discovery_reverse_engineering(),
+                runtime_capabilities=["state_transitions", "run_state_validation", "capability_discovery"],
+            )
+            design_docs = generate_design_docs(repo_root, run_root)
+            candidate_root = run_root / "outputs" / "candidate"
+            write_text(candidate_root / ".claude" / "rules" / "constraints.md", "# Constraints\n\n- Keep workflow assets managed.\n")
+            write_text(candidate_root / ".claude" / "commands" / "example.md", "## Usage\n\n1. Goal\n2. Verify\n")
+            for source_name, target_name in (
+                ("workflow_spec", "workflow-spec.yaml"),
+                ("workflow_view", "workflow-view.md"),
+                ("workflow_lowlevel", "workflow-lowlevel.md"),
+            ):
+                destination = candidate_root / ".workflowprogram" / "design" / target_name
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                destination.write_text(design_docs[source_name].read_text(encoding="utf-8"), encoding="utf-8", newline="\n")
+            generate_target_runtime_assets(repo_root, run_root / "workflow-spec.yaml", candidate_root / ".workflowprogram" / "runtime")
+            generated_files = create_target_outputs(run_root, target_root)
+            write_managed_outputs(run_root, target_root, conflict=False)
+            discovery_outputs = write_capability_discovery_outputs(repo_root, run_root, target_root, args.request)
+            if "requirement" in stage_history:
+                write_workflow_spec_draft(run_root, args.entry_skill, args.request)
+            if "lessons" in stage_history:
+                write_lessons_delta(run_root, intent, "none", args.request)
+            write_progress_outputs(
+                run_root,
+                stage_history,
+                "PASS",
+                "",
+                current_stage=stage_history[-1] if stage_history else "lessons",
+                next_action="review capability candidates and finalize host requirements",
+            )
+            write_runner_evidence(run_root, target_root, intent, args.entry_skill, stage_history, "PASS", "")
+            payload = {
+                "result": "PASS",
+                "failure_code": "",
+                "message": "Mock host generated capability discovery recommendations for reverse engineering.",
+                "is_error": False,
+                "stage_history": stage_history,
+                "stage_status": "done",
+                "current_stage": stage_history[-1] if stage_history else "lessons",
+                "next_action": "review capability candidates and finalize host requirements",
+                "generated_files": generated_files,
+                "metadata": {"capability_discovery_report": discovery_outputs.get("report", {})},
+            }
+        elif args.fixture in {"host-capability-validate", "host-capability-audit"}:
+            host_entry_skill = "workflowprogram-validate" if args.fixture == "host-capability-validate" else "workflowprogram-audit"
+            intent = infer_intent(host_entry_skill)
+            stage_history = stage_history_for_intent(intent)
+            copy_runtime_spec(
+                repo_root,
+                run_root,
+                "valid-minimal.yaml",
+                entry_skill=host_entry_skill,
+                deliverables=["validation-report.md"],
+                target_root_allow=["validation-report.md"],
+                host_capabilities=[
+                    {
+                        "id": "python3_runtime",
+                        "kind": "external_binary",
+                        "name": "Python 3",
+                        "required": True,
+                        "probe": {"binary": "python3", "args": ["--version"]},
+                        "bootstrap": {"scope": "manual_only", "summary": "Python 3 should already exist", "project_local_outputs": []},
+                        "approval_required": True,
+                    }
+                ],
+                runtime_capabilities=["state_transitions", "run_state_validation", "host_capability_probe"],
+            )
+            generate_design_docs(repo_root, run_root)
+            generated_files = create_target_outputs(run_root, target_root, include_claude_assets=False)
+            host_outputs = write_host_capability_outputs(repo_root, run_root, target_root, apply_project_local=False)
+            write_validation_report(
+                target_root,
+                "Workflow Validation",
+                [
+                    "- Result: `PASS`",
+                    f"- Entry skill: `{host_entry_skill}`",
+                    "- Host capabilities were probed successfully.",
+                ],
+            )
+            if "requirement" in stage_history:
+                write_workflow_spec_draft(run_root, host_entry_skill, args.request)
+            if "lessons" in stage_history:
+                write_lessons_delta(run_root, intent, "none", args.request)
+            write_progress_outputs(
+                run_root,
+                stage_history,
+                "PASS",
+                "",
+                current_stage=stage_history[-1] if stage_history else "validate",
+                next_action="complete",
+            )
+            write_runner_evidence(run_root, target_root, intent, host_entry_skill, stage_history, "PASS", "")
+            payload = {
+                "result": "PASS",
+                "failure_code": "",
+                "message": "Mock host validated host capabilities successfully.",
+                "is_error": False,
+                "stage_history": stage_history,
+                "stage_status": "done",
+                "current_stage": stage_history[-1] if stage_history else "validate",
+                "next_action": "complete",
+                "generated_files": generated_files,
+                "metadata": {"host_capability_report": host_outputs.get("report", {})},
+            }
+        elif args.fixture == "host-capability-iterate":
+            copy_runtime_spec(
+                repo_root,
+                run_root,
+                "valid-minimal.yaml",
+                entry_skill=args.entry_skill,
+                host_capabilities=host_capability_missing_contract(),
+                runtime_capabilities=["state_transitions", "run_state_validation", "host_capability_probe"],
+            )
+            generate_design_docs(repo_root, run_root)
+            generated_files = create_target_outputs(run_root, target_root, include_claude_assets=False)
+            write_managed_outputs(run_root, target_root, conflict=False)
+            host_outputs = write_host_capability_outputs(repo_root, run_root, target_root, apply_project_local=False)
+            seed_prior_host_capability_failure(target_root, host_outputs.get("report", {}))
+            write_lessons_delta(
+                run_root,
+                intent,
+                "environment",
+                args.request,
+                extra_candidates=["Add host_capability bootstrap coverage for missing_binary recurring failures."],
+            )
+            write_progress_outputs(
+                run_root,
+                stage_history,
+                "FAIL",
+                "HOST_CAPABILITY_MISSING",
+                current_stage=stage_history[-1] if stage_history else "lessons",
+                next_action="add host capability bootstrap guidance",
+            )
+            write_runner_evidence(run_root, target_root, intent, args.entry_skill, stage_history, "FAIL", "HOST_CAPABILITY_MISSING")
+            payload = {
+                "result": "FAIL",
+                "failure_code": "HOST_CAPABILITY_MISSING",
+                "message": "Mock host identified recurring host capability failures during iterate.",
+                "is_error": True,
+                "stage_history": stage_history,
+                "stage_status": "failed",
+                "current_stage": stage_history[-1] if stage_history else "lessons",
+                "next_action": "add host capability bootstrap guidance",
+                "generated_files": generated_files,
+                "metadata": {"host_capability_report": host_outputs.get("report", {})},
+            }
+        elif args.fixture == "agent-team-develop-pass":
+            team_contract = agent_team_contract_fixture(max_fan_out=2)
+            copy_runtime_spec(
+                repo_root,
+                run_root,
+                "valid-minimal.yaml",
+                entry_skill=args.entry_skill,
+                agent_team_contract=team_contract,
+                runtime_capabilities=["state_transitions", "run_state_validation", "team_orchestration"],
+            )
+            design_docs = generate_design_docs(repo_root, run_root)
+            candidate_root = run_root / "outputs" / "candidate"
+            write_text(candidate_root / ".claude" / "rules" / "constraints.md", "# Constraints\n\n- Keep workflow assets managed.\n")
+            write_text(candidate_root / ".claude" / "commands" / "example.md", "## Usage\n\n1. Goal\n2. Verify\n")
+            for source_name, target_name in (
+                ("workflow_spec", "workflow-spec.yaml"),
+                ("workflow_view", "workflow-view.md"),
+                ("workflow_lowlevel", "workflow-lowlevel.md"),
+            ):
+                destination = candidate_root / ".workflowprogram" / "design" / target_name
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                destination.write_text(design_docs[source_name].read_text(encoding="utf-8"), encoding="utf-8", newline="\n")
+            generate_target_runtime_assets(repo_root, run_root / "workflow-spec.yaml", candidate_root / ".workflowprogram" / "runtime")
+            generated_files = create_target_outputs(run_root, target_root)
+            write_managed_outputs(run_root, target_root, conflict=False)
+            write_team_evidence(run_root, team_contract, overflow=False, join_satisfied=True)
+            if "requirement" in stage_history:
+                write_workflow_spec_draft(run_root, args.entry_skill, args.request)
+            if "lessons" in stage_history:
+                write_lessons_delta(run_root, intent, "none", args.request)
+            write_progress_outputs(run_root, stage_history, "PASS", "", current_stage=stage_history[-1], next_action="complete")
+            write_runner_evidence(run_root, target_root, intent, args.entry_skill, stage_history, "PASS", "")
+            payload = {
+                "result": "PASS",
+                "failure_code": "",
+                "message": "Mock host completed deterministic team orchestration successfully.",
+                "is_error": False,
+                "stage_history": stage_history,
+                "stage_status": "done",
+                "current_stage": stage_history[-1],
+                "next_action": "complete",
+                "generated_files": generated_files,
+            }
+        elif args.fixture == "agent-team-fanout-fail":
+            team_contract = agent_team_contract_fixture(max_fan_out=2)
+            copy_runtime_spec(
+                repo_root,
+                run_root,
+                "valid-minimal.yaml",
+                entry_skill=args.entry_skill,
+                agent_team_contract=team_contract,
+                runtime_capabilities=["state_transitions", "run_state_validation", "team_orchestration"],
+            )
+            design_docs = generate_design_docs(repo_root, run_root)
+            candidate_root = run_root / "outputs" / "candidate"
+            write_text(candidate_root / ".claude" / "rules" / "constraints.md", "# Constraints\n\n- Keep workflow assets managed.\n")
+            write_text(candidate_root / ".claude" / "commands" / "example.md", "## Usage\n\n1. Goal\n2. Verify\n")
+            for source_name, target_name in (
+                ("workflow_spec", "workflow-spec.yaml"),
+                ("workflow_view", "workflow-view.md"),
+                ("workflow_lowlevel", "workflow-lowlevel.md"),
+            ):
+                destination = candidate_root / ".workflowprogram" / "design" / target_name
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                destination.write_text(design_docs[source_name].read_text(encoding="utf-8"), encoding="utf-8", newline="\n")
+            generate_target_runtime_assets(repo_root, run_root / "workflow-spec.yaml", candidate_root / ".workflowprogram" / "runtime")
+            generated_files = create_target_outputs(run_root, target_root)
+            write_managed_outputs(run_root, target_root, conflict=False)
+            write_team_evidence(run_root, team_contract, overflow=True, join_satisfied=True)
+            if "requirement" in stage_history:
+                write_workflow_spec_draft(run_root, args.entry_skill, args.request)
+            if "lessons" in stage_history:
+                write_lessons_delta(run_root, intent, "implementation", args.request)
+            write_progress_outputs(run_root, stage_history, "FAIL", "TEAM_ORCHESTRATION_FAILURE", current_stage=stage_history[-1], next_action="reduce team fan-out and rerun")
+            write_runner_evidence(run_root, target_root, intent, args.entry_skill, stage_history, "FAIL", "TEAM_ORCHESTRATION_FAILURE")
+            payload = {
+                "result": "FAIL",
+                "failure_code": "TEAM_ORCHESTRATION_FAILURE",
+                "message": "Mock host exceeded agent team max_fan_out.",
+                "is_error": True,
+                "stage_history": stage_history,
+                "stage_status": "failed",
+                "current_stage": stage_history[-1],
+                "next_action": "reduce team fan-out and rerun",
+                "generated_files": generated_files,
+            }
+        elif args.fixture in {"agent-team-validate", "agent-team-audit"}:
+            team_contract = agent_team_contract_fixture(max_fan_out=2)
+            team_entry_skill = "workflowprogram-validate" if args.fixture == "agent-team-validate" else "workflowprogram-audit"
+            intent = infer_intent(team_entry_skill)
+            stage_history = stage_history_for_intent(intent)
+            copy_runtime_spec(
+                repo_root,
+                run_root,
+                "valid-minimal.yaml",
+                entry_skill=team_entry_skill,
+                deliverables=["validation-report.md"],
+                target_root_allow=["validation-report.md"],
+                agent_team_contract=team_contract,
+                runtime_capabilities=["state_transitions", "run_state_validation", "team_orchestration"],
+            )
+            generate_design_docs(repo_root, run_root)
+            generated_files = create_target_outputs(run_root, target_root, include_claude_assets=False)
+            write_team_evidence(run_root, team_contract, overflow=False, join_satisfied=True)
+            write_validation_report(
+                target_root,
+                "Workflow Team Validation",
+                [
+                    "- Result: `PASS`",
+                    f"- Entry skill: `{team_entry_skill}`",
+                    "- Team orchestration evidence was captured.",
+                ],
+            )
+            if "requirement" in stage_history:
+                write_workflow_spec_draft(run_root, team_entry_skill, args.request)
+            if "lessons" in stage_history:
+                write_lessons_delta(run_root, intent, "none", args.request)
+            write_progress_outputs(run_root, stage_history, "PASS", "", current_stage=stage_history[-1], next_action="complete")
+            write_runner_evidence(run_root, target_root, intent, team_entry_skill, stage_history, "PASS", "")
+            payload = {
+                "result": "PASS",
+                "failure_code": "",
+                "message": "Mock host validated team orchestration successfully.",
+                "is_error": False,
+                "stage_history": stage_history,
+                "stage_status": "done",
+                "current_stage": stage_history[-1],
+                "next_action": "complete",
                 "generated_files": generated_files,
             }
         elif args.fixture == "existing-workflow":

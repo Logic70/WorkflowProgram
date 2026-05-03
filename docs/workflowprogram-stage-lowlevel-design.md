@@ -363,6 +363,42 @@ ref: runtime_contract.<field>
 6. 当声明 `agent_team_contract.enabled=true` 时，`runtime_capabilities` 必须包含 `team_orchestration`。
 7. 目标工作流 runtime 通过 wrapper 调共享控制面脚本，不复制一套独立 runner。
 
+#### 2.5.5A `workflow_graph`（目标工作流业务图契约）
+
+`workflow-spec.yaml.workflow_graph` 是可选 top-level section，用于描述生成后的目标工作流自己的业务节点、入口、转移、输出与 gate。它与 WorkflowProgram 自身的 `stages` / `intent_flows` 分层：
+
+- `stages` / `intent_flows`：WorkflowProgram 开发、审计、迭代、验证控制面，仍按 `S0..S6` 归属证据。
+- `workflow_graph`：目标工作流的业务执行图，不强制套用 `S1..S6`，可使用 `collect_input`、`reverse_binary`、`triage_findings` 等请求特定节点。
+- `workflow-spec.yaml`：唯一机器语义真源。
+- `workflow-spec.md`：需求澄清后的用户回读材料。
+- `workflow-view.md` / `workflow-lowlevel.md`：从 YAML 派生的只读概览与维护说明，不得反向覆盖 graph 语义。
+
+必须字段：
+
+- `schema_version`
+- `templates_used`
+- `entrypoints`
+- `nodes`
+- `transitions`
+
+节点必须声明：
+
+- `id`
+- `role`
+- `template`
+- `input_refs`
+- `output_refs`
+- `gate`
+- `owner`
+
+固定约束：
+
+1. `entrypoints[*].name` 必须能解析到 `registry.commands` 或 `registry.skills`。
+2. `transitions[*].from/to` 必须引用已声明节点或终止状态。
+3. 所有节点必须能从至少一个 entrypoint 到达。
+4. 目标资产类 `output_refs` 必须能回到 `registry` 或 `test_contract.artifacts`，避免生成未声明文件。
+5. 修改目标工作流图时，只能先改 `workflow-spec.yaml.workflow_graph`，再重新生成 `workflow-view.md` 与 `workflow-lowlevel.md`。
+
 #### 2.5.6 `capability_discovery`（能力发现与推荐契约）
 
 `workflow-spec.yaml.capability_discovery` 是可选 top-level section，用于在 `host_capabilities` 最终定稿前，生成候选 `skill / MCP / CLI` 能力和结构化人工指引。
@@ -422,7 +458,7 @@ ref: runtime_contract.<field>
 2. 若存在缺口，同时必须写 `RUN_ROOT/outputs/stages/host-bootstrap-plan.json`。
 3. `apply-host-bootstrap.py` 只允许自动执行 `project_local + approval_required=false` 的 bootstrap。
 4. 若声明 `bootstrap.assets`，`apply-host-bootstrap.py` 必须按声明式格式真实生成配置 / wrapper / marker 文件，并把 materialized asset 与 re-check 结果写入 apply 证据和 target bootstrap manifest。
-5. `host_global` 默认只产生 plan；仅当 `approval_required=true` 且声明了受支持的 `bootstrap.adapter` 时，才允许在显式审批后执行。
+5. `host_global` 与 `manual_only` 只产生 plan 和待处理指引，WorkflowProgram 不自动执行宿主全局变更。
 6. `manual_only` 永不自动执行，只产生 plan。
 7. 只要存在 `required && status != ready`，最终 verdict 必须为 `FAIL`，且 `failure_kind=environment`，但 runner 仍需完整落证。
 8. `generate-environment-remediation.py` 必须把当前 run 的 host readiness 与 `TARGET_ROOT/.workflowprogram/runs/*` 中的历史环境失败聚合为 `environment-remediation-report.json` 与 `environment-remediation-guide.md`。
@@ -825,6 +861,7 @@ WorkflowProgram 自身必须按原子能力组织，每个 Stage 必须可拆分
 14. 若声明 `capability_discovery`，则 `generated_runtime_contract.runtime_capabilities` 必须包含 `capability_discovery`。
 15. 若声明 `host_capabilities`，则 `generated_runtime_contract.runtime_capabilities` 必须包含 `host_capability_probe`。
 16. 若声明 `agent_team_contract.enabled=true`，则 `generated_runtime_contract.runtime_capabilities` 必须包含 `team_orchestration`。
+17. 若声明 `workflow_graph`，validator 必须校验 graph entrypoints、nodes、transitions、templates_used、可达性与目标资产声明。
 
 ### 实现方案
 
@@ -860,6 +897,8 @@ WorkflowProgram 自身必须按原子能力组织，每个 Stage 必须可拆分
 - `managed-change-plan.json`
 - `managed-change-result.json`
 - `managed-change-summary.md`
+- `managed-rollback-manifest.json`
+- `managed-recover-instructions.md`
 - 应用后的 `TARGET_ROOT/.claude/*`（无冲突时）
 - 应用后的 `TARGET_ROOT/.workflowprogram/design/*`（无冲突时）
 - 应用后的 `TARGET_ROOT/.workflowprogram/runtime/*`（无冲突时）
@@ -870,6 +909,8 @@ WorkflowProgram 自身必须按原子能力组织，每个 Stage 必须可拆分
 - unmanaged/drifted 文件不被覆盖
 - `managed-files.json` 与 apply 结果一致
 - 冲突文件必须落盘到冲突目录
+- 更新文件前必须保存 before snapshot，并在 `managed-rollback-manifest.json` 中记录安全回退条件
+- 面向用户共享的 managed 报告必须包含 `schema_version`、`error_code`、`failure_kind`、`remediation` 并做 secret-like 脱敏
 
 ### 执行过程（封装级）
 
@@ -897,11 +938,12 @@ WorkflowProgram 自身必须按原子能力组织，每个 Stage 必须可拆分
 
 1. `RUN_ROOT/outputs/candidate/.claude/` 与 `RUN_ROOT/outputs/candidate/.workflowprogram/design/` 必须存在。
 2. `managed-change-plan.json` 与 `managed-change-result.json` 必须存在。
-3. 若存在冲突，`RUN_ROOT/outputs/conflicts/` 必须存在且包含冲突文件副本。
-4. `TARGET_ROOT/.workflowprogram/managed-files.json` 必须更新 `updated_at`。
-5. `user-progress.md` 必须包含“已应用/冲突”摘要。
-6. `RUN_ROOT/state.json` 必须存在且通过 `validate-run-state.py`。
-7. `RUN_ROOT/outputs/stages/runner-summary.json` 必须存在。
+3. `managed-rollback-manifest.json` 与 `managed-recover-instructions.md` 必须存在。
+4. 若存在冲突，`RUN_ROOT/outputs/conflicts/` 必须存在且包含冲突文件副本。
+5. `TARGET_ROOT/.workflowprogram/managed-files.json` 必须更新 `updated_at`。
+6. `user-progress.md` 必须包含“已应用/冲突”摘要。
+7. `RUN_ROOT/state.json` 必须存在且通过 `validate-run-state.py`。
+8. `RUN_ROOT/outputs/stages/runner-summary.json` 必须存在。
 8. `TARGET_ROOT/.workflowprogram/runtime/runtime-manifest.json` 必须存在，并通过 `${CLAUDE_PLUGIN_ROOT}/scripts/validate-generated-runtime.py` 校验。
 9. 若声明 `host_capabilities`，则 `RUN_ROOT/outputs/stages/host-capability-report.json` 必须存在。
 10. 若声明 `capability_discovery`，则 `RUN_ROOT/outputs/stages/host-capability-candidates.json` 与 `RUN_ROOT/outputs/stages/host-bootstrap-instructions.md` 必须存在。

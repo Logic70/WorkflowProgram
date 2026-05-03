@@ -35,4 +35,12 @@
 - `S1` 仅属于 `develop` 主链。
 - `S3` 必须经过审批 gate，且必须区分 `approved` 与 `auto-approved`。
 - 阶段模型固定为显式 `stage_slot: S1..S6`，不再允许按顺序隐式推导。
+- `stage_slot: S1..S6` 只约束 WorkflowProgram 自身控制面；生成后的目标工作流可通过 `workflow_graph` 声明自己的业务节点图。
 - 产品主入口的确定性脚本链为 `workflow-entry.py -> managed-assets.py -> workflow-runner.py -> validate-run-state.py`。
+- 目标工作流 runtime 的交付模式固定为 `generated_runtime_contract.mode = shared-control-plane-wrapper`。
+- `workflow-spec.yaml` 是唯一机器语义真源；`workflow-spec.md` 是用户回读，`workflow-view.md` 与 `workflow-lowlevel.md` 是派生报告。
+- managed apply 必须保留 `managed-rollback-manifest.json` 与 `managed-recover-instructions.md`，并在共享报告中包含 schema/remediation 字段。
+- 宿主专业能力必须通过 `host_capabilities` 声明，readiness / bootstrap 证据只写入 `RUN_ROOT`。
+- `project_local` bootstrap 只允许写入 `TARGET_ROOT/.workflowprogram/bootstrap/**`，且应优先通过声明式 `bootstrap.assets` 生成可复用配置 / wrapper / marker 资产，并同步落 target bootstrap manifest。
+- 若工作流启用 `capability_discovery`，则必须在 `RUN_ROOT` 生成 `host-capability-candidates.json` 与 `host-bootstrap-instructions.md`，用于在 `host_capabilities` 最终定稿前给出候选能力和精确人工指引。
+- 显式 team orchestration 必须通过 `agent_team_contract` 声明；普通 subagent 不自动等于 team flow。

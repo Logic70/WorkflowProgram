@@ -44,6 +44,13 @@
 
 这条边界，是 `WorkflowProgram` 当前实现最关键的设计之一。
 
+如果 workflow 还声明了外部能力或显式 team，S5 不只看基础 verdict，还会额外消费：
+
+- 能力发现报告与人工指引
+- 宿主能力探测结果
+- 环境修复报告与修复指南
+- Team fan-out / join 证据
+
 ## 6.4 最终看什么文件
 
 这层最重要的输出是：
@@ -58,6 +65,13 @@
 - `RUN_ROOT/events.jsonl`
 
 这两类文件不要混着理解。
+
+如果启用了扩展能力，常见的附加证据还包括：
+
+- `RUN_ROOT/outputs/stages/host-capability-candidates.json`
+- `RUN_ROOT/outputs/stages/host-capability-report.json`
+- `RUN_ROOT/outputs/stages/environment-remediation-report.json`
+- `RUN_ROOT/outputs/stages/team-plan.json`
 
 ## 6.5 提炼模板
 

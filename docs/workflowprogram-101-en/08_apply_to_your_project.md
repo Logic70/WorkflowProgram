@@ -30,6 +30,7 @@ You should answer these questions before implementation:
 - what the machine-readable truth source is
 - whether a stage model is needed
 - which steps must move into deterministic scripts
+- whether the target project also needs its own runtime wrapper
 
 ### Validation
 
@@ -37,6 +38,13 @@ You should answer these questions before implementation:
 - what counts as `FAIL`
 - which failures are design issues, implementation issues, or environment issues
 - who produces the final verdict
+- if external capabilities are required, who discovers them, probes them, and generates remediation guidance
+
+### Capability Extensions
+
+- whether the workflow depends on external skills, MCP servers, CLIs, or host-specialized capabilities
+- if so, which ones may bootstrap automatically and which ones require explicit approval
+- whether you truly need an explicit agent team rather than ordinary subagents
 
 ### Feedback Loop
 

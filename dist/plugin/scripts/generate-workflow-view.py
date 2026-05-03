@@ -111,6 +111,52 @@ def render_intent_flows(spec: Dict[str, Any]) -> List[str]:
     return lines
 
 
+def render_workflow_graph(spec: Dict[str, Any]) -> List[str]:
+    """渲染目标工作流自身的业务图。
+
+    这里与 WorkflowProgram 自身 S0-S6 控制面分开展示，避免误以为生成的目标
+    工作流也必须套用固定阶段模板。
+    """
+
+    graph = spec.get("workflow_graph", {})
+    lines: List[str] = ["## Target Workflow Graph", ""]
+    if not isinstance(graph, dict) or not graph:
+        return lines + ["- None", ""]
+    entrypoints = graph.get("entrypoints", [])
+    nodes = graph.get("nodes", [])
+    transitions = graph.get("transitions", [])
+    lines.extend(
+        [
+            f"- schema_version: `{format_value(graph.get('schema_version'))}`",
+            f"- templates_used: `{format_value(graph.get('templates_used', []))}`",
+            f"- entrypoints: `{len(entrypoints) if isinstance(entrypoints, list) else 0}`",
+            f"- nodes: `{len(nodes) if isinstance(nodes, list) else 0}`",
+            f"- transitions: `{len(transitions) if isinstance(transitions, list) else 0}`",
+            "",
+        ]
+    )
+    if isinstance(entrypoints, list) and entrypoints:
+        lines.append("### Graph Entrypoints")
+        lines.append("")
+        for item in entrypoints:
+            if isinstance(item, dict):
+                lines.append(f"- `{format_value(item.get('name'))}` -> `{format_value(item.get('node'))}`")
+        lines.append("")
+    if isinstance(nodes, list) and nodes:
+        lines.append("### Graph Nodes")
+        lines.append("")
+        for item in nodes:
+            if not isinstance(item, dict):
+                continue
+            lines.append(
+                f"- `{format_value(item.get('id'))}` role=`{format_value(item.get('role'))}` "
+                f"template=`{format_value(item.get('template'))}` gate=`{format_value(item.get('gate'))}` "
+                f"outputs=`{format_value(item.get('output_refs', []))}`"
+            )
+        lines.append("")
+    return lines
+
+
 def render_stages(stages: List[Dict[str, Any]]) -> List[str]:
     """渲染逐阶段的细节，便于人工检查和审阅。"""
     lines: List[str] = ["## Stage Details", ""]
@@ -172,6 +218,9 @@ def render_refs_and_constraints(spec: Dict[str, Any]) -> List[str]:
     registry = spec.get("registry", {})
     commands = registry.get("commands", []) if isinstance(registry, dict) else []
     reg_skills = registry.get("skills", []) if isinstance(registry, dict) else []
+    agents = registry.get("agents", []) if isinstance(registry, dict) else []
+    hooks = registry.get("hooks", []) if isinstance(registry, dict) else []
+    runtime_assets = registry.get("runtime_assets", []) if isinstance(registry, dict) else []
     lines.extend(
         [
             "",
@@ -179,6 +228,9 @@ def render_refs_and_constraints(spec: Dict[str, Any]) -> List[str]:
             "",
             f"- commands: `{len(commands) if isinstance(commands, list) else 0}`",
             f"- skills: `{len(reg_skills) if isinstance(reg_skills, list) else 0}`",
+            f"- agents: `{len(agents) if isinstance(agents, list) else 0}`",
+            f"- hooks: `{len(hooks) if isinstance(hooks, list) else 0}`",
+            f"- runtime_assets: `{len(runtime_assets) if isinstance(runtime_assets, list) else 0}`",
             "",
             "## Constraints",
             "",
@@ -223,6 +275,50 @@ def render_contracts(spec: Dict[str, Any]) -> List[str]:
     ]
 
 
+def render_host_capabilities(spec: Dict[str, Any]) -> List[str]:
+    host_capabilities = spec.get("host_capabilities", [])
+    lines = ["## Host Capabilities", ""]
+    if not isinstance(host_capabilities, list) or not host_capabilities:
+        return lines + ["- None", ""]
+    for item in host_capabilities:
+        if not isinstance(item, dict):
+            continue
+        bootstrap = item.get("bootstrap", {}) if isinstance(item.get("bootstrap"), dict) else {}
+        outputs = bootstrap.get("project_local_outputs", []) if isinstance(bootstrap.get("project_local_outputs"), list) else []
+        assets = bootstrap.get("assets", []) if isinstance(bootstrap.get("assets"), list) else []
+        lines.append(
+            f"- `{item.get('id', 'unknown')}` kind=`{item.get('kind', '-')}` required=`{item.get('required', False)}` "
+            f"approval_required=`{item.get('approval_required', False)}` scope=`{bootstrap.get('scope', '-')}` "
+            f"project_local_outputs=`{format_value(outputs)}` assets=`{len(assets)}`"
+        )
+    lines.append("")
+    return lines
+
+
+def render_agent_team_contract(spec: Dict[str, Any]) -> List[str]:
+    contract = spec.get("agent_team_contract", {})
+    lines = ["## Agent Team Contract", ""]
+    if not isinstance(contract, dict) or not contract:
+        return lines + ["- None", ""]
+    lines.append(
+        f"- enabled=`{format_value(contract.get('enabled'))}` "
+        f"max_fan_out=`{format_value(contract.get('max_fan_out'))}` "
+        f"join_policy=`{format_value(contract.get('join_policy'))}`"
+    )
+    roles = contract.get("roles", [])
+    if isinstance(roles, list) and roles:
+        lines.append("- roles:")
+        for role in roles:
+            if not isinstance(role, dict):
+                continue
+            lines.append(
+                f"  - `{role.get('id', 'unknown')}` stages=`{format_value(role.get('ownership_stage_slots', []))}` "
+                f"outputs=`{format_value(role.get('output_patterns', []))}`"
+            )
+    lines.append("")
+    return lines
+
+
 def render_view(spec: Dict[str, Any]) -> str:
     """组装 workflow spec 的完整 Markdown 视图。"""
     lines: List[str] = [
@@ -234,8 +330,11 @@ def render_view(spec: Dict[str, Any]) -> str:
     lines.extend(render_meta(spec.get("meta", {})))
     lines.extend(render_stage_flow(spec.get("stages", [])))
     lines.extend(render_intent_flows(spec))
+    lines.extend(render_workflow_graph(spec))
     lines.extend(render_stages(spec.get("stages", [])))
     lines.extend(render_refs_and_constraints(spec))
+    lines.extend(render_host_capabilities(spec))
+    lines.extend(render_agent_team_contract(spec))
     lines.extend(render_contracts(spec))
     return "\n".join(lines).rstrip() + "\n"
 

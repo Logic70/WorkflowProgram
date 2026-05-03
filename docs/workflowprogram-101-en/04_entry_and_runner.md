@@ -48,11 +48,21 @@ The entry chain invokes these steps in order:
 
 1. `validate-workflow-spec.py`
 2. `generate-workflow-view.py`
-3. `managed-assets.py plan/apply-staged`
-4. `workflow-runner.py run`
-5. `validate-run-state.py`
+3. `generate-workflow-lowlevel.py`
+4. `generate-target-runtime.py`
+5. `managed-assets.py plan/apply-staged`
+6. `discover-host-capabilities.py` (when declared)
+7. `probe-host-capabilities.py` / `apply-host-bootstrap.py`
+8. `generate-environment-remediation.py`
+9. `workflow-runner.py run`
+10. `validate-run-state.py`
 
 This means the main path no longer depends on "the model remembering what to do next".
+
+Two boundaries matter here:
+
+- the entry layer prepares not only `.claude/` candidates, but also `workflow-view.md`, `workflow-lowlevel.md`, and the target-side runtime wrapper bundle
+- if the workflow depends on external capabilities, the entry layer completes discovery, probing, bootstrap, and remediation guidance before entering the runner
 
 ## Why This Matters
 

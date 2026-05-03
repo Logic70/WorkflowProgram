@@ -15,6 +15,8 @@ from typing import Any, Dict, List
 NO_NEW_CONSTRAINT_RE = re.compile(r"无新增约束|no new constraint", re.IGNORECASE)
 CONSTRAINT_HEADING_RE = re.compile(r"^##\s+(Constraint Candidates|约束候选)\s*$", re.MULTILINE)
 HISTORY_HEADING = "历史关键节点结果"
+HOST_CAPABILITY_RE = re.compile(r"host[_ -]?capabilit|宿主能力", re.IGNORECASE)
+REMEDIATION_RE = re.compile(r"remediat|bootstrap|manual step|recheck|repair|修复|引导", re.IGNORECASE)
 
 
 def load_text(path: Path) -> str:
@@ -87,6 +89,22 @@ def validate_lessons(run_root: Path, run_id: str, failure_kind: str) -> Dict[str
         candidates = find_constraint_candidates(delta_text)
         if not candidates:
             errors.append("s6-lessons-delta.md must contain at least one constraint candidate or an explicit no-new-constraint statement")
+        host_report_present = any(
+            (run_root / rel_path).exists()
+            for rel_path in (
+                "outputs/stages/host-capability-report.json",
+                "outputs/stages/host-capability-probe.json",
+            )
+        )
+        if failure_kind == "environment" and host_report_present:
+            remediation_report = load_json(run_root / "outputs" / "stages" / "environment-remediation-report.json")
+            if not remediation_report:
+                errors.append("environment-remediation-report.json must exist when environment failures include host capability evidence")
+            if not any(HOST_CAPABILITY_RE.search(item) for item in candidates):
+                errors.append("s6-lessons-delta.md must include at least one host capability improvement candidate when environment failures include host capability evidence")
+            repeated_failures = remediation_report.get("repeated_failure_count", 0) if isinstance(remediation_report, dict) else 0
+            if int(repeated_failures or 0) > 0 and not any(REMEDIATION_RE.search(item) for item in candidates):
+                errors.append("s6-lessons-delta.md must include at least one remediation/bootstrap candidate when repeated environment failures are present")
     # progress summary 是里程碑流的用户侧镜像。
     # 强制要求历史标题，能让 S6 输出保持可读、可审阅。
     if user_progress_text:

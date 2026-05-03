@@ -42,6 +42,8 @@
 | 提示词能跑，但语义没有统一真源 | 口径散在技能说明、聊天记录和人工约定里 | 先收口到机器可读的设计真源，再派生说明文档 |
 | 编排顺序靠模型“记住” | 这轮先做设计，下一轮直接跳去写文件 | 把关键顺序沉到确定性程序里 |
 | 目标项目被直接覆盖 | 改坏 `.claude/` 后很难恢复 | 先写隔离候选区，再做受控应用 |
+| 工作流依赖外部能力，但运行前没人确认 | 缺 skill、MCP、CLI 时直接在中途失败 | 先做能力发现，再做宿主探测和环境修复指引 |
+| 并行协作只停留在口头约定 | 多个 agent 同时工作但没有结构化证据 | 用显式 team 契约声明 fan-out、join 和证据要求 |
 | 失败后不知道错在设计还是执行 | 最终只有“失败了”，没有分层证据 | 把设计、执行、判定、补证据拆层 |
 | 运行留下的证据不足 | 回头看不到状态、事件和运行报告 | 为每次运行固定留下结构化证据 |
 | 多轮迭代没有记忆 | 每次都重复踩同一个坑 | 把单次经验回流到长期规则 |
@@ -56,6 +58,12 @@
 4. [workflow-entry.py](/mnt/d/Code/WorkflowProgram-CN/.claude/scripts/workflow-entry.py)
 5. [workflow-runner.py](/mnt/d/Code/WorkflowProgram-CN/.claude/scripts/workflow-runner.py)
 6. [workflow-s5-judge.py](/mnt/d/Code/WorkflowProgram-CN/.claude/scripts/workflow-s5-judge.py)
+
+如果你的 workflow 还依赖外部工具、MCP、宿主技能或显式 team，还应额外关注：
+
+7. [discover-host-capabilities.py](/mnt/d/Code/WorkflowProgram-CN/.claude/scripts/discover-host-capabilities.py)
+8. [probe-host-capabilities.py](/mnt/d/Code/WorkflowProgram-CN/.claude/scripts/probe-host-capabilities.py)
+9. [generate-environment-remediation.py](/mnt/d/Code/WorkflowProgram-CN/.claude/scripts/generate-environment-remediation.py)
 
 ## 这套教程的目标
 

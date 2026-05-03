@@ -220,6 +220,11 @@
               <p>Turn the run into lessons, constraint candidates, and the next improvement direction.</p>
             </article>
           </div>
+
+          <div class="note-strip">
+            <strong>One important detail:</strong>
+            <span>`S0` is the universal route layer. The minimum required path through `S1-S6` is declared by `intent_flows`: the default template uses `develop=S1-S6`, `audit=S5-S6`, `validate=S5 (+ optional S6)`, and `iterate=S6 (+ optional S5)`.</span>
+          </div>
         </section>
 
         <section class="panel" id="orchestration">
@@ -246,6 +251,11 @@
           <div class="note-strip">
             <strong>Current mapping</strong>
             <span>`workflow-entry.py` sequences the chain. `workflow-runner.py` governs execution. `workflowprogram-validate` and `workflow-s5-judge.py` produce the verdict.</span>
+          </div>
+
+          <div class="note-strip">
+            <strong>What the entry path actually covers now</strong>
+            <span>It renders spec/view/lowlevel/runtime assets, applies managed writes, optionally runs capability discovery and host bootstrap, generates remediation guidance, then enters the runner.</span>
           </div>
         </section>
 
@@ -308,6 +318,11 @@
               <p>Did a real run leave enough evidence to support the verdict?</p>
             </article>
           </div>
+
+          <div class="note-strip">
+            <strong>Optional evidence layers also exist</strong>
+            <span>If the workflow declares external capabilities or an explicit team contract, validation also consumes capability reports, remediation guidance, and team fan-out / join evidence.</span>
+          </div>
         </section>
 
         <section class="panel" id="lessons">
@@ -352,6 +367,14 @@
               <p>Deterministic execution, validation, and control-plane tools.</p>
             </article>
             <article class="file-card">
+              <h3>`TARGET_ROOT/.workflowprogram/design/`</h3>
+              <p>The persisted design package: spec, view, and lowlevel guidance.</p>
+            </article>
+            <article class="file-card">
+              <h3>`TARGET_ROOT/.workflowprogram/runtime/`</h3>
+              <p>The target-side deterministic runtime wrapper bundle.</p>
+            </article>
+            <article class="file-card">
               <h3>`tools/`</h3>
               <p>Build and smoke-test tooling, including runtime harnesses.</p>
             </article>
@@ -379,6 +402,11 @@ claude --plugin-dir /path/to/WorkflowProgram-CN/dist/plugin</code></pre>
           <pre><code>"Design a code review workflow for this project"
 "Audit the workflow structure of this project"
 "Validate the workflow assets in this project"</code></pre>
+
+          <div class="note-strip">
+            <strong>If your workflow depends on external tools</strong>
+            <span>The first run will generate capability recommendations, host probe results, and remediation guidance before declaring a final verdict.</span>
+          </div>
         </section>
 
         <section class="panel" id="chapters">

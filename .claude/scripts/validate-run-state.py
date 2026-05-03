@@ -42,7 +42,19 @@ VALID_KIND = {
     "managed_manifest",
     "managed_plan",
     "managed_result",
+    "managed_rollback",
+    "managed_recovery",
     "build_manifest",
+    "host_capability_report",
+    "host_bootstrap_plan",
+    "host_bootstrap_apply",
+    "host_bootstrap_execution",
+    "host_bootstrap_manifest",
+    "host_capability_candidates",
+    "host_bootstrap_instructions",
+    "team_plan",
+    "team_result",
+    "team_join",
 }
 
 
@@ -160,6 +172,10 @@ def main() -> int:
 
     diagnostics = DiagnosticCollector()
     errors = diagnostics.errors
+    if payload.get("schema_version") != 1:
+        errors.append("schema_version must be 1")
+    if not str(payload.get("schema_name", "")).strip():
+        errors.append("schema_name is required")
     values = payload.get("values")
     artifacts = payload.get("artifacts")
     if not isinstance(values, dict):
