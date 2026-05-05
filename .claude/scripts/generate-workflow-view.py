@@ -131,6 +131,7 @@ def render_workflow_graph(spec: Dict[str, Any]) -> List[str]:
             f"- entrypoints: `{len(entrypoints) if isinstance(entrypoints, list) else 0}`",
             f"- nodes: `{len(nodes) if isinstance(nodes, list) else 0}`",
             f"- transitions: `{len(transitions) if isinstance(transitions, list) else 0}`",
+            f"- loop_enabled_nodes: `{len([item for item in nodes if isinstance(item, dict) and isinstance(item.get('loop_policy'), dict) and item.get('loop_policy', {}).get('enabled') is True]) if isinstance(nodes, list) else 0}`",
             "",
         ]
     )
@@ -150,6 +151,7 @@ def render_workflow_graph(spec: Dict[str, Any]) -> List[str]:
             lines.append(
                 f"- `{format_value(item.get('id'))}` role=`{format_value(item.get('role'))}` "
                 f"template=`{format_value(item.get('template'))}` gate=`{format_value(item.get('gate'))}` "
+                f"loop=`{format_value(item.get('loop_policy', {}).get('mode')) if isinstance(item.get('loop_policy'), dict) and item.get('loop_policy', {}).get('enabled') is True else 'disabled'}` "
                 f"outputs=`{format_value(item.get('output_refs', []))}`"
             )
         lines.append("")

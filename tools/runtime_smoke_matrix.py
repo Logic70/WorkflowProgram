@@ -152,6 +152,21 @@ def base_cases(provider_command: str) -> List[Dict[str, Any]]:
             "expected_result": "PASS",
         },
         {
+            "name": "adapter-node-loop-develop-pass",
+            "fixture": "node-loop-develop-pass",
+            "provider": "command_adapter",
+            "provider_command": provider_command,
+            "expected_result": "PASS",
+        },
+        {
+            "name": "adapter-node-loop-max-iterations-fail",
+            "fixture": "node-loop-max-iterations-fail",
+            "provider": "command_adapter",
+            "provider_command": provider_command,
+            "expected_result": "FAIL",
+            "expected_category": "S5_FLOW_NODE_LOOP_ITERATION_LIMIT_OBSERVED",
+        },
+        {
             "name": "fixture-develop-pass",
             "fixture": "empty-project",
             "provider": "fixture_host",

@@ -53,6 +53,7 @@ def copy_runtime_spec(
     host_capabilities: List[Dict[str, Any]] | None = None,
     agent_team_contract: Dict[str, Any] | None = None,
     capability_discovery: Dict[str, Any] | None = None,
+    node_loop_policy: Dict[str, Any] | None = None,
     runtime_capabilities: List[str] | None = None,
 ) -> None:
     """把 fixture workflow spec 复制到 RUN_ROOT，并按需打补丁。
@@ -107,6 +108,16 @@ def copy_runtime_spec(
             caps = generated_runtime_contract.get("runtime_capabilities", [])
             if isinstance(caps, list) and "capability_discovery" not in caps:
                 caps.append("capability_discovery")
+                generated_runtime_contract["runtime_capabilities"] = caps
+    if node_loop_policy is not None:
+        graph = payload.get("workflow_graph", {})
+        nodes = graph.get("nodes", []) if isinstance(graph, dict) else []
+        if isinstance(nodes, list) and nodes:
+            nodes[-1]["loop_policy"] = node_loop_policy
+        if isinstance(generated_runtime_contract, dict):
+            caps = generated_runtime_contract.get("runtime_capabilities", [])
+            if isinstance(caps, list) and "node_loop_execution" not in caps:
+                caps.append("node_loop_execution")
                 generated_runtime_contract["runtime_capabilities"] = caps
     target_path.write_text(
         yaml.safe_dump(payload, allow_unicode=True, sort_keys=False),
@@ -245,6 +256,43 @@ def agent_team_contract_fixture(*, max_fan_out: int = 2) -> Dict[str, Any]:
                 "role_ids": ["reviewer", "security_reviewer"],
                 "join_role": "lead_reviewer",
             }
+        ],
+    }
+
+
+def node_loop_policy_fixture(*, max_iterations: int = 3) -> Dict[str, Any]:
+    return {
+        "enabled": True,
+        "mode": "ralph",
+        "goal_source": "model_subgoal",
+        "parent_goal_ref": "user_goal.workflow_quality",
+        "max_iterations": max_iterations,
+        "fresh_context_each_iteration": True,
+        "prompt_package": ".workflowprogram/loops/implement/prompt-package.md",
+        "tdd_policy": {
+            "enabled": True,
+            "test_first_required": True,
+            "red_green_refactor": True,
+        },
+        "feedback_commands": [
+            {
+                "id": "validate_generated_workflow",
+                "kind": "test",
+                "argv": ["python3", ".workflowprogram/runtime/validate-run-state.py", "--json"],
+                "timeout_seconds": 120,
+                "failure_effect": "feedback",
+            }
+        ],
+        "stop_conditions": {
+            "success": ["verifier_passed"],
+            "max_iterations": "fail",
+            "no_progress_iterations": 2,
+            "hard_fail_on": ["unsafe_write"],
+        },
+        "evidence_outputs": [
+            "outputs/stages/loops/implement/loop-plan.json",
+            "outputs/stages/loops/implement/iteration-summary.jsonl",
+            "outputs/stages/loops/implement/final-verdict.json",
         ],
     }
 
@@ -405,6 +453,63 @@ def write_team_evidence(
         append_jsonl(run_root / "events.jsonl", {"ts": iso_now(), "type": "TeamRoleStarted", "stage": "S5", "source": "mock-runtime-host", "status": "running", "message": f"Started role {role_id}", "role_id": role_id})
         append_jsonl(run_root / "events.jsonl", {"ts": iso_now(), "type": "TeamRoleCompleted", "stage": "S5", "source": "mock-runtime-host", "status": "ok", "message": f"Completed role {role_id}", "role_id": role_id})
     append_jsonl(run_root / "events.jsonl", {"ts": iso_now(), "type": "TeamJoinCompleted", "stage": "S5", "source": "mock-runtime-host", "status": "ok" if join_satisfied else "error", "message": "Team join completed", "join_policy": contract.get("join_policy"), "satisfied": join_satisfied})
+
+
+def write_loop_evidence(
+    run_root: Path,
+    *,
+    node_id: str = "implement",
+    iterations: int = 2,
+    final_status: str = "PASS",
+    verifier_passed: bool = True,
+    stop_reason: str = "verifier_passed",
+) -> None:
+    loop_root = run_root / "outputs" / "stages" / "loops" / node_id
+    plan = {
+        "generated_at": iso_now(),
+        "node_id": node_id,
+        "mode": "ralph",
+        "goal_source": "model_subgoal",
+        "parent_goal_ref": "user_goal.workflow_quality",
+        "max_iterations": 3,
+        "fresh_context_each_iteration": True,
+        "test_first_observed": True,
+        "prompt_package": f".workflowprogram/loops/{node_id}/prompt-package.md",
+    }
+    write_json(loop_root / "loop-plan.json", plan)
+    iteration_path = loop_root / "iteration-summary.jsonl"
+    for index in range(1, iterations + 1):
+        status = "PASS" if index == iterations and final_status == "PASS" else "FAIL"
+        entry = {
+            "iteration": index,
+            "status": status,
+            "feedback_command_id": "validate_generated_workflow",
+            "agent_result": "updated target workflow outputs" if status == "FAIL" else "no changes needed",
+            "verifier_passed": status == "PASS",
+        }
+        append_jsonl(iteration_path, entry)
+        iteration_dir = loop_root / "iterations" / str(index)
+        write_json(iteration_dir / "feedback-commands.json", {"iteration": index, "commands": [{"id": "validate_generated_workflow", "status": status}]})
+        write_json(iteration_dir / "agent-result.json", {"iteration": index, "status": status})
+        write_json(iteration_dir / "verifier-result.json", {"iteration": index, "status": status, "passed": status == "PASS"})
+    write_json(
+        loop_root / "final-verdict.json",
+        {
+            "generated_at": iso_now(),
+            "node_id": node_id,
+            "status": final_status,
+            "stop_reason": stop_reason,
+            "iterations": iterations,
+            "verifier_passed": verifier_passed,
+        },
+    )
+    append_jsonl(run_root / "events.jsonl", {"ts": iso_now(), "type": "LoopStart", "stage": "S4", "source": "mock-runtime-host", "status": "ok", "node_id": node_id})
+    for index in range(1, iterations + 1):
+        append_jsonl(run_root / "events.jsonl", {"ts": iso_now(), "type": "LoopIterationStart", "stage": "S4", "source": "mock-runtime-host", "status": "running", "node_id": node_id, "iteration": index})
+        append_jsonl(run_root / "events.jsonl", {"ts": iso_now(), "type": "LoopFeedbackCommandCompleted", "stage": "S4", "source": "mock-runtime-host", "status": "ok", "node_id": node_id, "iteration": index})
+        append_jsonl(run_root / "events.jsonl", {"ts": iso_now(), "type": "LoopAgentCompleted", "stage": "S4", "source": "mock-runtime-host", "status": "ok", "node_id": node_id, "iteration": index})
+        append_jsonl(run_root / "events.jsonl", {"ts": iso_now(), "type": "LoopVerifierCompleted", "stage": "S4", "source": "mock-runtime-host", "status": "ok", "node_id": node_id, "iteration": index, "passed": index == iterations and verifier_passed})
+    append_jsonl(run_root / "events.jsonl", {"ts": iso_now(), "type": "LoopStop", "stage": "S4", "source": "mock-runtime-host", "status": final_status.lower(), "node_id": node_id, "stop_reason": stop_reason})
 
 
 def infer_intent(entry_skill: str) -> str:
@@ -1653,6 +1758,92 @@ def main() -> int:
                 "stage_status": "done",
                 "current_stage": stage_history[-1],
                 "next_action": "complete",
+                "generated_files": generated_files,
+            }
+        elif args.fixture == "node-loop-develop-pass":
+            loop_policy = node_loop_policy_fixture(max_iterations=3)
+            copy_runtime_spec(
+                repo_root,
+                run_root,
+                "valid-minimal.yaml",
+                entry_skill=args.entry_skill,
+                node_loop_policy=loop_policy,
+                runtime_capabilities=["state_transitions", "run_state_validation", "node_loop_execution"],
+            )
+            design_docs = generate_design_docs(repo_root, run_root)
+            candidate_root = run_root / "outputs" / "candidate"
+            write_text(candidate_root / ".claude" / "rules" / "constraints.md", "# Constraints\n\n- Loop success requires verifier evidence.\n")
+            write_text(candidate_root / ".claude" / "commands" / "example.md", "## Usage\n\n1. Goal\n2. Iterate until verified\n")
+            for source_name, target_name in (
+                ("workflow_spec", "workflow-spec.yaml"),
+                ("workflow_view", "workflow-view.md"),
+                ("workflow_lowlevel", "workflow-lowlevel.md"),
+            ):
+                destination = candidate_root / ".workflowprogram" / "design" / target_name
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                destination.write_text(design_docs[source_name].read_text(encoding="utf-8"), encoding="utf-8", newline="\n")
+            generate_target_runtime_assets(repo_root, run_root / "workflow-spec.yaml", candidate_root / ".workflowprogram" / "runtime")
+            generated_files = create_target_outputs(run_root, target_root)
+            write_managed_outputs(run_root, target_root, conflict=False)
+            write_loop_evidence(run_root, node_id="implement", iterations=2, final_status="PASS", verifier_passed=True)
+            if "requirement" in stage_history:
+                write_workflow_spec_draft(run_root, args.entry_skill, args.request)
+            if "lessons" in stage_history:
+                write_lessons_delta(run_root, intent, "none", args.request)
+            write_progress_outputs(run_root, stage_history, "PASS", "", current_stage=stage_history[-1], next_action="complete")
+            write_runner_evidence(run_root, target_root, intent, args.entry_skill, stage_history, "PASS", "")
+            payload = {
+                "result": "PASS",
+                "failure_code": "",
+                "message": "Mock host completed deterministic node loop successfully.",
+                "is_error": False,
+                "stage_history": stage_history,
+                "stage_status": "done",
+                "current_stage": stage_history[-1],
+                "next_action": "complete",
+                "generated_files": generated_files,
+            }
+        elif args.fixture == "node-loop-max-iterations-fail":
+            loop_policy = node_loop_policy_fixture(max_iterations=2)
+            copy_runtime_spec(
+                repo_root,
+                run_root,
+                "valid-minimal.yaml",
+                entry_skill=args.entry_skill,
+                node_loop_policy=loop_policy,
+                runtime_capabilities=["state_transitions", "run_state_validation", "node_loop_execution"],
+            )
+            design_docs = generate_design_docs(repo_root, run_root)
+            candidate_root = run_root / "outputs" / "candidate"
+            write_text(candidate_root / ".claude" / "rules" / "constraints.md", "# Constraints\n\n- Stop loop at max_iterations.\n")
+            write_text(candidate_root / ".claude" / "commands" / "example.md", "## Usage\n\n1. Goal\n2. Iterate until verified\n")
+            for source_name, target_name in (
+                ("workflow_spec", "workflow-spec.yaml"),
+                ("workflow_view", "workflow-view.md"),
+                ("workflow_lowlevel", "workflow-lowlevel.md"),
+            ):
+                destination = candidate_root / ".workflowprogram" / "design" / target_name
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                destination.write_text(design_docs[source_name].read_text(encoding="utf-8"), encoding="utf-8", newline="\n")
+            generate_target_runtime_assets(repo_root, run_root / "workflow-spec.yaml", candidate_root / ".workflowprogram" / "runtime")
+            generated_files = create_target_outputs(run_root, target_root)
+            write_managed_outputs(run_root, target_root, conflict=False)
+            write_loop_evidence(run_root, node_id="implement", iterations=3, final_status="FAIL", verifier_passed=False, stop_reason="max_iterations")
+            if "requirement" in stage_history:
+                write_workflow_spec_draft(run_root, args.entry_skill, args.request)
+            if "lessons" in stage_history:
+                write_lessons_delta(run_root, intent, "implementation", args.request)
+            write_progress_outputs(run_root, stage_history, "FAIL", "NODE_LOOP_MAX_ITERATIONS", current_stage=stage_history[-1], next_action="tighten loop feedback or raise max_iterations")
+            write_runner_evidence(run_root, target_root, intent, args.entry_skill, stage_history, "FAIL", "NODE_LOOP_MAX_ITERATIONS")
+            payload = {
+                "result": "FAIL",
+                "failure_code": "NODE_LOOP_MAX_ITERATIONS",
+                "message": "Mock host exceeded node loop max_iterations.",
+                "is_error": True,
+                "stage_history": stage_history,
+                "stage_status": "failed",
+                "current_stage": stage_history[-1],
+                "next_action": "tighten loop feedback or raise max_iterations",
                 "generated_files": generated_files,
             }
         elif args.fixture == "existing-workflow":

@@ -25,6 +25,7 @@
 - 若工作流启用 `capability_discovery`，则在 `host_capabilities` 最终定稿前，必须先生成候选能力推荐与结构化人工指引。
 - 若工作流依赖宿主专业能力或显式 agent team，则必须分别通过 `host_capabilities` 与 `agent_team_contract` 在 `workflow-spec.yaml` 中声明。
 - 生成后的目标工作流若需要自己的业务节点图，必须在 `workflow-spec.yaml.workflow_graph` 中声明；目标工作流不强制套用 WorkflowProgram 自身的 `S1..S6` 模板。
+- 若目标工作流的某个业务节点需要 Ralph-style 持续执行直到验证通过，必须在该 `workflow_graph.nodes[*].loop_policy` 中声明；它是目标节点策略，不替换 WorkflowProgram 自身 `S1..S6` 主链。
 
 ### 2.2 冲突收敛决策
 
@@ -178,6 +179,7 @@ TARGET_ROOT/
   - `capability_discovery` 可按领域画像展开基线能力包；当前至少支持 `reverse_engineering`，并允许通过 `profile_overrides` 显式移除、替换 profile 默认能力。
   - 当声明 `host_capabilities` 时，`generated_runtime_contract.runtime_capabilities` 必须包含 `host_capability_probe`。
   - 当声明 `agent_team_contract.enabled=true` 时，`generated_runtime_contract.runtime_capabilities` 必须包含 `team_orchestration`。
+  - 当任一 `workflow_graph.nodes[*].loop_policy.enabled=true` 时，`generated_runtime_contract.runtime_capabilities` 必须包含 `node_loop_execution`。
   - 领域画像可选地推荐默认 `agent_team_contract`，但推荐值必须保持可编辑，且不得覆盖用户显式选择。
   - `workflow-spec.md` 是用户回读确认材料；真正进入脚本、validator、runner、judge 的语义必须全部落在 `workflow-spec.yaml`。
   - 若存在 `workflow_graph`，S3 readback 必须列出 graph summary、目标资产清单、启用/关闭能力与 managed apply policy。
@@ -218,6 +220,7 @@ TARGET_ROOT/
   - 若声明 `host_capabilities`，S5 必须消费 `host-capability-report.json`，并在 `validate/audit` 场景对当前宿主执行实时 probe。
   - 若声明 `host_capabilities`，`validate/audit/iterate` 还必须产出 `environment-remediation-report.json` 与 `environment-remediation-guide.md`，把未解决的 manual step / bootstrap / re-check 指引显式写给用户。
   - 若声明 `agent_team_contract.enabled=true`，S5 必须消费 `team-plan.json`、`team-results.json`、`team-join-summary.json` 与对应事件证据；确定性 provider 缺结构化 team evidence 时不得判为 clean PASS。
+  - 若声明 `workflow_graph.nodes[*].loop_policy.enabled=true`，S5 必须消费 `outputs/stages/loops/<node_id>/loop-plan.json`、`iteration-summary.jsonl`、`final-verdict.json` 与 loop events；确定性 provider 缺结构化 loop evidence 时必须失败，`claude_cli` 缺证据只能 WARN。
 
 ### S6 闭环阶段（Lessons & Constraints）
 
@@ -265,6 +268,8 @@ TARGET_ROOT/
 - `host_capabilities` 只描述宿主依赖，不改变 `TARGET_ROOT` 交付语义；对应 readiness / bootstrap 证据必须落在 `RUN_ROOT`。唯一允许进入 `TARGET_ROOT` 的宿主 bootstrap 资产，必须严格限制在 `TARGET_ROOT/.workflowprogram/bootstrap/**`。
 - 只要存在 `required && status != ready`，最终 summary 必须 `FAIL`，且 `failure_kind = environment`。
 - `agent_team_contract` 只在显式声明时生效；普通 subagent 并不自动等于 team orchestration。
+- `workflow_graph.nodes[*].loop_policy` 只适合验证驱动的迭代节点，例如逆向分析、迁移修复、报告修订、测试驱动实现；不适合一次性问答、不可自动验证的主观写作、宿主环境安装或人工审批动作。
+- `loop_policy.goal_source` 可以来自用户，也可以来自模型分解的子目标；模型子目标必须通过 `parent_goal_ref` 回溯到用户目标或上游节点输出，TDD 型 loop 必须先有 failing verifier/test 再进入实现。
 - `workflowprogram-validate` 是 `test_contract` 的主消费方，`runtime_smoke.py` 是补充烟测与证据采集工具。
 - `test_contract` 对执行字段只允许引用，不允许复制同名内容。
 - `test_contract.failure.implemented_now` 仅表达“当前实现覆盖度”，不得反向改变 runner 的 `verdict` 或 `failure_kind` 语义。

@@ -165,6 +165,34 @@ workflow_graph:
         - .claude/skills/example/SKILL.md
       gate: user_approval
       owner: example-skill
+      # Ralph-style loop 只用于目标工作流业务节点，不替换 WorkflowProgram 自身 S1-S6。
+      # 适合逆向分析、迁移修复、报告收敛、TDD 实现等 verifier/test 可判定任务。
+      # loop_policy:
+      #   enabled: true
+      #   mode: ralph
+      #   goal_source: model_subgoal # user | model_subgoal
+      #   parent_goal_ref: user_goal.example
+      #   max_iterations: 5
+      #   fresh_context_each_iteration: true
+      #   prompt_package: .workflowprogram/loops/produce_result/prompt-package.md
+      #   tdd_policy:
+      #     enabled: true
+      #     test_first_required: true
+      #     red_green_refactor: true
+      #   feedback_commands:
+      #     - id: validate_result
+      #       kind: test # validator | verifier | test
+      #       argv: [python3, -m, pytest, tests/workflow]
+      #       timeout_seconds: 120
+      #       failure_effect: feedback # feedback | gate | hard_fail
+      #   stop_conditions:
+      #     success: [verifier_passed]
+      #     max_iterations: fail
+      #     no_progress_iterations: 2
+      #   evidence_outputs:
+      #     - outputs/stages/loops/produce_result/loop-plan.json
+      #     - outputs/stages/loops/produce_result/iteration-summary.jsonl
+      #     - outputs/stages/loops/produce_result/final-verdict.json
   transitions:
     - from: collect_input
       to: produce_result
@@ -295,6 +323,7 @@ generated_runtime_contract:
     # - capability_discovery
     # - host_capability_probe
     # - team_orchestration
+    # - node_loop_execution
 
 # 可选能力搜索与推荐契约
 # capability_discovery:

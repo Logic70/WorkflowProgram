@@ -11,6 +11,7 @@ VALID_RUNTIME_CAPABILITIES = {
     "host_capability_probe",
     "capability_discovery",
     "team_orchestration",
+    "node_loop_execution",
 }
 VALID_HOST_CAPABILITY_KINDS = {
     "mcp_server",
@@ -45,6 +46,14 @@ TEAM_EVENT_TYPES = {
     "TeamRoleStarted",
     "TeamRoleCompleted",
     "TeamJoinCompleted",
+}
+LOOP_EVENT_TYPES = {
+    "LoopStart",
+    "LoopIterationStart",
+    "LoopFeedbackCommandCompleted",
+    "LoopAgentCompleted",
+    "LoopVerifierCompleted",
+    "LoopStop",
 }
 
 
@@ -82,6 +91,22 @@ def agent_team_contract_from_spec(spec: Dict[str, Any]) -> Dict[str, Any]:
 
 def agent_team_enabled(contract: Dict[str, Any]) -> bool:
     return bool(contract.get("enabled", False))
+
+
+def node_loop_enabled(spec: Dict[str, Any]) -> bool:
+    graph = spec.get("workflow_graph", {})
+    if not isinstance(graph, dict):
+        return False
+    nodes = graph.get("nodes", [])
+    if not isinstance(nodes, list):
+        return False
+    for raw_node in nodes:
+        if not isinstance(raw_node, dict):
+            continue
+        policy = raw_node.get("loop_policy", {})
+        if isinstance(policy, dict) and policy.get("enabled") is True:
+            return True
+    return False
 
 
 def deterministic_runtime_provider(provider: str) -> bool:

@@ -137,6 +137,18 @@ FIXTURE_PRESETS: Dict[str, Dict[str, str]] = {
         "request": "审计目标工作流的 agent team orchestration 契约",
         "contract_categories": "flow,artifacts,failure",
     },
+    "node-loop-develop-pass": {
+        "workspace_fixture": "empty-project",
+        "entry_skill": "workflowprogram-develop",
+        "request": "触发 deterministic node loop PASS 路径，验证循环直到测试通过",
+        "contract_categories": "flow,artifacts,failure",
+    },
+    "node-loop-max-iterations-fail": {
+        "workspace_fixture": "empty-project",
+        "entry_skill": "workflowprogram-develop",
+        "request": "触发 deterministic node loop max_iterations 失败路径",
+        "contract_categories": "flow,artifacts,failure",
+    },
 }
 
 

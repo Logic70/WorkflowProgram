@@ -251,6 +251,31 @@
       ]
     },
     {
+      "id": "workflow-node-loop-policy",
+      "checks": [
+        {
+          "file": "docs/workflowprogram-stage-highlevel-design.md",
+          "markers": ["workflow_graph.nodes[*].loop_policy", "node_loop_execution", "verifier/test"]
+        },
+        {
+          "file": "docs/workflowprogram-stage-lowlevel-design.md",
+          "markers": ["workflow_graph.nodes[*].loop_policy", "LoopStart", "node_loop_execution"]
+        },
+        {
+          "file": ".claude/scripts/validate-workflow-spec.py",
+          "markers": ["validate_node_loop_policy", "node_loop_execution", "feedback_commands"]
+        },
+        {
+          "file": ".claude/scripts/workflow-s5-judge.py",
+          "markers": ["node_loop_evidence_present", "node_loop_iteration_limit_observed", "node_loop_verifier_gate_observed"]
+        },
+        {
+          "file": "tools/mock_runtime_host.py",
+          "markers": ["LoopStart", "loop-plan.json", "node-loop-develop-pass"]
+        }
+      ]
+    },
+    {
       "id": "workflow-runtime-evidence-and-s5",
       "checks": [
         {

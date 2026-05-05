@@ -44,3 +44,4 @@
 - `project_local` bootstrap 只允许写入 `TARGET_ROOT/.workflowprogram/bootstrap/**`，且应优先通过声明式 `bootstrap.assets` 生成可复用配置 / wrapper / marker 资产，并同步落 target bootstrap manifest。
 - 若工作流启用 `capability_discovery`，则必须在 `RUN_ROOT` 生成 `host-capability-candidates.json` 与 `host-bootstrap-instructions.md`，用于在 `host_capabilities` 最终定稿前给出候选能力和精确人工指引。
 - 显式 team orchestration 必须通过 `agent_team_contract` 声明；普通 subagent 不自动等于 team flow。
+- Ralph-style 持续执行只能作为 `workflow_graph.nodes[*].loop_policy` 的目标节点策略；它不替换 WorkflowProgram 自身 `S1..S6`，且成功必须由 verifier/test 证据证明。

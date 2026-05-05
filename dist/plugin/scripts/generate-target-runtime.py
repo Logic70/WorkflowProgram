@@ -25,6 +25,7 @@ from lib.host_team_utils import (
     capability_discovery_from_spec,
     host_global_adapter,
     host_capabilities_from_spec,
+    node_loop_enabled,
     runtime_capabilities_from_contract,
 )
 from lib.io_utils import iso_now, write_json
@@ -140,6 +141,7 @@ ENVIRONMENT_REMEDIATION_SCRIPT = "generate-environment-remediation.py"
 RUNTIME_CAPABILITIES = {contract["runtime_capabilities"]!r}
 CAPABILITY_DISCOVERY_ENABLED = {capability_discovery_enabled_flag!r}
 TEAM_ORCHESTRATION_ENABLED = {team_enabled_flag!r}
+NODE_LOOP_EXECUTION_ENABLED = {"node_loop_execution" in contract["runtime_capabilities"]!r}
 
 
 def utc_run_id() -> str:
@@ -728,6 +730,7 @@ def manifest_payload(
         "host_capabilities_declared": bool(declared_host_capabilities),
         "host_global_adapter_declared": host_global_adapter_declared,
         "agent_team_enabled": agent_team_enabled(agent_team_contract_from_spec(spec)),
+        "node_loop_enabled": node_loop_enabled(spec),
         "shared_plugin_dependency": True,
         "shared_scripts": [
             "discover-host-capabilities.py",

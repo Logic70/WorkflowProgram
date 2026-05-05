@@ -84,6 +84,11 @@ VALID_WORKFLOW_GRAPH_GATES = {
     "test_gate",
     "done",
 }
+VALID_LOOP_MODES = {"ralph"}
+VALID_LOOP_GOAL_SOURCES = {"user", "model_subgoal"}
+VALID_LOOP_FEEDBACK_KINDS = {"validator", "verifier", "test"}
+VALID_LOOP_FAILURE_EFFECTS = {"feedback", "gate", "hard_fail"}
+VALID_LOOP_MAX_ITERATION_EFFECTS = {"fail", "warn"}
 REQUIRED_FAILURE_KINDS = {"none", "design", "implementation", "environment", "conflict"}
 VALID_ENV_SKIP_CHECKS = {
     "runtime_host_available",
@@ -481,6 +486,7 @@ def validate_workflow_graph(
         owner = str(node.get("owner", "")).strip()
         input_refs = node.get("input_refs")
         output_refs = node.get("output_refs")
+        loop_policy = node.get("loop_policy")
 
         if not node_id:
             add_error(errors, f"{prefix}.id is required")
@@ -518,6 +524,8 @@ def validate_workflow_graph(
                     errors,
                     f"{prefix}.output_refs[{output_idx}] target asset must be declared in registry or test_contract.artifacts: {output_ref}",
                 )
+        if loop_policy is not None:
+            validate_node_loop_policy(node_id, loop_policy, prefix, errors, warnings)
 
     transitions = workflow_graph.get("transitions", [])
     if transitions is None:
@@ -585,6 +593,137 @@ def validate_workflow_graph(
         add_error(errors, f"workflow_graph contains unreachable nodes from entrypoints: {', '.join(unreachable)}")
     if not transitions and len(node_ids) > 1:
         add_warn(warnings, "workflow_graph has multiple nodes but no transitions")
+
+
+def workflow_graph_loop_nodes(workflow_graph: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """Return workflow_graph nodes whose loop_policy is explicitly enabled."""
+
+    if not isinstance(workflow_graph, dict):
+        return []
+    nodes = workflow_graph.get("nodes", [])
+    if not isinstance(nodes, list):
+        return []
+    enabled: List[Dict[str, Any]] = []
+    for raw_node in nodes:
+        if not isinstance(raw_node, dict):
+            continue
+        loop_policy = raw_node.get("loop_policy", {})
+        if isinstance(loop_policy, dict) and loop_policy.get("enabled") is True:
+            enabled.append(raw_node)
+    return enabled
+
+
+def validate_node_loop_policy(
+    node_id: str,
+    raw_policy: Any,
+    node_prefix: str,
+    errors: List[str],
+    warnings: List[str],
+) -> None:
+    """Validate a target workflow node-level Ralph-style loop policy."""
+
+    prefix = f"{node_prefix}.loop_policy"
+    policy = require_mapping(raw_policy, prefix, errors)
+    enabled = policy.get("enabled")
+    if not isinstance(enabled, bool):
+        add_error(errors, f"{prefix}.enabled must be a boolean")
+        return
+    if enabled is False:
+        return
+
+    mode = str(policy.get("mode", "")).strip()
+    if mode not in VALID_LOOP_MODES:
+        add_error(errors, f"{prefix}.mode must be one of {sorted(VALID_LOOP_MODES)}")
+
+    max_iterations = policy.get("max_iterations")
+    if not isinstance(max_iterations, int) or max_iterations < 1 or max_iterations > 50:
+        add_error(errors, f"{prefix}.max_iterations must be an integer between 1 and 50")
+
+    fresh_context = policy.get("fresh_context_each_iteration")
+    if not isinstance(fresh_context, bool):
+        add_error(errors, f"{prefix}.fresh_context_each_iteration must be a boolean")
+
+    prompt_package = str(policy.get("prompt_package", "")).strip()
+    expected_prompt_prefix = ".workflowprogram/loops/"
+    if not prompt_package:
+        add_error(errors, f"{prefix}.prompt_package is required")
+    elif prompt_package.startswith("/") or not SAFE_RELATIVE_PATH_RE.match(prompt_package):
+        add_error(errors, f"{prefix}.prompt_package must be a safe relative path")
+    elif not prompt_package.startswith(expected_prompt_prefix):
+        add_error(errors, f"{prefix}.prompt_package must stay under {expected_prompt_prefix}**")
+
+    goal_source = str(policy.get("goal_source", "user")).strip() or "user"
+    if goal_source not in VALID_LOOP_GOAL_SOURCES:
+        add_error(errors, f"{prefix}.goal_source must be one of {sorted(VALID_LOOP_GOAL_SOURCES)}")
+    if goal_source == "model_subgoal" and not str(policy.get("parent_goal_ref", "")).strip():
+        add_error(errors, f"{prefix}.parent_goal_ref is required when goal_source=model_subgoal")
+
+    feedback_commands = policy.get("feedback_commands", [])
+    if not isinstance(feedback_commands, list) or not feedback_commands:
+        add_error(errors, f"{prefix}.feedback_commands must be a non-empty list")
+        feedback_commands = []
+    for command_idx, raw_command in enumerate(feedback_commands):
+        command_prefix = f"{prefix}.feedback_commands[{command_idx}]"
+        command = require_mapping(raw_command, command_prefix, errors)
+        command_id = str(command.get("id", "")).strip()
+        if not command_id:
+            add_error(errors, f"{command_prefix}.id is required")
+        kind = str(command.get("kind", "")).strip()
+        if kind not in VALID_LOOP_FEEDBACK_KINDS:
+            add_error(errors, f"{command_prefix}.kind must be one of {sorted(VALID_LOOP_FEEDBACK_KINDS)}")
+        if "command" in command:
+            add_error(errors, f"{command_prefix}.command is not allowed; use structured argv")
+        argv = command.get("argv")
+        if not isinstance(argv, list) or not argv or any(not str(item).strip() for item in argv):
+            add_error(errors, f"{command_prefix}.argv must be a non-empty list of strings")
+        timeout = command.get("timeout_seconds")
+        if timeout is not None and (not isinstance(timeout, int) or timeout < 1 or timeout > 600):
+            add_error(errors, f"{command_prefix}.timeout_seconds must be an integer between 1 and 600")
+        failure_effect = str(command.get("failure_effect", "")).strip()
+        if failure_effect not in VALID_LOOP_FAILURE_EFFECTS:
+            add_error(errors, f"{command_prefix}.failure_effect must be one of {sorted(VALID_LOOP_FAILURE_EFFECTS)}")
+
+    stop_conditions = require_mapping(policy.get("stop_conditions", {}), f"{prefix}.stop_conditions", errors)
+    success_conditions = stop_conditions.get("success", [])
+    if not isinstance(success_conditions, list) or not [str(item).strip() for item in success_conditions if str(item).strip()]:
+        add_error(errors, f"{prefix}.stop_conditions.success must be a non-empty list")
+    max_iteration_effect = str(stop_conditions.get("max_iterations", "")).strip()
+    if max_iteration_effect not in VALID_LOOP_MAX_ITERATION_EFFECTS:
+        add_error(errors, f"{prefix}.stop_conditions.max_iterations must be one of {sorted(VALID_LOOP_MAX_ITERATION_EFFECTS)}")
+    no_progress_iterations = stop_conditions.get("no_progress_iterations")
+    if no_progress_iterations is not None:
+        if not isinstance(no_progress_iterations, int) or no_progress_iterations < 1:
+            add_error(errors, f"{prefix}.stop_conditions.no_progress_iterations must be a positive integer")
+        elif isinstance(max_iterations, int) and no_progress_iterations > max_iterations:
+            add_error(errors, f"{prefix}.stop_conditions.no_progress_iterations must be <= max_iterations")
+    hard_fail_on = stop_conditions.get("hard_fail_on", [])
+    if hard_fail_on is not None and not isinstance(hard_fail_on, list):
+        add_error(errors, f"{prefix}.stop_conditions.hard_fail_on must be a list when provided")
+
+    tdd_policy = policy.get("tdd_policy", {})
+    if tdd_policy:
+        tdd = require_mapping(tdd_policy, f"{prefix}.tdd_policy", errors)
+        tdd_enabled = tdd.get("enabled", False)
+        if not isinstance(tdd_enabled, bool):
+            add_error(errors, f"{prefix}.tdd_policy.enabled must be a boolean")
+        if tdd_enabled:
+            for key in ("test_first_required", "red_green_refactor"):
+                if not isinstance(tdd.get(key), bool):
+                    add_error(errors, f"{prefix}.tdd_policy.{key} must be a boolean when tdd_policy.enabled=true")
+
+    evidence_outputs = policy.get("evidence_outputs", [])
+    expected_evidence_prefix = f"outputs/stages/loops/{node_id}/"
+    if not isinstance(evidence_outputs, list) or not evidence_outputs:
+        add_error(errors, f"{prefix}.evidence_outputs must be a non-empty list")
+    else:
+        for output_idx, raw_output in enumerate(evidence_outputs):
+            output = str(raw_output).strip()
+            if not output:
+                add_error(errors, f"{prefix}.evidence_outputs[{output_idx}] must not be empty")
+            elif output.startswith("/") or not SAFE_RELATIVE_PATH_RE.match(output):
+                add_error(errors, f"{prefix}.evidence_outputs[{output_idx}] must be a safe relative path")
+            elif not output.startswith(expected_evidence_prefix):
+                add_error(errors, f"{prefix}.evidence_outputs[{output_idx}] must stay under {expected_evidence_prefix}**")
 
 
 def validate_intent_flows(intent_flows: Dict[str, Any], slot_map: Dict[str, str], errors: List[str]) -> None:
@@ -1105,6 +1244,7 @@ def validate_generated_runtime_contract(
     stages: List[Any],
     intent_flows: Dict[str, Any],
     test_contract: Dict[str, Any],
+    workflow_graph: Dict[str, Any],
     capability_discovery: Dict[str, Any],
     host_capabilities: List[Dict[str, Any]],
     agent_team_contract: Dict[str, Any],
@@ -1160,6 +1300,11 @@ def validate_generated_runtime_contract(
             add_error(
                 errors,
                 "generated_runtime_contract.runtime_capabilities must include team_orchestration when agent_team_contract.enabled=true",
+            )
+        if workflow_graph_loop_nodes(workflow_graph) and "node_loop_execution" not in runtime_capabilities:
+            add_error(
+                errors,
+                "generated_runtime_contract.runtime_capabilities must include node_loop_execution when workflow_graph node loop_policy.enabled=true",
             )
 
     develop_flow = intent_flows.get("develop", {}) if isinstance(intent_flows, dict) else {}
@@ -1504,6 +1649,7 @@ def validate_spec(spec: Dict[str, Any]) -> Dict[str, Any]:
         stages,
         intent_flows,
         spec.get("test_contract", {}),
+        workflow_graph,
         capability_discovery,
         normalized_host_capabilities,
         agent_team_contract,

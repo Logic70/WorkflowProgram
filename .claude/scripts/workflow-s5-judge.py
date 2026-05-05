@@ -19,7 +19,13 @@ from typing import Any, Dict, List, Optional
 
 from lib.capability_discovery import capability_discovery_from_spec
 from lib.failure_codes import failure_kind_for_result
-from lib.host_team_utils import TEAM_EVENT_TYPES, agent_team_contract_from_spec, agent_team_enabled, host_capabilities_from_spec
+from lib.host_team_utils import (
+    LOOP_EVENT_TYPES,
+    TEAM_EVENT_TYPES,
+    agent_team_contract_from_spec,
+    agent_team_enabled,
+    host_capabilities_from_spec,
+)
 from lib.reporting import with_report_fields
 from lib.spec_utils import path_matches_any, stage_slot_id_map
 from lib.yaml_utils import try_load_yaml_mapping
@@ -162,6 +168,8 @@ def failure_kind_for_check(category: str, name: str) -> str:
         return "implementation"
     if "team_contract" in lowered_name or "team_evidence" in lowered_name:
         return "design"
+    if "node_loop" in lowered_name or "loop_iteration" in lowered_name:
+        return "implementation"
     return FAILURE_KIND_BY_CATEGORY.get(category, "implementation")
 
 
@@ -396,6 +404,42 @@ def load_event_types(path: Path) -> List[str]:
     return event_types
 
 
+def load_jsonl(path: Path) -> List[Dict[str, Any]]:
+    """Load a JSONL evidence stream, ignoring malformed lines for deterministic judging."""
+
+    if not path.exists():
+        return []
+    entries: List[Dict[str, Any]] = []
+    for line in path.read_text(encoding="utf-8").splitlines():
+        stripped = line.strip()
+        if not stripped:
+            continue
+        try:
+            payload = json.loads(stripped)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(payload, dict):
+            entries.append(payload)
+    return entries
+
+
+def loop_enabled_nodes(spec: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """Return target workflow graph nodes with loop_policy.enabled=true."""
+
+    graph = spec.get("workflow_graph", {}) if isinstance(spec, dict) else {}
+    nodes = graph.get("nodes", []) if isinstance(graph, dict) else []
+    if not isinstance(nodes, list):
+        return []
+    enabled: List[Dict[str, Any]] = []
+    for raw_node in nodes:
+        if not isinstance(raw_node, dict):
+            continue
+        policy = raw_node.get("loop_policy", {})
+        if isinstance(policy, dict) and policy.get("enabled") is True:
+            enabled.append(raw_node)
+    return enabled
+
+
 def derive_contract(run_root: Path, fallback_categories: List[str]) -> Dict[str, Any]:
     """推导当前运行实际生效的 contract 上下文。
 
@@ -491,6 +535,7 @@ def build_checks(
     capability_discovery_enabled = bool(declared_capability_discovery.get("enabled", False))
     declared_agent_team = agent_team_contract_from_spec(spec) if isinstance(spec, dict) else {}
     team_enabled = agent_team_enabled(declared_agent_team)
+    loop_nodes = loop_enabled_nodes(spec)
     event_types = load_event_types(run_root / "events.jsonl")
 
     # entry 检查先回答“是不是用正确的产品入口、以正确的请求形态触发了执行”，
@@ -1500,6 +1545,78 @@ def build_checks(
                     f"join_policy={join_policy or '<missing>'}; satisfied={join_satisfied}",
                     "agent_team_contract.join_policy",
                 )
+        if loop_nodes:
+            deterministic_provider = provider_name in {"fixture_host", "command_adapter"}
+            expected_loop_events_present = LOOP_EVENT_TYPES.issubset(set(event_types))
+            for node in loop_nodes:
+                node_id = str(node.get("id", "")).strip()
+                loop_policy = node.get("loop_policy", {}) if isinstance(node.get("loop_policy"), dict) else {}
+                loop_root = run_root / "outputs" / "stages" / "loops" / node_id
+                loop_plan = load_json(loop_root / "loop-plan.json")
+                final_verdict = load_json(loop_root / "final-verdict.json")
+                iteration_entries = load_jsonl(loop_root / "iteration-summary.jsonl")
+                structured_evidence = bool(loop_plan) and bool(final_verdict) and bool(iteration_entries)
+                evidence_status = "PASS" if structured_evidence and expected_loop_events_present else ("FAIL" if deterministic_provider else "WARN")
+                add_check(
+                    checks["flow"],
+                    "node_loop_evidence_present",
+                    evidence_status,
+                    (
+                        f"node={node_id}; provider={provider_name or '<unknown>'}; structured={structured_evidence}; "
+                        f"events={sorted(LOOP_EVENT_TYPES & set(event_types))}"
+                    ),
+                    f"workflow_graph.nodes.{node_id}.loop_policy",
+                )
+
+                max_iterations = int(loop_policy.get("max_iterations", 0) or 0)
+                observed_iterations = len(iteration_entries)
+                add_check(
+                    checks["flow"],
+                    "node_loop_iteration_limit_observed",
+                    "PASS" if not observed_iterations or not max_iterations or observed_iterations <= max_iterations else "FAIL",
+                    f"node={node_id}; observed_iterations={observed_iterations}; max_iterations={max_iterations}",
+                    f"workflow_graph.nodes.{node_id}.loop_policy.max_iterations",
+                )
+
+                final_status = str(final_verdict.get("status", "")).strip().upper() if final_verdict else ""
+                verifier_passed = bool(final_verdict.get("verifier_passed", False)) if final_verdict else False
+                if final_verdict:
+                    add_check(
+                        checks["flow"],
+                        "node_loop_verifier_gate_observed",
+                        "PASS" if final_status != "PASS" or verifier_passed else "FAIL",
+                        f"node={node_id}; final_status={final_status or '<missing>'}; verifier_passed={verifier_passed}",
+                        f"outputs/stages/loops/{node_id}/final-verdict.json",
+                    )
+                    stop_reason = str(final_verdict.get("stop_reason", "")).strip()
+                    add_check(
+                        checks["flow"],
+                        "node_loop_stop_reason_valid",
+                        "PASS" if stop_reason else "FAIL",
+                        f"node={node_id}; stop_reason={stop_reason or '<missing>'}",
+                        f"outputs/stages/loops/{node_id}/final-verdict.json",
+                    )
+
+                if str(loop_policy.get("goal_source", "user")).strip() == "model_subgoal":
+                    plan_parent_goal = str(loop_plan.get("parent_goal_ref", "")).strip() if loop_plan else ""
+                    add_check(
+                        checks["flow"],
+                        "node_loop_model_subgoal_trace_present",
+                        "PASS" if plan_parent_goal else ("FAIL" if deterministic_provider else "WARN"),
+                        f"node={node_id}; parent_goal_ref={plan_parent_goal or '<missing>'}",
+                        f"workflow_graph.nodes.{node_id}.loop_policy.parent_goal_ref",
+                    )
+
+                tdd_policy = loop_policy.get("tdd_policy", {}) if isinstance(loop_policy.get("tdd_policy"), dict) else {}
+                if tdd_policy.get("enabled") is True and tdd_policy.get("test_first_required") is True:
+                    test_first_observed = bool(loop_plan.get("test_first_observed", False)) if loop_plan else False
+                    add_check(
+                        checks["flow"],
+                        "node_loop_tdd_trace_observed",
+                        "PASS" if test_first_observed else ("FAIL" if deterministic_provider else "WARN"),
+                        f"node={node_id}; test_first_observed={test_first_observed}",
+                        f"workflow_graph.nodes.{node_id}.loop_policy.tdd_policy",
+                    )
     elif "artifacts" in contract.get("contract_categories", []):
         add_check(checks["artifacts"], "contract_source_fallback", "INFO", "Artifact checks derived from fixture preset.", "fixture_preset")
 

@@ -145,6 +145,7 @@ def render_workflow_graph_guide(spec: Dict[str, Any]) -> List[str]:
             "维护规则：`workflow_graph` 是生成后目标工作流的业务图；`stages` 和 `intent_flows` 仍然只描述 WorkflowProgram 自身的开发/审计/迭代/验证控制面。",
             "维护规则：任何会影响目标工作流入口、节点转移、输出资产或 gate 的调整，都必须先改 `workflow-spec.yaml.workflow_graph`，再重生成 view/lowlevel。",
             "维护规则：目标资产输出必须能回到 `registry` 或 `test_contract.artifacts`，避免模型生成未声明文件。",
+            "维护规则：若节点声明 `loop_policy.enabled=true`，它只代表目标业务节点持续执行策略，不改变 WorkflowProgram 自身 S1-S6；成功必须由 verifier/test 证据支撑。",
             "",
         ]
     )
@@ -157,8 +158,17 @@ def render_workflow_graph_guide(spec: Dict[str, Any]) -> List[str]:
                 continue
             lines.append(
                 f"- `{format_value(node.get('id'))}` role=`{format_value(node.get('role'))}` "
-                f"owner=`{format_value(node.get('owner'))}` outputs=`{format_value(node.get('output_refs', []))}`"
+                f"owner=`{format_value(node.get('owner'))}` "
+                f"loop=`{format_value(node.get('loop_policy', {}).get('mode')) if isinstance(node.get('loop_policy'), dict) and node.get('loop_policy', {}).get('enabled') is True else 'disabled'}` "
+                f"outputs=`{format_value(node.get('output_refs', []))}`"
             )
+            loop_policy = node.get("loop_policy", {})
+            if isinstance(loop_policy, dict) and loop_policy.get("enabled") is True:
+                lines.append(
+                    f"  - loop max_iterations=`{format_value(loop_policy.get('max_iterations'))}` "
+                    f"goal_source=`{format_value(loop_policy.get('goal_source', 'user'))}` "
+                    f"evidence=`{format_value(loop_policy.get('evidence_outputs', []))}`"
+                )
         lines.append("")
     return lines
 

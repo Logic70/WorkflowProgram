@@ -355,13 +355,15 @@ ref: runtime_contract.<field>
    - `capability_discovery`
    - `host_capability_probe`
    - `team_orchestration`
+   - `node_loop_execution`
 3. `runtime_capabilities` 必须始终包含：
    - `state_transitions`
    - `run_state_validation`
 4. 当声明 `capability_discovery.enabled=true` 时，`runtime_capabilities` 必须包含 `capability_discovery`。
 5. 当声明 `host_capabilities` 时，`runtime_capabilities` 必须包含 `host_capability_probe`。
 6. 当声明 `agent_team_contract.enabled=true` 时，`runtime_capabilities` 必须包含 `team_orchestration`。
-7. 目标工作流 runtime 通过 wrapper 调共享控制面脚本，不复制一套独立 runner。
+7. 当任一 `workflow_graph.nodes[*].loop_policy.enabled=true` 时，`runtime_capabilities` 必须包含 `node_loop_execution`。
+8. 目标工作流 runtime 通过 wrapper 调共享控制面脚本，不复制一套独立 runner。
 
 #### 2.5.5A `workflow_graph`（目标工作流业务图契约）
 
@@ -398,6 +400,45 @@ ref: runtime_contract.<field>
 3. 所有节点必须能从至少一个 entrypoint 到达。
 4. 目标资产类 `output_refs` 必须能回到 `registry` 或 `test_contract.artifacts`，避免生成未声明文件。
 5. 修改目标工作流图时，只能先改 `workflow-spec.yaml.workflow_graph`，再重新生成 `workflow-view.md` 与 `workflow-lowlevel.md`。
+
+#### 2.5.5B `workflow_graph.nodes[*].loop_policy`（目标节点循环策略）
+
+`loop_policy` 是目标工作流业务节点的可选策略，用于类似 RalphLoop 的持续执行：模型或目标运行时围绕一个明确目标反复执行、读取反馈、修正输出，直到 verifier/test 满足停止条件。它不改变 WorkflowProgram 自身 `S1..S6` 主链。
+
+适用场景：
+
+- 逆向分析、漏洞 triage、迁移修复、报告质量收敛、TDD 实现等“可用测试或 verifier 判定是否完成”的任务。
+- 目标可以来自用户，也可以来自模型分解的子目标；模型子目标必须有 `parent_goal_ref` 回溯到用户目标或上游节点输出。
+- TDD 型子目标必须先记录 failing verifier/test，再进入实现迭代。
+
+不适用场景：
+
+- 一次性问答、不可自动验证的主观写作、宿主环境安装、`host_global/manual_only` bootstrap、人工审批。
+- V1 不支持把同一节点同时作为 nested agent-team fan-out 与 loop 强编排单元；如确需组合，必须拆成不同 graph 节点并分别留下 team / loop 证据。
+
+启用时必须字段：
+
+- `enabled: true`
+- `mode: ralph`
+- `goal_source: user | model_subgoal`
+- `max_iterations`
+- `fresh_context_each_iteration`
+- `prompt_package`
+- `feedback_commands`
+- `stop_conditions`
+- `evidence_outputs`
+
+固定约束：
+
+1. `max_iterations` 必须是 `1..50` 的整数。
+2. `prompt_package` 必须是安全相对路径，且位于 `.workflowprogram/loops/**`。
+3. `feedback_commands[*]` 只能使用结构化 `argv`，不得使用 shell 字符串；`kind` 只能是 `validator | verifier | test`。
+4. `stop_conditions.success` 必须非空；`stop_conditions.max_iterations` 只能是 `fail | warn`。
+5. `evidence_outputs` 必须位于 `outputs/stages/loops/<node_id>/**`。
+6. 若 `goal_source=model_subgoal`，必须声明 `parent_goal_ref`。
+7. 若 `tdd_policy.enabled=true` 且 `test_first_required=true`，S5 必须看到 test-first 证据。
+8. loop 成功不能依赖模型自报；`final-verdict.json.status=PASS` 必须有 verifier/test pass 证据。
+9. 确定性 provider（`fixture_host`、`command_adapter`）缺结构化 loop evidence 必须 `FAIL`；`claude_cli` V1 缺结构化 evidence 只能 `WARN`，不得 clean PASS。
 
 #### 2.5.6 `capability_discovery`（能力发现与推荐契约）
 
@@ -862,6 +903,7 @@ WorkflowProgram 自身必须按原子能力组织，每个 Stage 必须可拆分
 15. 若声明 `host_capabilities`，则 `generated_runtime_contract.runtime_capabilities` 必须包含 `host_capability_probe`。
 16. 若声明 `agent_team_contract.enabled=true`，则 `generated_runtime_contract.runtime_capabilities` 必须包含 `team_orchestration`。
 17. 若声明 `workflow_graph`，validator 必须校验 graph entrypoints、nodes、transitions、templates_used、可达性与目标资产声明。
+18. 若声明 `workflow_graph.nodes[*].loop_policy.enabled=true`，则 validator 必须校验 loop policy、要求 `node_loop_execution` runtime capability，并确保 loop evidence 路径位于 `outputs/stages/loops/<node_id>/**`。
 
 ### 实现方案
 
@@ -948,6 +990,7 @@ WorkflowProgram 自身必须按原子能力组织，每个 Stage 必须可拆分
 9. 若声明 `host_capabilities`，则 `RUN_ROOT/outputs/stages/host-capability-report.json` 必须存在。
 10. 若声明 `capability_discovery`，则 `RUN_ROOT/outputs/stages/host-capability-candidates.json` 与 `RUN_ROOT/outputs/stages/host-bootstrap-instructions.md` 必须存在。
 11. 若声明 `host_capabilities`，则 `RUN_ROOT/outputs/stages/environment-remediation-report.json` 与 `RUN_ROOT/outputs/stages/environment-remediation-guide.md` 必须存在。
+12. 若声明 `workflow_graph.nodes[*].loop_policy.enabled=true`，则 `RUN_ROOT/outputs/stages/loops/<node_id>/loop-plan.json`、`iteration-summary.jsonl`、`final-verdict.json` 与 `LoopStart/LoopStop` 等事件必须存在。
 
 ### 实现方案
 
@@ -1021,6 +1064,7 @@ WorkflowProgram 自身必须按原子能力组织，每个 Stage 必须可拆分
 8. 若声明 `host_capabilities`，则 `host-capability-report.json` 必须被 S5 消费；required 缺失应判为 `FAIL/environment`，optional 缺失只记 `INFO`。
 9. 若声明 `host_capabilities`，则 `environment-remediation-report.json` 与 `environment-remediation-guide.md` 也必须被 S5 消费；`validate/audit` 必须让 unresolved manual steps 对用户可见。
 10. 若声明 `agent_team_contract.enabled=true`，则确定性 provider 缺 team evidence 必须 `FAIL`；`claude_cli` 缺结构化 team evidence 只能 `WARN`。
+11. 若声明 `workflow_graph.nodes[*].loop_policy.enabled=true`，则确定性 provider 缺 loop evidence、超过 `max_iterations`、PASS 缺 verifier、模型子目标缺 `parent_goal_ref`、TDD 缺 test-first 证据都必须由 S5 判定为失败；`claude_cli` 缺结构化 loop evidence 只能 `WARN`。
 
 ### 实现方案
 

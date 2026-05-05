@@ -16,6 +16,7 @@ from lib.host_team_utils import (
     capability_discovery_from_spec,
     host_global_adapter,
     host_capabilities_from_spec,
+    node_loop_enabled,
     runtime_capabilities_from_contract,
 )
 from lib.yaml_utils import load_yaml_mapping
@@ -84,6 +85,7 @@ def validate_generated_runtime(spec_path: Path, target_root: Path) -> Dict[str, 
             if isinstance(item, dict) and isinstance(item.get("bootstrap"), dict)
         )
         declared_agent_team = agent_team_contract_from_spec(spec)
+        declared_node_loop_enabled = node_loop_enabled(spec)
         main_entry = (
             str(spec.get("test_contract", {}).get("entry", {}).get("main_entry", "")).strip()
             if isinstance(spec.get("test_contract", {}), dict)
@@ -136,6 +138,7 @@ def validate_generated_runtime(spec_path: Path, target_root: Path) -> Dict[str, 
                 "host_capabilities_declared": bool(declared_host_capabilities),
                 "host_global_adapter_declared": host_global_adapter_declared,
                 "agent_team_enabled": agent_team_enabled(declared_agent_team),
+                "node_loop_enabled": declared_node_loop_enabled,
             }
             for key, expected in expected_pairs.items():
                 observed_value = manifest_payload.get(key)
@@ -172,6 +175,8 @@ def validate_generated_runtime(spec_path: Path, target_root: Path) -> Dict[str, 
                 errors.append("entry wrapper is missing generate-environment-remediation.py integration marker")
             if agent_team_enabled(declared_agent_team) and "TEAM_ORCHESTRATION_ENABLED = True" not in entry_text:
                 errors.append("entry wrapper is missing TEAM_ORCHESTRATION_ENABLED marker")
+            if declared_node_loop_enabled and "NODE_LOOP_EXECUTION_ENABLED = True" not in entry_text:
+                errors.append("entry wrapper is missing NODE_LOOP_EXECUTION_ENABLED marker")
 
         if runner_path.exists():
             runner_text = runner_path.read_text(encoding="utf-8")

@@ -97,6 +97,11 @@
 - Event-Driven 需求：
 - Test-Driven 循环：
 - Specialized Agent 需求：
+- RalphLoop 适用性：
+- 是否需要某个目标节点持续迭代直到 verifier/test 通过：
+- 循环目标来源（用户目标 / 模型分解子目标）：
+- 若是模型子目标，父目标引用：
+- 是否需要 TDD test-first 证据：
 
 ## Target Workflow Graph Readback
 
@@ -105,6 +110,8 @@
 - 目标 workflow_graph 节点：
 - 目标 workflow_graph 入口与转移：
 - 每个 graph 节点的输入、输出、gate、owner：
+- 需要 `loop_policy` 的 graph 节点：
+- 每个 loop 节点的 `max_iterations`、反馈命令、停止条件、证据输出：
 - 目标输出是否已映射到 `registry` 或 `test_contract.artifacts`：
 
 ## Extraction Decision

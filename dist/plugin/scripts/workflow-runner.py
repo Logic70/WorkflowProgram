@@ -64,6 +64,9 @@ VALID_KIND = {
     "team_plan",
     "team_result",
     "team_join",
+    "loop_plan",
+    "loop_iteration",
+    "loop_final",
 }
 TERMINALS = {"abort", "end", "done", "complete", "stop", "finish"}
 DEFAULT_STAGE_SLOT_ORDER = ["S1", "S2", "S3", "S4", "S5", "S6"]
@@ -474,6 +477,12 @@ def infer_kind(path: str) -> str:
         return "team_result"
     if cleaned.endswith("team-join-summary.json"):
         return "team_join"
+    if "/outputs/stages/loops/" in cleaned and cleaned.endswith("loop-plan.json"):
+        return "loop_plan"
+    if "/outputs/stages/loops/" in cleaned and cleaned.endswith("iteration-summary.jsonl"):
+        return "loop_iteration"
+    if "/outputs/stages/loops/" in cleaned and cleaned.endswith("final-verdict.json"):
+        return "loop_final"
     return "report"
 
 
