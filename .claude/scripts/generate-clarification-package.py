@@ -15,7 +15,9 @@ from lib.clarification_utils import (
     draft_data_from_text,
     load_text,
     open_questions_from_data,
+    question_backlog_from_data,
     readiness_report_from_data,
+    requirement_logic_map_from_data,
 )
 from lib.io_utils import write_json
 
@@ -53,15 +55,21 @@ def main() -> int:
     open_questions_path = stages_root / "open-questions.json"
     assumption_log_path = stages_root / "assumption-log.md"
     readiness_report_path = stages_root / "design-readiness-report.json"
+    question_backlog_path = stages_root / "question-backlog.json"
+    requirement_logic_map_path = stages_root / "requirement-logic-map.json"
 
     clarification_record = clarification_record_from_data(data)
     open_questions = open_questions_from_data(data)
     readiness_report = readiness_report_from_data(data)
+    question_backlog = question_backlog_from_data(data, readiness_report)
+    requirement_logic_map = requirement_logic_map_from_data(data, readiness_report)
     assumption_log = assumption_log_from_data(data)
 
     write_json(clarification_record_path, clarification_record)
     write_json(open_questions_path, open_questions)
     write_json(readiness_report_path, readiness_report)
+    write_json(question_backlog_path, question_backlog)
+    write_json(requirement_logic_map_path, requirement_logic_map)
     assumption_log_path.parent.mkdir(parents=True, exist_ok=True)
     assumption_log_path.write_text(assumption_log, encoding="utf-8", newline="\n")
 
@@ -75,6 +83,8 @@ def main() -> int:
         "open_questions": str(open_questions_path),
         "assumption_log": str(assumption_log_path),
         "design_readiness_report": str(readiness_report_path),
+        "question_backlog": str(question_backlog_path),
+        "requirement_logic_map": str(requirement_logic_map_path),
         "ready": readiness_report.get("ready", False),
     }
     if args.json:

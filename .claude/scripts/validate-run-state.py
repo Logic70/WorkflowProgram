@@ -39,6 +39,8 @@ VALID_KIND = {
     "event_log",
     "state_snapshot",
     "requirement_index",
+    "question_backlog",
+    "requirement_logic_map",
     "context_findings",
     "design_source",
     "node_design",

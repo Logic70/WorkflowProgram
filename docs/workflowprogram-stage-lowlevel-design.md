@@ -369,6 +369,8 @@ ref: runtime_contract.<field>
 推荐字段：
 
 - `requirements`
+- `question_backlog`
+- `requirement_logic_map`
 - `context_findings`
 - `design_highlevel`
 - `design_lowlevel`
@@ -799,6 +801,8 @@ WorkflowProgram 自身必须按原子能力组织，每个 Stage 必须可拆分
 
 - `RUN_ROOT/workflow-spec.md`（规格草案）
 - `RUN_ROOT/outputs/stages/s1-requirements.yaml`
+- `RUN_ROOT/outputs/stages/question-backlog.json`
+- `RUN_ROOT/outputs/stages/requirement-logic-map.json`
 - `RUN_ROOT/outputs/stages/clarification-record.json`
 - `RUN_ROOT/outputs/stages/open-questions.json`
 - `RUN_ROOT/outputs/stages/assumption-log.md`
@@ -812,6 +816,8 @@ WorkflowProgram 自身必须按原子能力组织，每个 Stage 必须可拆分
 
 - 规格字段无 `TBD`
 - 触发方式、输入输出、门禁、角色维度明确
+- 七个 logic lenses（`purpose`、`object_model`、`process_model`、`decision_model`、`evidence_model`、`acceptance_model`、`boundary_model`）已按复杂度记录
+- M+ 请求的 `REQ-*` 已链接到 process/evidence/acceptance 逻辑元素
 - 原始请求已拆成 `REQ-*`，且每条需求保留来源、优先级、验收口径和边界
 - 规格文件落盘到约定路径
 
@@ -821,20 +827,21 @@ WorkflowProgram 自身必须按原子能力组织，每个 Stage 必须可拆分
    - `workflowprogram-develop` 必须与用户进行多轮澄清。
    - 只有 `requirement-clarification-lead` 允许直接与用户对话；`scenario-extractor`、`assumption-auditor`、`constraint-reviewer` 只允许内部 challenge，不得直接触达用户。
    - 每轮只提出当前最关键的 1-3 个未决问题；若回答后仍存在会影响设计的歧义，则继续下一轮。
-   - 只有当“用户诉求、最终目的、成功标准、触发方式、输入输出、质量门禁”均已明确时，才允许进入草案写入。
+   - 问题必须落到七个 logic lenses，并且是 design-consequential：不同回答应能改变 node、decision、evidence、acceptance 或 boundary。
+   - 只有当“用户诉求、最终目的、成功标准、触发方式、输入输出、质量门禁、logic lenses”均已明确时，才允许进入草案写入。
 2. `draft_spec`（agent_node）
-   - `requirement_analyst` 生成规格草案内容，必须把多轮对话收敛结果整理为 `User Intent`、`Clarification Summary`、`Open Questions`、`Assumptions and Boundaries`、`Readback Confirmation`。
+   - `requirement_analyst` 生成规格草案内容，必须把多轮对话收敛结果整理为 `User Intent`、`Clarification Summary`、`Requirement Logic Interview`、`Open Questions`、`Assumptions and Boundaries`、`Readback Confirmation`。
 3. `persist_spec`（script_node）
    - 套用 `spec-template.md`，写入 `RUN_ROOT/workflow-spec.md`。
 4. `derive_requirements`（agent_node）
    - 从 `workflow-spec.md` 与澄清记录中派生 `REQ-*`，写入 `RUN_ROOT/outputs/stages/s1-requirements.yaml`。
    - 需求项必须包含 `id`、`source_ref`、`priority`、`statement`、`acceptance_hint`、`boundaries`。
 5. `generate_clarification_package`（script_node）
-   - 通过 `generate-clarification-package.py` 从 `workflow-spec.md` 派生 `clarification-record.json`、`open-questions.json`、`assumption-log.md`、`design-readiness-report.json`。
+   - 通过 `generate-clarification-package.py` 从 `workflow-spec.md` 派生 `clarification-record.json`、`open-questions.json`、`question-backlog.json`、`requirement-logic-map.json`、`assumption-log.md`、`design-readiness-report.json`。
 6. `generate_clarification_review`（script_node）
    - 通过 `generate-clarification-review.py` 生成 `clarification-challenge-report.json`、`clarification-handoff.json`、`clarification-evidence.json`。
-   - `clarification-challenge-report.json` 必须记录内部 challenge roles 提出的补问建议与阻塞点。
-   - `clarification-handoff.json` 必须为 `S2/S3` 生成确定性输入。
+   - `clarification-challenge-report.json` 必须记录内部 challenge roles 提出的补问建议、阻塞点和 weakest logic lenses。
+   - `clarification-handoff.json` 必须为 `S2/S3` 生成确定性输入，并包含 `logic_map_path`、`question_backlog_path`、S2 logic lens inputs、S3 node candidates 与 acceptance scenarios。
 7. `spec_quality_check`（script_node）
    - 检查是否包含 `TBD/待补`、结构化澄清字段、有效 `澄清轮次` 与 `READY` 状态；失败则回到步骤 1。
 8. `emit_stage_progress`（script_node）
@@ -846,13 +853,15 @@ WorkflowProgram 自身必须按原子能力组织，每个 Stage 必须可拆分
 2. 文件不包含 `TBD` 或 `待补`。
 3. 文件包含输入、输出、触发方式、质量门禁四个段落。
 4. 文件必须包含 `User Intent` 与 `Clarification Summary` 两个段落。
-5. 文件必须包含 `Open Questions`、`Assumptions and Boundaries`、`Readback Confirmation` 三个段落。
+5. 文件必须包含 `Requirement Logic Interview`、`Open Questions`、`Assumptions and Boundaries`、`Readback Confirmation` 四个段落。
 6. `Clarification Summary.澄清轮次` 必须是整数，且 `>= 2`。
 7. `s1-requirements.yaml` 必须存在，至少包含一条 `REQ-*`，且每条需求有 `source_ref` 与验收口径。
-8. `clarification-record.json`、`open-questions.json`、`assumption-log.md`、`design-readiness-report.json`、`clarification-challenge-report.json`、`clarification-handoff.json`、`clarification-evidence.json` 必须存在，且 `design-readiness-report.json.ready=true`、`clarification-handoff.json.ready=true`。
-9. `clarification-challenge-report.json.review_roles[*].direct_user_contact` 必须全部为 `false`。
-10. `clarification-evidence.json` 必须记录 `challenge_rounds >= 1`，并确认 `readback_confirmed=true`、`s2_handoff_ready=true`、`s3_handoff_ready=true`。
-11. `milestones.jsonl` 至少包含 `clarify_requirement`、`persist_spec`、`derive_requirements`、`generate_clarification_package`、`generate_clarification_review` 五个节点结果。
+8. `question-backlog.json` 必须记录 lens、问题、设计影响、阻塞性、期望回答形态与 linked requirement ids；L/XL 不允许只有泛问题。
+9. `requirement-logic-map.json` 必须包含七个 lens key，且 M+ 请求的 must-have `REQ-*` 至少链接到 process/evidence/acceptance refs；`open_logic_gaps` 不得包含 blocking gap。
+10. `clarification-record.json`、`open-questions.json`、`assumption-log.md`、`design-readiness-report.json`、`clarification-challenge-report.json`、`clarification-handoff.json`、`clarification-evidence.json` 必须存在，且 `design-readiness-report.json.ready=true`、`clarification-handoff.json.ready=true`。
+11. `clarification-challenge-report.json.review_roles[*].direct_user_contact` 必须全部为 `false`。
+12. `clarification-evidence.json` 必须记录 `challenge_rounds >= 1`，并确认 `readback_confirmed=true`、`logic_map_ready=true`、`s2_handoff_ready=true`、`s3_handoff_ready=true`。
+13. `milestones.jsonl` 至少包含 `clarify_requirement`、`persist_spec`、`derive_requirements`、`generate_clarification_package`、`generate_clarification_review` 五个节点结果。
 
 ### 实现方案
 

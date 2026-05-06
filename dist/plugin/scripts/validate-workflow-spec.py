@@ -1254,6 +1254,8 @@ def validate_design_refs(
 
     allowed_fields = {
         "requirements",
+        "question_backlog",
+        "requirement_logic_map",
         "context_findings",
         "design_highlevel",
         "design_lowlevel",

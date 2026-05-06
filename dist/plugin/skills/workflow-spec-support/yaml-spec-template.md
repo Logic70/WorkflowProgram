@@ -14,6 +14,8 @@ meta:
 # S5 使用这些引用检查 REQ -> design node -> asset -> acceptance test -> evidence。
 design_refs:
   requirements: outputs/stages/s1-requirements.yaml
+  question_backlog: outputs/stages/question-backlog.json
+  requirement_logic_map: outputs/stages/requirement-logic-map.json
   context_findings: outputs/stages/s2-context-findings.yaml
   design_highlevel: outputs/stages/s3-design-highlevel.md
   design_lowlevel: outputs/stages/s3-design-lowlevel.md
@@ -34,6 +36,8 @@ stages:
     output: |
       workflow-spec.md
       outputs/stages/s1-requirements.yaml
+      outputs/stages/question-backlog.json
+      outputs/stages/requirement-logic-map.json
     gate: user_approval
     max_retries: 3
     on_approve: context
@@ -47,6 +51,8 @@ stages:
     input: |
       workflow-spec.md
       outputs/stages/s1-requirements.yaml
+      outputs/stages/question-backlog.json
+      outputs/stages/requirement-logic-map.json
     output: |
       outputs/stages/s2-context-report.md
       outputs/stages/s2-context-findings.yaml
@@ -59,6 +65,8 @@ stages:
     agent_ref: workflow_designer
     input: |
       outputs/stages/s1-requirements.yaml
+      outputs/stages/question-backlog.json
+      outputs/stages/requirement-logic-map.json
       outputs/stages/s2-context-report.md
       outputs/stages/s2-context-findings.yaml
     output: |

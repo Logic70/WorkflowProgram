@@ -51,6 +51,8 @@ def main() -> int:
         stages_root / "clarification-record.json",
         stages_root / "open-questions.json",
         stages_root / "design-readiness-report.json",
+        stages_root / "question-backlog.json",
+        stages_root / "requirement-logic-map.json",
     ]
     missing = [str(path) for path in required_inputs if not path.exists()]
     if missing:
@@ -67,15 +69,31 @@ def main() -> int:
 
     data = draft_data_from_text(load_text(spec_path))
     readiness = readiness_report_from_data(data)
-    challenge_report = clarification_challenge_report_from_data(data, readiness)
+    question_backlog = load_json(stages_root / "question-backlog.json")
+    requirement_logic_map = load_json(stages_root / "requirement-logic-map.json")
+    challenge_report = clarification_challenge_report_from_data(
+        data,
+        readiness,
+        requirement_logic_map,
+        question_backlog,
+    )
     handoff = clarification_handoff_from_data(
         data,
         readiness,
         challenge_report,
         spec_path=spec_path,
         run_root=run_root,
+        logic_map=requirement_logic_map,
+        question_backlog=question_backlog,
     )
-    evidence = clarification_evidence_from_data(data, readiness, challenge_report, handoff)
+    evidence = clarification_evidence_from_data(
+        data,
+        readiness,
+        challenge_report,
+        handoff,
+        requirement_logic_map,
+        question_backlog,
+    )
 
     challenge_path = stages_root / "clarification-challenge-report.json"
     handoff_path = stages_root / "clarification-handoff.json"
@@ -98,6 +116,8 @@ def main() -> int:
         "clarification_record_path": str(required_inputs[0]),
         "open_questions_path": str(required_inputs[1]),
         "design_readiness_path": str(required_inputs[2]),
+        "question_backlog_path": str(required_inputs[3]),
+        "requirement_logic_map_path": str(required_inputs[4]),
     }
     if args.json:
         print(json.dumps(payload, ensure_ascii=False, indent=2))

@@ -333,6 +333,8 @@ def add_check(bucket: List[Dict[str, str]], name: str, status: str, detail: str,
 
 DESIGN_REF_PATH_KEYS = (
     "requirements",
+    "question_backlog",
+    "requirement_logic_map",
     "context_findings",
     "design_highlevel",
     "design_lowlevel",
@@ -1207,6 +1209,8 @@ def build_checks(
                     ("outputs/stages/open-questions.json", "clarification_open_questions_exists"),
                     ("outputs/stages/assumption-log.md", "clarification_assumption_log_exists"),
                     ("outputs/stages/design-readiness-report.json", "clarification_design_readiness_exists"),
+                    ("outputs/stages/question-backlog.json", "clarification_question_backlog_exists"),
+                    ("outputs/stages/requirement-logic-map.json", "clarification_requirement_logic_map_exists"),
                     ("outputs/stages/clarification-challenge-report.json", "clarification_challenge_report_exists"),
                     ("outputs/stages/clarification-handoff.json", "clarification_handoff_exists"),
                     ("outputs/stages/clarification-evidence.json", "clarification_evidence_exists"),

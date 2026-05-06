@@ -31,6 +31,20 @@
 - 已确认事项：
 - 已消解歧义：
 
+## Requirement Logic Interview
+
+- 复杂度：S / M / L / XL
+- Purpose Lens：问题、目的、主要使用者、成功信号、非目标
+- Object Lens：输入对象、中间对象、输出对象、关键字段、source of truth、未知信息处理
+- Process Lens：候选步骤 / node、每步输入输出、前置条件、完成信号、人工触点
+- Decision Lens：关键分支、决策输入、规则或启发式、fallback、置信度、owner
+- Evidence Lens：必须保留的证据、证据链接、PASS 最小证据、不可接受证据
+- Acceptance Lens：happy path、负向场景、歧义场景、期望输出、验收 owner
+- Boundary Lens：明确不做、停止条件、人工确认、可延后规则、安全约束、降级策略
+- 关键追问：记录 1-3 个会改变 node / decision / evidence / acceptance / boundary 的窄问题
+- 候选节点：复杂请求中目标 workflow_graph.nodes[*] 的候选节点
+- 负向/停止场景：复杂请求中必须失败、停止或要求用户确认的场景
+
 ## Open Questions
 
 - 阻塞未决问题：

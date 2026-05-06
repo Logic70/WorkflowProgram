@@ -54,6 +54,8 @@ VALID_KIND = {
     "managed_result",
     "build_manifest",
     "requirement_index",
+    "question_backlog",
+    "requirement_logic_map",
     "context_findings",
     "design_source",
     "node_design",
@@ -433,6 +435,10 @@ def infer_kind(path: str) -> str:
     name = Path(cleaned).name
     if cleaned.endswith("outputs/stages/s1-requirements.yaml"):
         return "requirement_index"
+    if cleaned.endswith("outputs/stages/question-backlog.json"):
+        return "question_backlog"
+    if cleaned.endswith("outputs/stages/requirement-logic-map.json"):
+        return "requirement_logic_map"
     if cleaned.endswith("outputs/stages/s2-context-findings.yaml"):
         return "context_findings"
     if cleaned.endswith("outputs/stages/s3-design-highlevel.md") or cleaned.endswith("outputs/stages/s3-design-lowlevel.md"):

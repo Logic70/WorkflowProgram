@@ -15,6 +15,19 @@
 - 已确认事项: 目标项目路径由当前目录提供；设计包和 runtime 包都属于交付范围。
 - 已消解歧义: 不处理 Windows 兼容性；validate 失败必须留下证据链。
 
+## Requirement Logic Interview
+- 复杂度: M
+- Purpose Lens: 让团队能够稳定生成、验证并迭代 workflow 资产；成功信号是 develop、validate 与 smoke 证据一致。
+- Object Lens: 输入对象为用户请求、目标项目路径和现有 .claude 资产；中间对象为 REQ 索引、设计源、managed plan；输出对象为 .claude 资产和 .workflowprogram 设计/runtime 包。
+- Process Lens: clarify requirement -> collect context -> design workflow graph -> generate managed assets -> validate runtime evidence。
+- Decision Lens: 资产冲突、审批未通过、环境缺失或验证失败时不得继续 clean PASS，必须停止或回到对应阶段。
+- Evidence Lens: 必须保留 clarification package、logic map、managed result、state.json、events.jsonl、S5 summary 和 smoke 记录。
+- Acceptance Lens: develop 生成资产后 validate/smoke 通过；冲突或验证失败时输出可追溯失败证据。
+- Boundary Lens: 不处理 Windows；不得静默覆盖非托管资产；不得跳过审批和 S5。
+- 关键追问: 哪些目标输出必须进入 registry 或 test_contract 以便 S5 验证；哪些失败证据足以阻止 clean PASS。
+- 候选节点: intake；design_assets；managed_apply；runtime_validate。
+- 负向/停止场景: 审批未通过时停止；目标资产冲突时停止；validate 失败时返回设计或生成阶段。
+
 ## Trigger Model
 - 调用方式: 手动命令触发
 - 触发细节: 用户通过 /develop 在仓库根目录发起工作流设计。

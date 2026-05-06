@@ -14,20 +14,54 @@ from __future__ import annotations
 import argparse
 import json
 from pathlib import Path
-from typing import Dict, List
+from typing import Any, Dict, List
+
+import yaml
 
 from lib.clarification_utils import (
     CONFIRMED_STATUS_RE,
+    LOGIC_LENS_KEYS,
     PLACEHOLDER_RE,
     REQUIRED_SECTIONS,
+    complexity_rank,
     draft_data_from_text,
     extract_sections,
+    is_design_consequential_question,
     load_json,
     load_text,
     readiness_report_from_data,
     section_value,
     split_items,
 )
+
+
+def load_requirement_ids(path: Path) -> List[str]:
+    if not path.exists():
+        return []
+    try:
+        payload = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    except Exception:
+        return []
+    requirements = payload.get("requirements", []) if isinstance(payload, dict) else []
+    if isinstance(requirements, dict):
+        iterable = requirements.values()
+    elif isinstance(requirements, list):
+        iterable = requirements
+    else:
+        iterable = []
+    ids: List[str] = []
+    for item in iterable:
+        if not isinstance(item, dict):
+            continue
+        requirement_id = str(item.get("id", "")).strip()
+        if requirement_id and requirement_id not in ids:
+            ids.append(requirement_id)
+    return ids
+
+
+def list_value(payload: Dict[str, Any], key: str) -> List[Any]:
+    value = payload.get(key, [])
+    return value if isinstance(value, list) else []
 
 
 def validate_draft(path: Path, run_root: Path | None = None) -> Dict[str, object]:
@@ -88,6 +122,8 @@ def validate_draft(path: Path, run_root: Path | None = None) -> Dict[str, object
         errors.append("section 'Open Questions' field '问题处理策略' must explain how deferred questions are handled")
 
     readiness_expected = readiness_report_from_data(data)
+    complexity = str(data.get("complexity", "M"))
+    complexity_level = complexity_rank(complexity)
 
     if run_root is not None:
         stages_root = run_root / "outputs" / "stages"
@@ -95,6 +131,8 @@ def validate_draft(path: Path, run_root: Path | None = None) -> Dict[str, object
         open_questions_path = stages_root / "open-questions.json"
         assumption_log_path = stages_root / "assumption-log.md"
         readiness_report_path = stages_root / "design-readiness-report.json"
+        question_backlog_path = stages_root / "question-backlog.json"
+        requirement_logic_map_path = stages_root / "requirement-logic-map.json"
         challenge_report_path = stages_root / "clarification-challenge-report.json"
         handoff_path = stages_root / "clarification-handoff.json"
         evidence_path = stages_root / "clarification-evidence.json"
@@ -107,6 +145,10 @@ def validate_draft(path: Path, run_root: Path | None = None) -> Dict[str, object
             errors.append(f"assumption log not found: {assumption_log_path}")
         if not readiness_report_path.exists():
             errors.append(f"design readiness report not found: {readiness_report_path}")
+        if complexity_level >= 2 and not question_backlog_path.exists():
+            errors.append(f"question backlog not found: {question_backlog_path}")
+        if complexity_level >= 2 and not requirement_logic_map_path.exists():
+            errors.append(f"requirement logic map not found: {requirement_logic_map_path}")
         if not challenge_report_path.exists():
             errors.append(f"clarification challenge report not found: {challenge_report_path}")
         if not handoff_path.exists():
@@ -162,6 +204,76 @@ def validate_draft(path: Path, run_root: Path | None = None) -> Dict[str, object
             actual_checks = readiness_report.get("blocking_checks", {})
             if expected_checks and actual_checks != expected_checks:
                 errors.append("design-readiness-report.json blocking_checks do not match workflow-spec.md derived readiness state")
+            if complexity_level >= 2 and actual_checks.get("logic_lenses_sufficient") is not True:
+                errors.append("design-readiness-report.json blocking_checks.logic_lenses_sufficient must be true for M+ drafts")
+
+        question_backlog = load_json(question_backlog_path)
+        if question_backlog_path.exists():
+            if question_backlog.get("schema_version") != 1:
+                errors.append("question-backlog.json schema_version must be 1")
+            if question_backlog.get("complexity") != complexity:
+                errors.append("question-backlog.json complexity must match workflow-spec.md")
+            questions = list_value(question_backlog, "questions")
+            if complexity_level >= 2 and not questions:
+                errors.append("question-backlog.json must contain questions for M+ drafts")
+            for question in questions:
+                if not isinstance(question, dict):
+                    errors.append("question-backlog.json questions entries must be mapping objects")
+                    continue
+                lens = str(question.get("lens", "")).strip()
+                if lens not in LOGIC_LENS_KEYS:
+                    errors.append(f"question-backlog.json question lens must be one of {LOGIC_LENS_KEYS}, got: {lens or '<missing>'}")
+                for key in ("id", "question", "why_it_matters", "expected_answer_shape", "linked_requirement_ids"):
+                    if key not in question:
+                        errors.append(f"question-backlog.json question is missing key '{key}'")
+                text = str(question.get("question", "")).strip()
+                if text and bool(question.get("design_consequence")) != is_design_consequential_question(text):
+                    errors.append("question-backlog.json design_consequence must match deterministic question-depth classification")
+            if complexity_level >= 3 and int(question_backlog.get("design_consequential_count", 0) or 0) < 1:
+                errors.append("question-backlog.json must contain at least one design-consequential question for L/XL drafts")
+
+        requirement_logic_map = load_json(requirement_logic_map_path)
+        if requirement_logic_map_path.exists():
+            if requirement_logic_map.get("schema_version") != 1:
+                errors.append("requirement-logic-map.json schema_version must be 1")
+            if requirement_logic_map.get("complexity") != complexity:
+                errors.append("requirement-logic-map.json complexity must match workflow-spec.md")
+            if requirement_logic_map.get("status") != "READY":
+                errors.append("requirement-logic-map.json must mark status=READY before S1 exits")
+            lenses = requirement_logic_map.get("lenses", {})
+            if not isinstance(lenses, dict):
+                errors.append("requirement-logic-map.json lenses must be a mapping")
+            else:
+                for lens_key in LOGIC_LENS_KEYS:
+                    lens = lenses.get(lens_key)
+                    if not isinstance(lens, dict):
+                        errors.append(f"requirement-logic-map.json lenses.{lens_key} must exist")
+                        continue
+                    if lens.get("status") == "blocking":
+                        errors.append(f"requirement-logic-map.json lenses.{lens_key}.status must not be blocking before S1 exits")
+                    if complexity_level >= 2 and lens.get("required") is True and not lens.get("items"):
+                        errors.append(f"requirement-logic-map.json lenses.{lens_key}.items must be non-empty for required M+ lenses")
+            open_logic_gaps = list_value(requirement_logic_map, "open_logic_gaps")
+            blocking_logic_gaps = [gap for gap in open_logic_gaps if isinstance(gap, dict) and gap.get("severity") == "blocking"]
+            if blocking_logic_gaps:
+                errors.append("requirement-logic-map.json open_logic_gaps must not contain blocking gaps before S1 exits")
+
+            requirement_ids = load_requirement_ids(stages_root / "s1-requirements.yaml") or ["REQ-001"]
+            links = list_value(requirement_logic_map, "requirement_links")
+            links_by_id = {
+                str(link.get("requirement_id", "")).strip(): link
+                for link in links
+                if isinstance(link, dict)
+            }
+            for requirement_id in requirement_ids:
+                link = links_by_id.get(requirement_id)
+                if not link:
+                    errors.append(f"requirement-logic-map.json must link requirement id {requirement_id}")
+                    continue
+                if complexity_level >= 2:
+                    for key in ("process_refs", "evidence_refs", "acceptance_refs"):
+                        if not isinstance(link.get(key), list) or not link.get(key):
+                            errors.append(f"requirement-logic-map.json requirement_links[{requirement_id}].{key} must be non-empty for M+ drafts")
 
         challenge_report = load_json(challenge_report_path)
         if challenge_report_path.exists():
@@ -179,6 +291,13 @@ def validate_draft(path: Path, run_root: Path | None = None) -> Dict[str, object
                         errors.append("clarification-challenge-report.json review roles must not speak to the user directly")
             if challenge_report.get("ready_for_handoff") is not True:
                 errors.append("clarification-challenge-report.json must mark ready_for_handoff=true for a completed S1 package")
+            if complexity_level >= 2:
+                weakest_lenses = challenge_report.get("weakest_logic_lenses", [])
+                if not isinstance(weakest_lenses, list):
+                    errors.append("clarification-challenge-report.json weakest_logic_lenses must be a list")
+                logic_lens_review = challenge_report.get("logic_lens_review", [])
+                if not isinstance(logic_lens_review, list) or len(logic_lens_review) < len(LOGIC_LENS_KEYS):
+                    errors.append("clarification-challenge-report.json must review every logic lens")
 
         handoff = load_json(handoff_path)
         if handoff_path.exists():
@@ -187,10 +306,27 @@ def validate_draft(path: Path, run_root: Path | None = None) -> Dict[str, object
             source_files = handoff.get("source_files", {})
             if not isinstance(source_files, dict) or "draft" not in source_files or "clarification_record" not in source_files:
                 errors.append("clarification-handoff.json must include deterministic source_files references")
+            for key in ("logic_map_path", "question_backlog_path"):
+                if complexity_level >= 2 and not str(handoff.get(key, "")).strip():
+                    errors.append(f"clarification-handoff.json must include {key}")
+            if complexity_level >= 2 and isinstance(source_files, dict):
+                for key in ("question_backlog", "requirement_logic_map"):
+                    if key not in source_files:
+                        errors.append(f"clarification-handoff.json source_files must include {key}")
             if not isinstance(handoff.get("s2_inputs", None), dict) or not handoff.get("s2_inputs"):
                 errors.append("clarification-handoff.json must contain non-empty s2_inputs")
+            elif complexity_level >= 2:
+                s2_inputs = handoff.get("s2_inputs", {})
+                if not isinstance(s2_inputs.get("logic_lenses", None), dict) or not s2_inputs.get("logic_lenses"):
+                    errors.append("clarification-handoff.json s2_inputs.logic_lenses must be non-empty for M+ drafts")
             if not isinstance(handoff.get("s3_inputs", None), dict) or not handoff.get("s3_inputs"):
                 errors.append("clarification-handoff.json must contain non-empty s3_inputs")
+            elif complexity_level >= 2:
+                s3_inputs = handoff.get("s3_inputs", {})
+                if not isinstance(s3_inputs.get("requirement_logic_links", None), list) or not s3_inputs.get("requirement_logic_links"):
+                    errors.append("clarification-handoff.json s3_inputs.requirement_logic_links must be non-empty for M+ drafts")
+                if not isinstance(s3_inputs.get("acceptance_scenarios", None), list) or not s3_inputs.get("acceptance_scenarios"):
+                    errors.append("clarification-handoff.json s3_inputs.acceptance_scenarios must be non-empty for M+ drafts")
 
         evidence = load_json(evidence_path)
         if evidence_path.exists():
@@ -212,6 +348,8 @@ def validate_draft(path: Path, run_root: Path | None = None) -> Dict[str, object
                     "challenge_roles_executed",
                     "readback_confirmed",
                     "blocking_questions_cleared",
+                    "logic_map_ready",
+                    "question_backlog_design_consequential",
                     "s2_handoff_ready",
                     "s3_handoff_ready",
                 ):

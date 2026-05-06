@@ -146,6 +146,8 @@ TARGET_ROOT/
   - `outputs/stages/s1-requirements.yaml`（`REQ-*` 需求索引、来源、优先级、成功标准、边界）
   - `clarification-record.json`
   - `open-questions.json`
+  - `question-backlog.json`
+  - `requirement-logic-map.json`
   - `assumption-log.md`
   - `design-readiness-report.json`
   - `clarification-challenge-report.json`
@@ -155,9 +157,12 @@ TARGET_ROOT/
 - 规范要求：
   - S1 不得只做单轮问答后立即结束；只要仍存在会影响设计的歧义，就必须继续向用户追问。
   - `requirement-clarification-lead` 是唯一直接与用户对话的角色；challenge roles 只能在内部审阅草案、提出补问建议与 handoff 建议，不得直接对用户发问。
-  - 每轮只聚焦当前最高优先级的未决问题，直到“用户诉求 / 最终目的 / 成功标准 / 触发方式 / 输入输出 / 质量门禁”全部明确。
-  - `workflow-spec.md` 必须包含 `User Intent`、`Clarification Summary`、`Open Questions`、`Assumptions and Boundaries`、`Readback Confirmation`。
+  - 每轮只聚焦当前最高优先级的 1-3 个 design-consequential 问题，直到“用户诉求 / 最终目的 / 成功标准 / 触发方式 / 输入输出 / 质量门禁 / logic lenses”全部明确。
+  - S1 必须按七个 logic lenses 组织需求逻辑：`purpose`、`object_model`、`process_model`、`decision_model`、`evidence_model`、`acceptance_model`、`boundary_model`。
+  - 问题必须能改变目标 workflow 节点、分支决策、证据要求、验收场景或停止边界；L/XL 请求不得只靠“还有什么边界场景/输入输出/约束”这类泛问题进入设计。
+  - `workflow-spec.md` 必须包含 `User Intent`、`Clarification Summary`、`Requirement Logic Interview`、`Open Questions`、`Assumptions and Boundaries`、`Readback Confirmation`。
   - S1 必须把澄清结果派生为结构化澄清包与 challenge/handoff/evidence 产物，供 `S2/S3` 直接消费，而不是只依赖 prose draft。
+  - `clarification-handoff.json` 必须携带 `logic_map_path`、`question_backlog_path`、S2 logic lens inputs、S3 node candidates 与 acceptance scenarios。
   - S1 必须把原始请求拆成可追踪 `REQ-*`，每条需求都要保留 `source_ref`、优先级、验收口径和边界；阻塞未决问题不得伪装成已确认需求。
 
 ### S2 领域研究阶段（Explore Context）
@@ -264,7 +269,7 @@ TARGET_ROOT/
 | Stage | 可验证准出条件 | 最小证据 |
 |---|---|---|
 | S0 | `intent` 属于 4 个枚举，`target_root` 为绝对路径且目录已存在（不存在时已创建） | `RUN_ROOT/outputs/stages/s0-route.json` |
-| S1 | `workflow-spec.md` 存在、不含 `TBD/待补`，包含 `User Intent`、`Clarification Summary`、`Open Questions`、`Assumptions and Boundaries`、`Readback Confirmation`；`澄清轮次 >= 2`；`s1-requirements.yaml` 至少包含一条 `REQ-*`；`design-readiness-report.json=READY`；`clarification-handoff.json.ready=true`；challenge roles 未直接面向用户 | `RUN_ROOT/workflow-spec.md`、`RUN_ROOT/outputs/stages/s1-requirements.yaml`、`RUN_ROOT/outputs/stages/clarification-record.json`、`RUN_ROOT/outputs/stages/open-questions.json`、`RUN_ROOT/outputs/stages/assumption-log.md`、`RUN_ROOT/outputs/stages/design-readiness-report.json`、`RUN_ROOT/outputs/stages/clarification-challenge-report.json`、`RUN_ROOT/outputs/stages/clarification-handoff.json`、`RUN_ROOT/outputs/stages/clarification-evidence.json` |
+| S1 | `workflow-spec.md` 存在、不含 `TBD/待补`，包含 `User Intent`、`Clarification Summary`、`Requirement Logic Interview`、`Open Questions`、`Assumptions and Boundaries`、`Readback Confirmation`；`澄清轮次 >= 2`；`s1-requirements.yaml` 至少包含一条 `REQ-*`；M+ 草案必须有完整七个 logic lenses、`question-backlog.json`、`requirement-logic-map.json` 且 `REQ-*` 链接到 process/evidence/acceptance；`design-readiness-report.json=READY`；`clarification-handoff.json.ready=true`；challenge roles 未直接面向用户 | `RUN_ROOT/workflow-spec.md`、`RUN_ROOT/outputs/stages/s1-requirements.yaml`、`RUN_ROOT/outputs/stages/question-backlog.json`、`RUN_ROOT/outputs/stages/requirement-logic-map.json`、`RUN_ROOT/outputs/stages/clarification-record.json`、`RUN_ROOT/outputs/stages/open-questions.json`、`RUN_ROOT/outputs/stages/assumption-log.md`、`RUN_ROOT/outputs/stages/design-readiness-report.json`、`RUN_ROOT/outputs/stages/clarification-challenge-report.json`、`RUN_ROOT/outputs/stages/clarification-handoff.json`、`RUN_ROOT/outputs/stages/clarification-evidence.json` |
 | S2 | 上下文报告包含“可复用资产/缺口/命名建议”三段，结构化 findings 能回溯到 `REQ-*` | `RUN_ROOT/outputs/stages/s2-context-report.md`、`RUN_ROOT/outputs/stages/s2-context-findings.yaml` |
 | S3 | `s3-design-highlevel.md`、`s3-design-lowlevel.md`、`acceptance-tests.yaml`、`traceability-matrix.json` 存在且覆盖 `REQ-*`；复杂节点已有 `node-design` 或明确豁免；`workflow-spec.yaml` 可解析且关键键存在；`workflow-view.md` 与 `workflow-lowlevel.md` 已生成，且 `workflow-lowlevel.md` 可由 `workflow-spec.yaml` 确定性重算；审批状态已记录且未绕过 gate | `RUN_ROOT/outputs/stages/s3-design-highlevel.md`、`RUN_ROOT/outputs/stages/s3-design-lowlevel.md`、条件性 `RUN_ROOT/outputs/stages/node-designs/`、`RUN_ROOT/outputs/stages/s3-implementation-plan.md`、`RUN_ROOT/outputs/stages/acceptance-tests.yaml`、`RUN_ROOT/outputs/stages/traceability-matrix.json`、`RUN_ROOT/workflow-spec.yaml`、`RUN_ROOT/workflow-view.md`、`RUN_ROOT/workflow-lowlevel.md`、`outputs/stages/s3-design-summary.json` |
 | S4 | candidate 目录存在；managed plan/result 存在；`TARGET_ROOT/.workflowprogram/managed-files.json` 已写入且带 `updated_at`；目标侧设计包与 `.workflowprogram/runtime/` 已持久化；冲突不覆盖目标文件 | `RUN_ROOT/outputs/candidate/.claude/`、`RUN_ROOT/outputs/candidate/.workflowprogram/design/`、`RUN_ROOT/outputs/candidate/.workflowprogram/runtime/`、`managed-change-plan/result`、`TARGET_ROOT/.workflowprogram/managed-files.json` |

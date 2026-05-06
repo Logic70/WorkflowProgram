@@ -23,7 +23,7 @@
 | spec 运行契约完整性 | PASS | `runtime_contract` 已覆盖写入边界、最小证据集、失败枚举、环境 skip 条件 |
 | spec 测试契约完整性 | PASS | `test_contract` 已覆盖入口、边界、流程、产物、失败五类判定，并与 `runtime_contract` 通过固定引用语法对接 |
 | 设计源与机器投影分层 | PASS | `s3-design-highlevel.md` / `s3-design-lowlevel.md` 承载设计推理，`workflow-spec.yaml` 只承载机器语义和 `design_refs` |
-| 需求血缘传递 | PASS | 原始请求通过 `s1-requirements.yaml -> s2-context-findings.yaml -> traceability-matrix.json` 映射到设计节点、资产、验收和证据 |
+| 需求血缘传递 | PASS | 原始请求通过 `s1-requirements.yaml -> requirement-logic-map.json -> s2-context-findings.yaml -> traceability-matrix.json` 映射到设计节点、资产、验收和证据 |
 | 复杂节点分层 | PASS | 复杂业务环节通过 `node-designs/<node-id>.md` 与 `workflow_graph.nodes[*]` 对接，不拆成新的 WorkflowProgram `S1..S6` |
 | 视图渲染链路一致性 | PASS | 设计与实现均明确 `tools/generate-view.py` 负责 `workflow-view.md` 渲染 |
 | Stage 间 I/O 依赖闭合 | PASS | `S1->S2->S3->S4->S5->S6` 无未定义依赖 |
@@ -39,6 +39,7 @@
 - `S0` 输出 `intent/target_root`，可驱动 `S1`。
 - `S1` 输出 `workflow-spec.md`，可驱动 `S2`。
 - `S1` 同时输出 `s1-requirements.yaml`，把原始请求转为 `REQ-*`。
+- `S1` 同时输出 `question-backlog.json` 与 `requirement-logic-map.json`，把澄清问题、七个 logic lenses 和 `REQ-* -> process/evidence/acceptance` 链接传给 `S2/S3`。
 - `S2` 输出上下文结论与 `s2-context-findings.yaml`，作为 `S3` 设计输入。
 - `S3` 输出设计源、验收测试、traceability 与 `workflow-spec.yaml` 机器投影，可驱动 `S4`。
 - `S4` 输出 candidate 与 managed 结果，可驱动 `S5`。
@@ -78,6 +79,7 @@
 - 已实现 R3：`workflow-runner.py` 提供程序化 Stage 转移、状态落盘与证据输出。
 - 已实现 R4：`route-intent.py` 提供确定性路由，strict 模式下可对歧义请求执行硬阻断。
 - 已实现 R5：`runtime_contract` 已程序化生效，`workflow-runner.py` 强制执行写入边界、最小证据集校验、失败类别枚举约束与环境 skip。
+- 已实现 R6：S1 logic interview 已程序化生效，`generate-clarification-package.py` 生成 `question-backlog.json` / `requirement-logic-map.json`，`validate-workflow-draft.py` 拒绝泛问题、缺 lens 或缺 `REQ-*` 逻辑链接的设计草案。
 - 已实现 R6：`test_contract` 已由 `validate-workflow-spec.py` 做字段级、引用一致性与覆盖度校验；`generate-view.py` 负责渲染但不改变 runner 语义。
 
 ### 4.3 本轮 5 轮设计审计结论

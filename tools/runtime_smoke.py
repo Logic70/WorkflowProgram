@@ -884,6 +884,8 @@ def main() -> int:
             "outputs/stages/open-questions.json",
             "outputs/stages/assumption-log.md",
             "outputs/stages/design-readiness-report.json",
+            "outputs/stages/question-backlog.json",
+            "outputs/stages/requirement-logic-map.json",
             "outputs/stages/clarification-challenge-report.json",
             "outputs/stages/clarification-handoff.json",
             "outputs/stages/clarification-evidence.json",
