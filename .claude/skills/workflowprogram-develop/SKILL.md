@@ -25,12 +25,18 @@ disable-model-invocation: true
 - 执行过程中必须由 runner / control-plane helper 在内部调用 `${CLAUDE_PLUGIN_ROOT}/scripts/stage-progress.py` 写入进展与关键节点结果；不要把严格 CLI 参数组装交给模型。
 - `workflow-spec.md` 草案在进入 YAML 设计前必须通过 `${CLAUDE_PLUGIN_ROOT}/scripts/validate-workflow-draft.py` 的确定性质量门槛，并产出 `clarification-record.json`、`open-questions.json`、`assumption-log.md`、`design-readiness-report.json`、`clarification-challenge-report.json`、`clarification-handoff.json`、`clarification-evidence.json`。
 - S1 必须通过多轮用户对话澄清“用户诉求、最终目的、成功标准”；若这些信息仍不清楚，不得提前结束需求阶段。
+- S1 必须把原始用户请求拆成 `REQ-*` 需求索引，并写入 `RUN_ROOT/outputs/stages/s1-requirements.yaml`；每条需求必须保留来源、优先级、验收口径和边界。
+- S2 必须把上下文研究结构化为 `RUN_ROOT/outputs/stages/s2-context-findings.yaml`，并把可复用资产、能力候选、风险、约束候选回溯到 `REQ-*`。
+- S3 必须先产出 `s3-design-highlevel.md`、`s3-design-lowlevel.md`、`acceptance-tests.yaml`、`traceability-matrix.json` 和 `s3-implementation-plan.md`，再把可执行语义投影成 `workflow-spec.yaml`。
+- 若某个目标业务节点需要跨模块推理、专业工具、独立 agent/team、loop 或会影响多个下游节点，必须为它生成 `RUN_ROOT/outputs/stages/node-designs/<node-id>.md`；简单整理节点不得强制拆独立 agent。
+- `workflow-spec.yaml` 是机器控制面投影，不是完整设计文档；完整设计推理留在 S3 设计源，YAML 只通过可选 `design_refs` 引用这些文件路径。
 - `workflow-spec.yaml` 产出后必须调用 `${CLAUDE_PLUGIN_ROOT}/scripts/validate-workflow-spec.py` 进行结构校验。
 - `workflow-spec.yaml` 必须包含 `intent_flows`，明确 `develop / audit / iterate / validate` 的逻辑阶段流。
 - `workflow-spec.yaml` 必须包含 `runtime_contract`，且至少声明：`write_boundaries`、`required_evidence`、`failure_kinds`、`environment_skip`。
 - `workflow-spec.yaml` 必须包含 `test_contract`，且至少声明：`entry`、`boundary`、`flow`、`artifacts`、`failure`。
 - `workflow-spec.yaml` 必须包含 `generated_runtime_contract`，且 `mode` 当前固定为 `shared-control-plane-wrapper`。
 - 若目标工作流需要请求特定业务节点图，则 `workflow-spec.yaml` 必须声明 `workflow_graph`；它描述目标工作流自身节点，不要求套用 WorkflowProgram 的 `S1..S6`。
+- node 是流程单位，agent 是执行角色；只有专业知识、上下文窗口、失败归因、并行审查或工具权限形成独立边界时，才为 node 指派独立 agent。
 - 若某个目标业务节点需要持续执行直到 verifier/test 通过，应在该 `workflow_graph.nodes[*].loop_policy` 中声明 Ralph-style loop；适用场景包括逆向分析、迁移修复、报告收敛和 TDD 实现，不适用于宿主安装或人工审批。
 - 若 `loop_policy.goal_source=model_subgoal`，必须声明 `parent_goal_ref`；若启用 TDD，必须声明 test-first 证据要求，并同步扩展 `generated_runtime_contract.runtime_capabilities` 包含 `node_loop_execution`。
 - 若 workflow 需要先发现候选专业能力，则 `workflow-spec.yaml` 还必须声明 `capability_discovery`，并同步扩展 `generated_runtime_contract.runtime_capabilities`。
@@ -45,6 +51,7 @@ disable-model-invocation: true
 - 生成链路完成后必须调用 `${CLAUDE_PLUGIN_ROOT}/scripts/workflow-runner.py` 进行程序化 stage 转移和状态落盘；runner 只负责控制面，不负责 S5 主判定。
 - develop 主链的确定性脚本入口是 `${CLAUDE_PLUGIN_ROOT}/scripts/workflow-entry.py run`；它负责串起 spec 校验、视图生成、managed apply、runner 与 run-state 校验。
 - S5 主判定必须由 `workflowprogram-validate` 承担，`runtime_smoke.py` 仅作为动态 harness 补证据。
+- S5 必须检查 `REQ -> design node -> asset -> acceptance test -> evidence` 的需求血缘；缺设计节点、缺验收测试、缺证据映射或 node-design 未投影到 YAML 时，不得给出 clean PASS。
 - `RUN_ROOT/state.json` 必须通过 `${CLAUDE_PLUGIN_ROOT}/scripts/validate-run-state.py`，确保 `kind/producer/status` 枚举合规。
 
 ## Step 1: Resolve Target
@@ -59,15 +66,24 @@ disable-model-invocation: true
 1. 用统一规格模板整理需求。
 2. 每轮只提出当前最关键的 1-3 个未决问题，并根据用户回答继续追问，直到诉求、目的和成功标准清楚为止。
 3. 在 `workflow-spec.md` 中显式整理 `User Intent`、`Clarification Summary`、`Open Questions`、`Assumptions and Boundaries`、`Target Workflow Graph Readback`、`File Plan`、`Readback Confirmation`。
-4. 调用 `${CLAUDE_PLUGIN_ROOT}/scripts/generate-clarification-package.py`，生成 S1 结构化澄清包。
-5. 调用 `${CLAUDE_PLUGIN_ROOT}/scripts/generate-clarification-review.py`，生成 challenge/handoff/evidence 三份审阅产物。
-6. 约束：`requirement-clarification-lead` 是唯一与用户直接对话的角色；`scenario-extractor`、`assumption-auditor`、`constraint-reviewer` 只能在内部 challenge 中提出补问与 handoff 建议，不得直接触达用户。
-7. 形成工作流规格、模式选择和文件清单，并让 `S2/S3` 显式消费 `clarification-handoff.json`。
-8. 写入进展事件：`S1 StageCheckpoint` 与 `S1 StageCompleted`。
+4. 派生 `RUN_ROOT/outputs/stages/s1-requirements.yaml`，把原始请求拆为 `REQ-*`，并记录 `source_ref`、`priority`、`acceptance_hint`、`boundaries`。
+5. 调用 `${CLAUDE_PLUGIN_ROOT}/scripts/generate-clarification-package.py`，生成 S1 结构化澄清包。
+6. 调用 `${CLAUDE_PLUGIN_ROOT}/scripts/generate-clarification-review.py`，生成 challenge/handoff/evidence 三份审阅产物。
+7. 约束：`requirement-clarification-lead` 是唯一与用户直接对话的角色；`scenario-extractor`、`assumption-auditor`、`constraint-reviewer` 只能在内部 challenge 中提出补问与 handoff 建议，不得直接触达用户。
+8. 形成工作流规格、模式选择和文件清单，并让 `S2/S3` 显式消费 `clarification-handoff.json` 与 `s1-requirements.yaml`。
+9. 写入进展事件：`S1 StageCheckpoint` 与 `S1 StageCompleted`。
 
 ## Step 3: Design Assets
 
-先在 `RUN_ROOT/outputs/candidate/` 规划或生成候选资产，再决定是否应用到目标项目：
+先形成设计源和机器投影，再在 `RUN_ROOT/outputs/candidate/` 规划或生成候选资产：
+
+- `outputs/stages/s3-design-highlevel.md`
+- `outputs/stages/s3-design-lowlevel.md`
+- 条件性 `outputs/stages/node-designs/<node-id>.md`
+- `outputs/stages/acceptance-tests.yaml`
+- `outputs/stages/traceability-matrix.json`
+- `outputs/stages/s3-implementation-plan.md`
+- `workflow-spec.yaml`，其中可选 `design_refs` 只引用上述文件路径
 
 - `settings.json`
 - `skills/`
@@ -94,7 +110,7 @@ disable-model-invocation: true
    - `workflow-runner.py run`
    - `validate-run-state.py`
 3. 若 `managed-assets.py apply-staged` 报冲突，停止在 S4，保留 candidate 与 conflict 副本，不静默覆盖目标项目
-4. 交由 `workflowprogram-validate` 形成 S5 主判定，并在可用时运行 `runtime_smoke.py` 补充动态证据
+4. 交由 `workflowprogram-validate` 形成 S5 主判定，并在可用时运行 `runtime_smoke.py` 补充动态证据；S5 必须检查 traceability 和 node-design 投影一致性
 5. 读取 `RUN_ROOT/outputs/stages/entry-orchestration-summary.json` 作为产品入口编排摘要
 6. 写入进展事件：`S4 StageStarted`、`S4 StageCheckpoint`、`S4 StageCompleted`
 
@@ -113,6 +129,7 @@ disable-model-invocation: true
 
 - 目标项目路径
 - 设计摘要
+- 需求血缘摘要：`REQ-* -> design node -> asset -> acceptance test -> evidence`
 - 计划新增或修改的 workflow 资产
 - managed asset 计划或冲突摘要
 - 当前阶段进展与关键节点历史结果摘要

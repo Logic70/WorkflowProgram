@@ -53,6 +53,13 @@ VALID_KIND = {
     "managed_plan",
     "managed_result",
     "build_manifest",
+    "requirement_index",
+    "context_findings",
+    "design_source",
+    "node_design",
+    "implementation_plan",
+    "acceptance_tests",
+    "traceability_matrix",
     "host_capability_report",
     "host_bootstrap_plan",
     "host_bootstrap_apply",
@@ -424,6 +431,20 @@ def infer_kind(path: str) -> str:
 
     cleaned = path.strip().rstrip("/")
     name = Path(cleaned).name
+    if cleaned.endswith("outputs/stages/s1-requirements.yaml"):
+        return "requirement_index"
+    if cleaned.endswith("outputs/stages/s2-context-findings.yaml"):
+        return "context_findings"
+    if cleaned.endswith("outputs/stages/s3-design-highlevel.md") or cleaned.endswith("outputs/stages/s3-design-lowlevel.md"):
+        return "design_source"
+    if "/outputs/stages/node-designs/" in cleaned:
+        return "node_design"
+    if cleaned.endswith("outputs/stages/s3-implementation-plan.md"):
+        return "implementation_plan"
+    if cleaned.endswith("outputs/stages/acceptance-tests.yaml"):
+        return "acceptance_tests"
+    if cleaned.endswith("outputs/stages/traceability-matrix.json"):
+        return "traceability_matrix"
     if cleaned.endswith("workflow-spec.md") or cleaned.endswith("workflow-spec.yaml"):
         return "spec"
     if cleaned.endswith("workflow-view.md"):

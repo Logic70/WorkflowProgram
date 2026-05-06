@@ -471,6 +471,136 @@ def _write_workflow_spec_draft(run_root: Path, entry_skill: str, request: str) -
     _write_text(run_root / "workflow-spec.md", content + "\n")
 
 
+def _write_design_source_artifacts(run_root: Path, request: str) -> None:
+    """写出最小但可追踪的 S1-S3 设计源证据。"""
+
+    request_text = request.strip() or "default request"
+    stages_root = run_root / "outputs" / "stages"
+    _write_text(
+        stages_root / "s1-requirements.yaml",
+        yaml.safe_dump(
+            {
+                "requirements": [
+                    {
+                        "id": "REQ-001",
+                        "source_ref": "USER-REQUEST-001",
+                        "priority": "must",
+                        "statement": f"Create a managed workflow for: {request_text}",
+                        "acceptance_hint": "Generated assets, runtime evidence, and validation summary exist.",
+                        "boundaries": [
+                            "Do not overwrite unmanaged target assets silently.",
+                            "Do not skip S5 validation.",
+                        ],
+                    }
+                ]
+            },
+            allow_unicode=True,
+            sort_keys=False,
+        ),
+    )
+    _write_text(
+        stages_root / "s2-context-findings.yaml",
+        yaml.safe_dump(
+            {
+                "findings": [
+                    {
+                        "id": "CTX-001",
+                        "requirement_refs": ["REQ-001"],
+                        "kind": "workflow_asset_context",
+                        "summary": "Target workflow assets and WorkflowProgram constraints are available to S3.",
+                    }
+                ]
+            },
+            allow_unicode=True,
+            sort_keys=False,
+        ),
+    )
+    _write_text(
+        stages_root / "s3-design-highlevel.md",
+        "\n".join(
+            [
+                "# S3 High-Level Design",
+                "",
+                "- Requirement refs: `REQ-001`",
+                "- Target workflow purpose: generate managed Claude Code workflow assets with runtime evidence.",
+                "- Target graph: `intake -> implement -> done`.",
+                "- Boundary: design source stays outside `workflow-spec.yaml` prose.",
+                "",
+            ]
+        ),
+    )
+    _write_text(
+        stages_root / "s3-design-lowlevel.md",
+        "\n".join(
+            [
+                "# S3 Low-Level Design",
+                "",
+                "- Requirement refs: `REQ-001`",
+                "- `intake` captures request context and produces an intake summary.",
+                "- `implement` generates `.claude` assets and `.workflowprogram` runtime/design assets.",
+                "- S5 validates managed apply, state evidence, and design lineage.",
+                "",
+            ]
+        ),
+    )
+    _write_text(
+        stages_root / "s3-implementation-plan.md",
+        "\n".join(
+            [
+                "# S3 Implementation Plan",
+                "",
+                "1. Generate candidate workflow assets from the accepted design.",
+                "2. Apply managed assets through the managed-asset boundary.",
+                "3. Run S5 validation and persist runtime evidence.",
+                "",
+            ]
+        ),
+    )
+    _write_text(
+        stages_root / "acceptance-tests.yaml",
+        yaml.safe_dump(
+            {
+                "acceptance_tests": [
+                    {
+                        "id": "AT-001",
+                        "covers": ["REQ-001"],
+                        "verifier": "S5",
+                        "expected_evidence": [
+                            "state.json",
+                            "events.jsonl",
+                            "outputs/stages/s5-validation-summary.json",
+                        ],
+                    }
+                ]
+            },
+            allow_unicode=True,
+            sort_keys=False,
+        ),
+    )
+    write_json(
+        stages_root / "traceability-matrix.json",
+        {
+            "schema_version": 1,
+            "links": [
+                {
+                    "requirement_id": "REQ-001",
+                    "design_nodes": ["intake", "implement"],
+                    "assets": [
+                        ".workflowprogram/design/workflow-spec.yaml",
+                        ".workflowprogram/runtime/workflow-entry.py",
+                    ],
+                    "acceptance_tests": ["AT-001"],
+                    "evidence": [
+                        "state.json",
+                        "events.jsonl",
+                        "outputs/stages/s5-validation-summary.json",
+                    ],
+                }
+            ],
+        },
+    )
+
+
 def _copy_runtime_spec(repo_root: Path, run_root: Path, entry_skill: str) -> Path:
     """为 fixture_host 准备可供 view/lowlevel 生成器消费的 workflow-spec.yaml。"""
 
@@ -717,6 +847,7 @@ def _invoke_fixture_host(
         # develop fixture 路径会写出与真实运行同类的产物：
         # spec draft、candidate assets、managed apply 输出和 S6 产物。
         _write_workflow_spec_draft(run_root, entry_skill, request)
+        _write_design_source_artifacts(run_root, request)
         spec_path = _copy_runtime_spec(_repo_root(), run_root, entry_skill)
         design_docs = _generate_design_docs(spec_path, run_root)
         candidate_root = run_root / "outputs" / "candidate"

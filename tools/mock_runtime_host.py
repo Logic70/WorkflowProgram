@@ -42,6 +42,117 @@ def manifest_path_for(target_root: Path) -> Path:
     return target_root / ".workflowprogram" / "managed-files.json"
 
 
+def write_design_source_artifacts(run_root: Path, request: str) -> None:
+    """写出最小但可追踪的设计源证据，供 S5 lineage 检查消费。"""
+
+    request_text = request.strip() or "mock request"
+    stages_root = run_root / "outputs" / "stages"
+    write_text(
+        stages_root / "s1-requirements.yaml",
+        yaml.safe_dump(
+            {
+                "requirements": [
+                    {
+                        "id": "REQ-001",
+                        "source_ref": "USER-REQUEST-001",
+                        "priority": "must",
+                        "statement": f"Create a managed workflow for: {request_text}",
+                        "acceptance_hint": "Generated assets, runtime evidence, and validation summary exist.",
+                        "boundaries": [
+                            "Do not overwrite unmanaged target assets silently.",
+                            "Do not skip S5 validation.",
+                        ],
+                    }
+                ]
+            },
+            allow_unicode=True,
+            sort_keys=False,
+        ),
+    )
+    write_text(
+        stages_root / "s2-context-findings.yaml",
+        yaml.safe_dump(
+            {
+                "findings": [
+                    {
+                        "id": "CTX-001",
+                        "requirement_refs": ["REQ-001"],
+                        "kind": "workflow_asset_context",
+                        "summary": "Target workflow assets and WorkflowProgram constraints are available to S3.",
+                    }
+                ]
+            },
+            allow_unicode=True,
+            sort_keys=False,
+        ),
+    )
+    write_text(
+        stages_root / "s3-design-highlevel.md",
+        "# S3 High-Level Design\n\n"
+        "- Requirement refs: `REQ-001`\n"
+        "- Target workflow purpose: generate managed Claude Code workflow assets with runtime evidence.\n"
+        "- Target graph: `intake -> implement -> done`.\n",
+    )
+    write_text(
+        stages_root / "s3-design-lowlevel.md",
+        "# S3 Low-Level Design\n\n"
+        "- Requirement refs: `REQ-001`\n"
+        "- `intake` captures request context and produces an intake summary.\n"
+        "- `implement` generates `.claude` and `.workflowprogram` assets.\n"
+        "- S5 validates managed apply, state evidence, and design lineage.\n",
+    )
+    write_text(
+        stages_root / "s3-implementation-plan.md",
+        "# S3 Implementation Plan\n\n"
+        "1. Generate candidate workflow assets from the accepted design.\n"
+        "2. Apply managed assets through the managed-asset boundary.\n"
+        "3. Run S5 validation and persist runtime evidence.\n",
+    )
+    write_text(
+        stages_root / "acceptance-tests.yaml",
+        yaml.safe_dump(
+            {
+                "acceptance_tests": [
+                    {
+                        "id": "AT-001",
+                        "covers": ["REQ-001"],
+                        "verifier": "S5",
+                        "expected_evidence": [
+                            "state.json",
+                            "events.jsonl",
+                            "outputs/stages/s5-validation-summary.json",
+                        ],
+                    }
+                ]
+            },
+            allow_unicode=True,
+            sort_keys=False,
+        ),
+    )
+    write_json(
+        stages_root / "traceability-matrix.json",
+        {
+            "schema_version": 1,
+            "links": [
+                {
+                    "requirement_id": "REQ-001",
+                    "design_nodes": ["intake", "implement"],
+                    "assets": [
+                        ".workflowprogram/design/workflow-spec.yaml",
+                        ".workflowprogram/runtime/workflow-entry.py",
+                    ],
+                    "acceptance_tests": ["AT-001"],
+                    "evidence": [
+                        "state.json",
+                        "events.jsonl",
+                        "outputs/stages/s5-validation-summary.json",
+                    ],
+                }
+            ],
+        },
+    )
+
+
 def copy_runtime_spec(
     repo_root: Path,
     run_root: Path,
@@ -63,6 +174,7 @@ def copy_runtime_spec(
     """
     spec_path = repo_root / "tests" / "spec-fixtures" / spec_name
     run_root.mkdir(parents=True, exist_ok=True)
+    write_design_source_artifacts(run_root, "mock request")
     target_path = run_root / "workflow-spec.yaml"
     payload = yaml.safe_load(spec_path.read_text(encoding="utf-8"))
     test_contract = payload.get("test_contract", {})

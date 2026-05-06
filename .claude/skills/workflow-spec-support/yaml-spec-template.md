@@ -5,8 +5,21 @@ meta:
   name: example-workflow
   version: "1.0.0"
   target_platform: claude_code
-  source_design: workflow-design.md
+  source_design: outputs/stages/s3-design-highlevel.md
   complexity: M  # S/M/L/XL - 用于 Stage 5 Turn Count 配置
+
+# 可选设计源引用：只保存 RUN_ROOT 相对路径，完整设计推理不要塞进 YAML。
+# S5 使用这些引用检查 REQ -> design node -> asset -> acceptance test -> evidence。
+design_refs:
+  requirements: outputs/stages/s1-requirements.yaml
+  context_findings: outputs/stages/s2-context-findings.yaml
+  design_highlevel: outputs/stages/s3-design-highlevel.md
+  design_lowlevel: outputs/stages/s3-design-lowlevel.md
+  implementation_plan: outputs/stages/s3-implementation-plan.md
+  acceptance_tests: outputs/stages/acceptance-tests.yaml
+  traceability_matrix: outputs/stages/traceability-matrix.json
+  # node_designs:
+  #   build_dfd: outputs/stages/node-designs/build_dfd.md
 
 # 阶段定义
 stages:
@@ -16,7 +29,9 @@ stages:
     pattern: Explore
     agent_ref: requirement_analyst
     input: $ARGUMENTS
-    output: workflow-spec.md
+    output: |
+      workflow-spec.md
+      outputs/stages/s1-requirements.yaml
     gate: user_approval
     max_retries: 3
     on_approve: context
@@ -27,8 +42,12 @@ stages:
     name: 领域研究
     pattern: Explore
     agent_ref: requirement_analyst
-    input: workflow-spec.md
-    output: outputs/stages/s2-context-report.md
+    input: |
+      workflow-spec.md
+      outputs/stages/s1-requirements.yaml
+    output: |
+      outputs/stages/s2-context-report.md
+      outputs/stages/s2-context-findings.yaml
     max_retries: 3
 
   - id: design
@@ -36,9 +55,16 @@ stages:
     name: 工作流设计
     pattern: Specialized
     agent_ref: workflow_designer
-    input: outputs/stages/s2-context-report.md
+    input: |
+      outputs/stages/s1-requirements.yaml
+      outputs/stages/s2-context-report.md
+      outputs/stages/s2-context-findings.yaml
     output: |
-      workflow-design.md
+      outputs/stages/s3-design-highlevel.md
+      outputs/stages/s3-design-lowlevel.md
+      outputs/stages/s3-implementation-plan.md
+      outputs/stages/acceptance-tests.yaml
+      outputs/stages/traceability-matrix.json
       workflow-spec.yaml
       workflow-view.md
       workflow-lowlevel.md

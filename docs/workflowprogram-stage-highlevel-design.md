@@ -26,11 +26,12 @@
 - 若工作流依赖宿主专业能力或显式 agent team，则必须分别通过 `host_capabilities` 与 `agent_team_contract` 在 `workflow-spec.yaml` 中声明。
 - 生成后的目标工作流若需要自己的业务节点图，必须在 `workflow-spec.yaml.workflow_graph` 中声明；目标工作流不强制套用 WorkflowProgram 自身的 `S1..S6` 模板。
 - 若目标工作流的某个业务节点需要 Ralph-style 持续执行直到验证通过，必须在该 `workflow_graph.nodes[*].loop_policy` 中声明；它是目标节点策略，不替换 WorkflowProgram 自身 `S1..S6` 主链。
+- 目标工作流设计采用“设计源 -> 机器投影 -> 派生视图 -> 运行证据”分层：`s3-design-highlevel.md` / `s3-design-lowlevel.md` 解释为什么这样设计，`workflow-spec.yaml` 只承载脚本、validator、runner、judge 需要执行和验证的最小机器契约。
 
 ### 2.2 冲突收敛决策
 
 - 决策 D1：优先使用现有 Claude Code 能力边界，不引入脱离现状的独立工作流引擎。
-- 决策 D2：`workflow-spec.yaml` 作为流程控制面（control plane）与设计单点真实源。
+- 决策 D2：`workflow-spec.yaml` 作为流程控制面（control plane）与机器语义真源；完整设计推理、取舍与复杂节点方案必须留在 S3 设计源文件中，不反向塞进 YAML。
 - 决策 D3：`state` 分为 `values` 与 `artifacts` 两类；文件内容落盘，`state` 仅追踪文件引用与状态。
 - 决策 D4：skill/agent 负责节点执行，跨节点轮转由 spec 约束，不由单一大提示词临场决定。
 - 决策 D5：所有目标项目写入必须经过 managed asset 链路，禁止静默覆盖。
@@ -42,6 +43,10 @@
 - 决策 D11：`workflow-spec.yaml.workflow_graph` 作为目标工作流业务图的机器可读真源；`workflow-view.md` 与 `workflow-lowlevel.md` 只能从 YAML 派生展示，不得反向定义新的执行语义。
 - 决策 D12：managed apply 必须同时产出 `managed-rollback-manifest.json` 与 `managed-recover-instructions.md`，用于覆盖 created / updated / conflicted / user-modified 文件的恢复边界。
 - 决策 D13：面向用户或跨阶段消费的 JSON 报告必须带 `schema_version`、`error_code`、`failure_kind` 与 `remediation` 字段，并对 token/password/key-like 内容做脱敏。
+- 决策 D14：原始需求必须沿 `S1 requirements -> S2 findings -> S3 design source -> workflow-spec.yaml projection -> S4 assets -> S5 evidence -> S6 lessons` 保留需求血缘，禁止在阶段切换中丢失来源。
+- 决策 D15：复杂目标业务节点不拆成新的 WorkflowProgram `S1..S6`，而是升级为 `node-design`，并由 `workflow_graph.nodes[*]`、可选 `loop_policy`、可选 agent/team 契约承接。
+- 决策 D16：node 是流程单位，agent 是执行角色；二者不强制一一对应，只有复杂认知边界、专业能力边界或独立上下文边界才需要独立 agent。
+- 决策 D17：简单工作流不得被强行重型化；`node-designs/**`、agent team、loop policy、host bootstrap 都是按复杂度和需求触发的条件性设计，不是所有工作流的默认负担。
 
 ## 3. 项目结构（高层）
 
@@ -58,6 +63,8 @@ TARGET_ROOT/
 ├── .claude/                 # 最终交付工作流资产
 └── .workflowprogram/
     ├── managed-files.json   # managed 文件清单
+    ├── design/              # 目标工作流机器契约与派生视图
+    ├── runtime/             # 目标侧 shared-control-plane-wrapper
     └── runs/<run-id>/       # 本次运行证据
 ```
 
@@ -113,7 +120,7 @@ TARGET_ROOT/
 最终输出（交付层）：
 
 - `TARGET_ROOT/.claude/` 资产（`settings.json`、`skills/`、`agents/`、`rules/`、可选 `commands/`）
-- `TARGET_ROOT/.workflowprogram/design/` 设计资产（`workflow-spec.yaml`、`workflow-view.md`、`workflow-lowlevel.md`）
+- `TARGET_ROOT/.workflowprogram/design/` 机器契约与派生视图（`workflow-spec.yaml`、`workflow-view.md`、`workflow-lowlevel.md`）
 - `TARGET_ROOT/.workflowprogram/runtime/` 目标侧 deterministic runtime 资产（`workflow-entry.py`、`workflow-runner.py`、`validate-run-state.py`、`runtime-manifest.json`）
 - `TARGET_ROOT/.workflowprogram/managed-files.json`
 - `RUN_ROOT` 证据（`context.json`、`state.json`、`events.jsonl`、`transcript.md`、`validation-runtime-report.md`、`outputs/`）
@@ -136,6 +143,7 @@ TARGET_ROOT/
 - 目标：通过持续多轮对话把自然语言需求收敛为无歧义规格，明确用户诉求、最终目的与成功标准。
 - 输出：
   - `workflow-spec.md`（人类可读规格草案）
+  - `outputs/stages/s1-requirements.yaml`（`REQ-*` 需求索引、来源、优先级、成功标准、边界）
   - `clarification-record.json`
   - `open-questions.json`
   - `assumption-log.md`
@@ -150,19 +158,32 @@ TARGET_ROOT/
   - 每轮只聚焦当前最高优先级的未决问题，直到“用户诉求 / 最终目的 / 成功标准 / 触发方式 / 输入输出 / 质量门禁”全部明确。
   - `workflow-spec.md` 必须包含 `User Intent`、`Clarification Summary`、`Open Questions`、`Assumptions and Boundaries`、`Readback Confirmation`。
   - S1 必须把澄清结果派生为结构化澄清包与 challenge/handoff/evidence 产物，供 `S2/S3` 直接消费，而不是只依赖 prose draft。
+  - S1 必须把原始请求拆成可追踪 `REQ-*`，每条需求都要保留 `source_ref`、优先级、验收口径和边界；阻塞未决问题不得伪装成已确认需求。
 
 ### S2 领域研究阶段（Explore Context）
 
 - 目标：识别目标项目可复用资产、缺口和命名约定。
-- 输出：结构化研究结论（供设计阶段使用）。
+- 输出：
+  - `outputs/stages/s2-context-report.md`
+  - `outputs/stages/s2-context-findings.yaml`（可复用资产、能力缺口、风险、外部依赖、约束候选）
+- 规范要求：
+  - S2 研究必须显式消费 `REQ-*` 与 `clarification-handoff.json`，不能只对目标仓库做泛泛扫描。
+  - 若发现某条需求依赖 skill / MCP / CLI / licensed tool，应先形成 `capability_candidate`，再由 S3 决定是否投影为 `capability_discovery` 或 `host_capabilities`。
 
 ### S3 结构设计阶段（Design）
 
-- 目标：确定模式组合、节点职责、文件清单与门禁。
+- 目标：把 S1 需求与 S2 上下文转化为可执行工作流设计、机器契约和验收映射。
 - 输出：
+  - `outputs/stages/s3-design-highlevel.md`（目标工作流整体设计源）
+  - `outputs/stages/s3-design-lowlevel.md`（节点、字段、证据、失败路径、能力依赖的设计源）
+  - 条件性 `outputs/stages/node-designs/<node-id>.md`（复杂节点子设计）
+  - `outputs/stages/s3-implementation-plan.md`
+  - `outputs/stages/acceptance-tests.yaml`
+  - `outputs/stages/traceability-matrix.json`
   - `workflow-spec.yaml`（机器可读控制面）
+  - 可选 `design_refs`（内嵌于 `workflow-spec.yaml`，只引用设计源、验收与 traceability 文件路径，不承载完整设计推理）
   - `runtime_contract`（内嵌于 `workflow-spec.yaml`，定义写入边界、证据集、失败枚举、环境 skip）
-- `test_contract`（内嵌于 `workflow-spec.yaml`，定义入口/边界/流程/产物/失败五类基础测试判定）
+  - `test_contract`（内嵌于 `workflow-spec.yaml`，定义入口/边界/流程/产物/失败五类基础测试判定）
   - `generated_runtime_contract`（内嵌于 `workflow-spec.yaml`，定义目标侧 runtime 包装层的交付路径与 `runtime_capabilities`）
   - 可选 `workflow_graph`（目标工作流自己的业务节点、入口、转移、输出、gate 与 owner；不要求套用 `S1..S6`）
   - 可选 `capability_discovery`（能力发现与推荐契约）
@@ -172,6 +193,12 @@ TARGET_ROOT/
   - `workflow-view.md`（只读视图）
   - `workflow-lowlevel.md`（维护与迭代指导；不得覆盖 YAML 语义）
 - 规范要求：
+  - S3 必须先产出设计源，再投影 `workflow-spec.yaml`；不得跳过设计源直接写 YAML。
+  - `s3-design-highlevel.md` 回答目标工作流为什么存在、整体怎么组织、用户怎么使用、如何验证。
+  - `s3-design-lowlevel.md` 回答每个目标节点的输入输出、owner、gate、能力依赖、证据、失败路径和对应 YAML 字段。
+  - 复杂节点满足任一条件时必须产出 `node-design`：跨模块阅读、多步推理、生成中间模型、需要专业工具/agent、需要 verifier/test 循环、输出影响多个后续节点。
+  - agent 设计必须基于复杂认知边界，而不是按 node 机械一一拆分；简单格式化、归档、命名、状态更新应优先由 skill 或 script 承接。
+  - `traceability-matrix.json` 必须记录 `REQ -> design node -> asset -> acceptance test -> evidence` 的最小覆盖链。
   - `develop` 主链必须在 S3 完成后经过审批 gate，方可进入 S4。
   - 审批记录必须区分 `approved`（人工批准）与 `auto-approved`（CI 或参数自动放行）。
   - `generated_runtime_contract.mode` 当前固定为 `shared-control-plane-wrapper`；目标工作流必须交付 wrapper，不得只交付提示词与设计文档。
@@ -181,7 +208,7 @@ TARGET_ROOT/
   - 当声明 `agent_team_contract.enabled=true` 时，`generated_runtime_contract.runtime_capabilities` 必须包含 `team_orchestration`。
   - 当任一 `workflow_graph.nodes[*].loop_policy.enabled=true` 时，`generated_runtime_contract.runtime_capabilities` 必须包含 `node_loop_execution`。
   - 领域画像可选地推荐默认 `agent_team_contract`，但推荐值必须保持可编辑，且不得覆盖用户显式选择。
-  - `workflow-spec.md` 是用户回读确认材料；真正进入脚本、validator、runner、judge 的语义必须全部落在 `workflow-spec.yaml`。
+  - `workflow-spec.md` 是用户回读确认材料；完整设计推理落在 S3 设计源；真正进入脚本、validator、runner、judge 的执行语义必须投影到 `workflow-spec.yaml`。
   - 若存在 `workflow_graph`，S3 readback 必须列出 graph summary、目标资产清单、启用/关闭能力与 managed apply policy。
 
 ### S4 资产生成与受控写入阶段（Generate + Managed Apply）
@@ -216,6 +243,8 @@ TARGET_ROOT/
   - `context.json`、`state.json`、`events.jsonl` 属于运行态/控制面证据，由 runner 负责保留。
   - `validation-runtime-report.md` 与 `outputs/stages/s5-validation-summary.json` 属于 S5 判定产物。
   - `transcript.md` 属于动态运行证据，由 `runtime_smoke.py` 或等效 harness 补充，供 S5 消费。
+  - S5 必须校验设计源、`workflow-spec.yaml`、生成资产与运行证据之间的覆盖关系；若某个 `REQ-*` 没有设计节点、验收测试或证据映射，不得判为 clean PASS。
+  - 若存在 `node-designs/<node-id>.md`，S5 必须确认对应 `workflow_graph.nodes[*].id` 存在，且该节点的关键输入、输出、gate、owner、能力与证据已投影到 YAML 或 traceability。
   - 若声明 `capability_discovery`，S5 必须消费 `host-capability-candidates.json` 与 `host-bootstrap-instructions.md`，并验证候选与人工指引都已生成。
   - 若声明 `host_capabilities`，S5 必须消费 `host-capability-report.json`，并在 `validate/audit` 场景对当前宿主执行实时 probe。
   - 若声明 `host_capabilities`，`validate/audit/iterate` 还必须产出 `environment-remediation-report.json` 与 `environment-remediation-guide.md`，把未解决的 manual step / bootstrap / re-check 指引显式写给用户。
@@ -235,9 +264,9 @@ TARGET_ROOT/
 | Stage | 可验证准出条件 | 最小证据 |
 |---|---|---|
 | S0 | `intent` 属于 4 个枚举，`target_root` 为绝对路径且目录已存在（不存在时已创建） | `RUN_ROOT/outputs/stages/s0-route.json` |
-| S1 | `workflow-spec.md` 存在、不含 `TBD/待补`，包含 `User Intent`、`Clarification Summary`、`Open Questions`、`Assumptions and Boundaries`、`Readback Confirmation`；`澄清轮次 >= 2`；`design-readiness-report.json=READY`；`clarification-handoff.json.ready=true`；challenge roles 未直接面向用户 | `RUN_ROOT/workflow-spec.md`、`RUN_ROOT/outputs/stages/clarification-record.json`、`RUN_ROOT/outputs/stages/open-questions.json`、`RUN_ROOT/outputs/stages/assumption-log.md`、`RUN_ROOT/outputs/stages/design-readiness-report.json`、`RUN_ROOT/outputs/stages/clarification-challenge-report.json`、`RUN_ROOT/outputs/stages/clarification-handoff.json`、`RUN_ROOT/outputs/stages/clarification-evidence.json` |
-| S2 | 上下文报告包含“可复用资产/缺口/命名建议”三段 | `RUN_ROOT/outputs/stages/s2-context-report.md` |
-| S3 | `workflow-spec.yaml` 可解析且关键键存在（含 `runtime_contract`、`test_contract`、`generated_runtime_contract`）；`workflow-view.md` 与 `workflow-lowlevel.md` 已生成，且 `workflow-lowlevel.md` 可由 `workflow-spec.yaml` 确定性重算；审批状态已记录且未绕过 gate | `RUN_ROOT/workflow-spec.yaml`、`RUN_ROOT/workflow-view.md`、`RUN_ROOT/workflow-lowlevel.md`、`outputs/stages/s3-design-summary.json` |
+| S1 | `workflow-spec.md` 存在、不含 `TBD/待补`，包含 `User Intent`、`Clarification Summary`、`Open Questions`、`Assumptions and Boundaries`、`Readback Confirmation`；`澄清轮次 >= 2`；`s1-requirements.yaml` 至少包含一条 `REQ-*`；`design-readiness-report.json=READY`；`clarification-handoff.json.ready=true`；challenge roles 未直接面向用户 | `RUN_ROOT/workflow-spec.md`、`RUN_ROOT/outputs/stages/s1-requirements.yaml`、`RUN_ROOT/outputs/stages/clarification-record.json`、`RUN_ROOT/outputs/stages/open-questions.json`、`RUN_ROOT/outputs/stages/assumption-log.md`、`RUN_ROOT/outputs/stages/design-readiness-report.json`、`RUN_ROOT/outputs/stages/clarification-challenge-report.json`、`RUN_ROOT/outputs/stages/clarification-handoff.json`、`RUN_ROOT/outputs/stages/clarification-evidence.json` |
+| S2 | 上下文报告包含“可复用资产/缺口/命名建议”三段，结构化 findings 能回溯到 `REQ-*` | `RUN_ROOT/outputs/stages/s2-context-report.md`、`RUN_ROOT/outputs/stages/s2-context-findings.yaml` |
+| S3 | `s3-design-highlevel.md`、`s3-design-lowlevel.md`、`acceptance-tests.yaml`、`traceability-matrix.json` 存在且覆盖 `REQ-*`；复杂节点已有 `node-design` 或明确豁免；`workflow-spec.yaml` 可解析且关键键存在；`workflow-view.md` 与 `workflow-lowlevel.md` 已生成，且 `workflow-lowlevel.md` 可由 `workflow-spec.yaml` 确定性重算；审批状态已记录且未绕过 gate | `RUN_ROOT/outputs/stages/s3-design-highlevel.md`、`RUN_ROOT/outputs/stages/s3-design-lowlevel.md`、条件性 `RUN_ROOT/outputs/stages/node-designs/`、`RUN_ROOT/outputs/stages/s3-implementation-plan.md`、`RUN_ROOT/outputs/stages/acceptance-tests.yaml`、`RUN_ROOT/outputs/stages/traceability-matrix.json`、`RUN_ROOT/workflow-spec.yaml`、`RUN_ROOT/workflow-view.md`、`RUN_ROOT/workflow-lowlevel.md`、`outputs/stages/s3-design-summary.json` |
 | S4 | candidate 目录存在；managed plan/result 存在；`TARGET_ROOT/.workflowprogram/managed-files.json` 已写入且带 `updated_at`；目标侧设计包与 `.workflowprogram/runtime/` 已持久化；冲突不覆盖目标文件 | `RUN_ROOT/outputs/candidate/.claude/`、`RUN_ROOT/outputs/candidate/.workflowprogram/design/`、`RUN_ROOT/outputs/candidate/.workflowprogram/runtime/`、`managed-change-plan/result`、`TARGET_ROOT/.workflowprogram/managed-files.json` |
 | S5 | 产生 workflow 级结论，且证据链文件齐全；若声明能力发现、宿主能力或 team 契约，则对应 discovery / probe / team evidence 已纳入判定 | `validation-runtime-report.md`、`outputs/stages/s5-validation-summary.json`、条件性 `outputs/stages/host-capability-candidates.json`、`outputs/stages/host-bootstrap-instructions.md`、`outputs/stages/host-capability-report.json`、`outputs/stages/team-plan.json`、`outputs/stages/team-results.json`、`outputs/stages/team-join-summary.json` |
 | S6 | 输出 lessons 增量与约束候选，关联本次 `run-id` 与 `failure_kind`，且 `user-progress.md` 含“历史关键节点结果” | `RUN_ROOT/outputs/stages/s6-lessons-delta.md` |
@@ -258,9 +287,12 @@ TARGET_ROOT/
   - 宿主专业能力声明、probe 方式与 bootstrap 范围；若 `bootstrap.scope=project_local`，还可声明要生成的复用配置 / wrapper / bootstrap 资产
 - 可选 `agent_team_contract`
   - opt-in team 拓扑、fan-out 限额、join policy 与运行证据要求
+- 可选 `design_refs`
+  - 只引用 S1/S2/S3 设计源、验收测试和 traceability 文件，帮助 S5 做一致性检查；不得把设计推理全文复制进 YAML
 
 统一原则：
 
+- S3 设计源回答“为什么这样设计”，`workflow-spec.yaml` 回答“机器怎么执行和验证”，S5 证据回答“实际有没有做到”。
 - `runtime_contract` 决定 runner 可以做什么、必须保留什么、如何降级。
 - `test_contract` 决定基础测试应检查什么、哪些结果算通过或失败。
 - `generated_runtime_contract` 决定目标工作流是否真正交付了自己的 wrapper + control-plane 接口，而不只是提示词资产。
@@ -270,6 +302,7 @@ TARGET_ROOT/
 - `agent_team_contract` 只在显式声明时生效；普通 subagent 并不自动等于 team orchestration。
 - `workflow_graph.nodes[*].loop_policy` 只适合验证驱动的迭代节点，例如逆向分析、迁移修复、报告修订、测试驱动实现；不适合一次性问答、不可自动验证的主观写作、宿主环境安装或人工审批动作。
 - `loop_policy.goal_source` 可以来自用户，也可以来自模型分解的子目标；模型子目标必须通过 `parent_goal_ref` 回溯到用户目标或上游节点输出，TDD 型 loop 必须先有 failing verifier/test 再进入实现。
+- `node-design` 只在复杂节点需要时生成；它必须被投影到 `workflow_graph`、能力契约、team 契约、loop 契约或 traceability，而不能成为孤立说明文档。
 - `workflowprogram-validate` 是 `test_contract` 的主消费方，`runtime_smoke.py` 是补充烟测与证据采集工具。
 - `test_contract` 对执行字段只允许引用，不允许复制同名内容。
 - `test_contract.failure.implemented_now` 仅表达“当前实现覆盖度”，不得反向改变 runner 的 `verdict` 或 `failure_kind` 语义。
@@ -310,6 +343,7 @@ TARGET_ROOT/
 
 - 所有 Stage 必须声明输入、输出、准出目标和失败反馈路径。
 - `workflow-spec.yaml` 字段命名、枚举和状态机转移必须一致。
+- `design_refs`、`traceability-matrix.json` 与 `workflow_graph` 必须保持一致，防止设计源、机器投影和 S5 证据相互漂移。
 - 文档中的 `TARGET_ROOT / RUN_ROOT / PLUGIN_ROOT` 含义必须统一。
 
 ### 6.2 可靠性要求
@@ -324,6 +358,7 @@ TARGET_ROOT/
 - 叶子 skill 只负责节点执行，不承担全流程调度职责。
 - 规则与校验脚本必须与真实注册状态同步。
 - 设计变更必须同步更新 high-level 与 low-level 文档。
+- 改设计理由或复杂节点推理时，先改 S3 设计源；改执行语义时，必须投影到 `workflow-spec.yaml` 并重生成派生视图。
 - 统一 runner 负责状态转移与 enum 约束落盘，避免仅靠自然语言约定驱动流程。
 - develop 主链必须通过 `workflow-entry.py` 串起 spec/view/managed-assets/runner/state 校验，而不是由 skill 自由决定脚本顺序。
 
@@ -338,7 +373,7 @@ TARGET_ROOT/
 ## 7. 与现有实现的关系
 
 - 本设计不推翻现有 `workflowprogram-*` skill 体系。
-- 本设计把 `workflow-spec.yaml` 升级为流程控制面，但仍通过现有 skill/agent/script 实现执行。
+- 本设计把 `workflow-spec.yaml` 定位为机器控制面投影，而不是完整设计文档；设计解释由 S3 设计源承载，执行仍通过现有 skill/agent/script 完成。
 - 本设计不引入强依赖的新外部运行时；先以当前能力闭环，再渐进增强自动化调度。
 - 当前 runner 已以脚本化控制面落地（`workflow-runner.py` + `validate-workflow-spec.py` + `validate-run-state.py`），并与 `managed-assets.py`、`stage-progress.py`、`generate-workflow-view.py` 组成闭环。
 - 当前 develop 产品入口已通过 `workflow-entry.py` 收口为确定性脚本编排。

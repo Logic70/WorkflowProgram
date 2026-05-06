@@ -22,6 +22,9 @@
 | artifact 字段约束完整性 | PASS | `kind/root/producer/status` 已由 `validate-run-state.py` 强制校验 |
 | spec 运行契约完整性 | PASS | `runtime_contract` 已覆盖写入边界、最小证据集、失败枚举、环境 skip 条件 |
 | spec 测试契约完整性 | PASS | `test_contract` 已覆盖入口、边界、流程、产物、失败五类判定，并与 `runtime_contract` 通过固定引用语法对接 |
+| 设计源与机器投影分层 | PASS | `s3-design-highlevel.md` / `s3-design-lowlevel.md` 承载设计推理，`workflow-spec.yaml` 只承载机器语义和 `design_refs` |
+| 需求血缘传递 | PASS | 原始请求通过 `s1-requirements.yaml -> s2-context-findings.yaml -> traceability-matrix.json` 映射到设计节点、资产、验收和证据 |
+| 复杂节点分层 | PASS | 复杂业务环节通过 `node-designs/<node-id>.md` 与 `workflow_graph.nodes[*]` 对接，不拆成新的 WorkflowProgram `S1..S6` |
 | 视图渲染链路一致性 | PASS | 设计与实现均明确 `tools/generate-view.py` 负责 `workflow-view.md` 渲染 |
 | Stage 间 I/O 依赖闭合 | PASS | `S1->S2->S3->S4->S5->S6` 无未定义依赖 |
 | Stage 准出可验证性 | PASS | 每个 Stage 已补充证据路径和可验证检查条目 |
@@ -35,8 +38,9 @@
 
 - `S0` 输出 `intent/target_root`，可驱动 `S1`。
 - `S1` 输出 `workflow-spec.md`，可驱动 `S2`。
-- `S2` 输出上下文结论，作为 `S3` 设计输入。
-- `S3` 输出 `workflow-spec.yaml` 与 `workflow-view.md`，可驱动 `S4`。
+- `S1` 同时输出 `s1-requirements.yaml`，把原始请求转为 `REQ-*`。
+- `S2` 输出上下文结论与 `s2-context-findings.yaml`，作为 `S3` 设计输入。
+- `S3` 输出设计源、验收测试、traceability 与 `workflow-spec.yaml` 机器投影，可驱动 `S4`。
 - `S4` 输出 candidate 与 managed 结果，可驱动 `S5`。
 - `S5` 输出验证结论，可驱动 `S6` 闭环。
 
@@ -76,8 +80,18 @@
 - 已实现 R5：`runtime_contract` 已程序化生效，`workflow-runner.py` 强制执行写入边界、最小证据集校验、失败类别枚举约束与环境 skip。
 - 已实现 R6：`test_contract` 已由 `validate-workflow-spec.py` 做字段级、引用一致性与覆盖度校验；`generate-view.py` 负责渲染但不改变 runner 语义。
 
+### 4.3 本轮 5 轮设计审计结论
+
+| 轮次 | 新识别问题 | 修正结论 |
+|---|---|---|
+| Round 1 | `workflow-spec.yaml` 被描述为“设计单点真实源”，容易把运行态地图膨胀成完整设计文档 | 改为“设计源 + 机器投影”分层，`workflow-spec.yaml` 只保留机器语义 |
+| Round 2 | 原始需求在 S1/S2/S3/S5 之间缺少可追踪转化链 | 增加 `s1-requirements.yaml`、`s2-context-findings.yaml`、`traceability-matrix.json` 的需求血缘口径 |
+| Round 3 | STRIDE / DFD 这类复杂环节如果只写整体 LowLevel，会导致上下文丢失或设计过载 | 增加条件性 `node-designs/<node-id>.md`，复杂节点独立设计但不改变 S1-S6 主链 |
+| Round 4 | “每个 node 是否一个 agent”会导致过度拆分和调度噪声 | 明确 node 是流程单位、agent 是执行角色，只有复杂认知/专业能力/上下文边界才独立 agent |
+| Round 5 | 新增设计源可能让流程变重并与历史派生 `workflow-lowlevel.md` 混淆 | 设计源只在 S3/RUN_ROOT 形成审计证据，`workflow-lowlevel.md` 继续是 YAML 派生维护视图，简单工作流不强制 node-design/team/loop |
+
 ## 5. 结论
 
 当前文档级设计与实现已形成“规范 -> 脚本校验 -> 程序执行 -> 证据回写”的闭环。
-当前无显式冲突：`runtime_contract` 负责执行约束，`test_contract` 负责基础运行测试判定，二者通过固定引用语法衔接而不重复定义。
+当前无显式冲突：S3 设计源负责设计解释，`workflow-spec.yaml` 负责机器投影，`runtime_contract` 负责执行约束，`test_contract` 负责基础运行测试判定，二者通过固定引用语法衔接而不重复定义。
 后续重点从“补缺”转为“稳定性与覆盖度提升”（如增加更多真实场景 smoke 和冲突恢复策略）。

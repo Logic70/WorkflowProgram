@@ -47,6 +47,7 @@ REQUIRED_TOP_KEYS = {
 }
 OPTIONAL_TOP_KEYS = {
     "capability_discovery",
+    "design_refs",
     "host_capabilities",
     "agent_team_contract",
     "workflow_graph",
@@ -1240,6 +1241,76 @@ def validate_capability_discovery(
     return capability_discovery
 
 
+def validate_design_refs(
+    design_refs: Dict[str, Any],
+    workflow_graph: Dict[str, Any],
+    errors: List[str],
+    warnings: List[str],
+) -> None:
+    """校验 S1/S2/S3 设计源引用，只检查路径安全和 graph 引用。"""
+
+    if not design_refs:
+        return
+
+    allowed_fields = {
+        "requirements",
+        "context_findings",
+        "design_highlevel",
+        "design_lowlevel",
+        "implementation_plan",
+        "acceptance_tests",
+        "traceability_matrix",
+        "node_designs",
+    }
+    extra = sorted(set(design_refs.keys()) - allowed_fields)
+    if extra:
+        add_warn(warnings, f"design_refs has unknown keys: {', '.join(extra)}")
+
+    def validate_ref_path(value: Any, field: str, require_node_design_prefix: bool = False) -> None:
+        path = str(value or "").strip()
+        if not path:
+            add_error(errors, f"{field} must not be empty")
+            return
+        if not SAFE_RELATIVE_PATH_RE.match(path):
+            add_error(errors, f"{field} must be a safe relative path")
+            return
+        if not path.startswith("outputs/stages/"):
+            add_error(errors, f"{field} must stay under outputs/stages/: {path}")
+        if require_node_design_prefix and not path.startswith("outputs/stages/node-designs/"):
+            add_error(errors, f"{field} must stay under outputs/stages/node-designs/: {path}")
+
+    for key in sorted(allowed_fields - {"node_designs"}):
+        if key in design_refs:
+            validate_ref_path(design_refs.get(key), f"design_refs.{key}")
+
+    raw_node_designs = design_refs.get("node_designs")
+    if raw_node_designs is None:
+        return
+    if not isinstance(raw_node_designs, dict):
+        add_error(errors, "design_refs.node_designs must be a mapping of node_id to path")
+        return
+
+    nodes = workflow_graph.get("nodes", []) if isinstance(workflow_graph, dict) else []
+    graph_node_ids: Set[str] = set()
+    if isinstance(nodes, list):
+        graph_node_ids = {
+            str(node.get("id", "")).strip()
+            for node in nodes
+            if isinstance(node, dict) and str(node.get("id", "")).strip()
+        }
+
+    for node_id, path in raw_node_designs.items():
+        node_text = str(node_id).strip()
+        if not node_text:
+            add_error(errors, "design_refs.node_designs contains an empty node id")
+            continue
+        if graph_node_ids and node_text not in graph_node_ids:
+            add_error(errors, f"design_refs.node_designs references unknown workflow_graph node: {node_text}")
+        elif not graph_node_ids:
+            add_warn(warnings, "design_refs.node_designs declared without workflow_graph.nodes; node references cannot be fully checked")
+        validate_ref_path(path, f"design_refs.node_designs.{node_text}", require_node_design_prefix=True)
+
+
 def validate_generated_runtime_contract(
     generated_runtime_contract: Dict[str, Any],
     stages: List[Any],
@@ -1625,6 +1696,9 @@ def validate_spec(spec: Dict[str, Any]) -> Dict[str, Any]:
 
     workflow_graph = require_mapping(spec.get("workflow_graph", {}), "workflow_graph", errors) if "workflow_graph" in spec else {}
     validate_workflow_graph(workflow_graph, registry, spec.get("test_contract", {}), errors, warnings)
+
+    design_refs = require_mapping(spec.get("design_refs", {}), "design_refs", errors) if "design_refs" in spec else {}
+    validate_design_refs(design_refs, workflow_graph, errors, warnings)
 
     constraints = require_mapping(spec.get("constraints", {}), "constraints", errors)
     validate_constraints(constraints, errors, warnings)

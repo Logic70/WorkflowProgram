@@ -2,8 +2,8 @@
 
 > **Note**: 本模板用于自然语言设计文档。
 > 对于机器可读的编排配置，请使用 `yaml-spec-template.md`。
-> 两者关系：`spec-template.md` → 人工审查 → `workflow-spec.yaml` → 生成 `workflow-view.md` / `workflow-lowlevel.md`。
-> `workflow-spec.yaml` 是唯一机器语义真源；`workflow-view.md` 与 `workflow-lowlevel.md` 是派生报告，不得单独承载目标工作流执行规则。
+> 两者关系：`spec-template.md` → S1/S2/S3 设计源 → `workflow-spec.yaml` 机器投影 → 生成 `workflow-view.md` / `workflow-lowlevel.md`。
+> `workflow-spec.yaml` 是机器语义真源与运行态地图；完整设计推理应保留在 `s3-design-highlevel.md` / `s3-design-lowlevel.md` / 条件性 `node-designs/**` 中。
 
 ## Workflow Identity
 
@@ -16,6 +16,14 @@
 - 用户诉求：
 - 最终目的：
 - 成功标准：
+
+## Requirement Lineage
+
+- 原始请求 source_ref：
+- `REQ-*` 需求条目：
+- 每条需求的优先级：
+- 每条需求的验收口径：
+- 每条需求的边界或明确不做：
 
 ## Clarification Summary
 
@@ -87,6 +95,14 @@
 - 若存在 `project_local` bootstrap，需要生成哪些可复用配置 / wrapper / bootstrap 资产：
 - 若存在 `host_global` bootstrap，WorkflowProgram 只生成 plan 与人工处理指引；哪些步骤必须由用户或外部安装流程完成：
 
+## Design Source Plan
+
+- 是否需要 `s3-design-highlevel.md`：
+- 是否需要 `s3-design-lowlevel.md`：
+- 是否存在复杂节点需要 `node-designs/<node-id>.md`：
+- 复杂节点升级理由：
+- `workflow-spec.yaml.design_refs` 应引用哪些设计源：
+
 ## Pattern Selection Notes
 
 - Sequential 需求：
@@ -108,6 +124,10 @@
 - 目标 workflow_graph 节点：
 - 目标 workflow_graph 入口与转移：
 - 每个 graph 节点的输入、输出、gate、owner：
+- 每个 graph 节点的执行模型（skill / agent / script / team / loop）：
+- 哪些 node 需要独立 agent，原因是什么：
+- 哪些 node 不需要独立 agent，原因是什么：
+- 复杂 node-design 输出路径：
 - 需要 `loop_policy` 的 graph 节点：
 - 每个 loop 节点的 `max_iterations`、反馈命令、停止条件、证据输出：
 - 目标输出是否已映射到 `registry` 或 `test_contract.artifacts`：
@@ -132,3 +152,11 @@
 - [ ] 验收项 1
 - [ ] 验收项 2
 - [ ] 验收项 3
+
+## Traceability Expectations
+
+- `REQ-* -> workflow_graph.nodes[*]` 映射：
+- `REQ-* -> generated assets` 映射：
+- `REQ-* -> acceptance-tests.yaml` 映射：
+- `REQ-* -> expected S5 evidence` 映射：
+- 无法自动验证的需求及豁免理由：
