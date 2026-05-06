@@ -1,10 +1,10 @@
 {
   "manifest_version": 1,
-  "generated_at": "2026-05-06T10:11:06Z",
+  "generated_at": "2026-05-06T10:25:51Z",
   "builder": "tools/build_plugin.py",
   "plugin_name": "workflowprogram-cn",
   "plugin_version": "0.1.1",
-  "source_commit": "bdeff3bab05c2a95ca650ae3040af208435d3363",
+  "source_commit": "e42bfc153084cab75880af7106bad03937babd1c",
   "source_dirty": true,
   "files": [
     {
@@ -421,11 +421,6 @@
       "path": "skills/workflowprogram-orchestrate/SKILL.md",
       "sha256": "74b071c10fa53ec8c1e07cbd2642ca9ae76d8b9be5995f0fd3694a4713dda465",
       "size": 2628
-    },
-    {
-      "path": "skills/workflowprogram-release/SKILL.md",
-      "sha256": "8936d608578adad4e07b3eeed1e05d2dd8e5ff55de834b15a860c0c3432635d7",
-      "size": 4368
     },
     {
       "path": "skills/workflowprogram-validate/SKILL.md",
