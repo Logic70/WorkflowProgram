@@ -70,6 +70,10 @@
     "workflowprogram-validate": {
       "description": "Validate workflow assets in the current target project at workflow scope",
       "file": ".claude/skills/workflowprogram-validate/SKILL.md"
+    },
+    "workflowprogram-release": {
+      "description": "Release WorkflowProgram plugin changes by bumping plugin metadata, rebuilding dist, validating, committing, and pushing",
+      "file": ".claude/skills/workflowprogram-release/SKILL.md"
     }
   }
 }
