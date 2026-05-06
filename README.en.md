@@ -41,6 +41,11 @@ After installation:
 2. On first session start, the plugin bootstraps its private Python dependency layer into `${CLAUDE_PLUGIN_DATA}/python/site-packages`
 3. For minimal troubleshooting, run `workflowprogram-doctor`
 
+Troubleshooting:
+
+- If you see `Unknown skill: workflowprogram-orchestrate`, the current Claude session usually has not reloaded the plugin. Run `/reload-plugins` or restart `claude`, then use `/workflowprogram-orchestrate ...`; do not ask the model to hand-write `Skill(workflowprogram-orchestrate)`.
+- If you see `bin/workflowprogram-python: Permission denied`, the installed launcher lost its executable bit. Update/reinstall from the latest marketplace payload. As a temporary local fix, run `chmod +x ~/.claude/plugins/cache/logic70-plugins/workflowprogram-cn/0.1.0/bin/workflowprogram-*`.
+
 Source builds of `dist/plugin/` remain useful for repository development and debugging, but they are no longer the primary end-user install model.
 
 ## Quick Start

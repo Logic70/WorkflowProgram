@@ -41,6 +41,11 @@ claude plugin install workflowprogram-cn@logic70-plugins
 2. 首次启动会在 `${CLAUDE_PLUGIN_DATA}/python/site-packages` 自动准备插件私有 Python 依赖
 3. 如需最小化排障，执行 `workflowprogram-doctor`
 
+排障：
+
+- 如果出现 `Unknown skill: workflowprogram-orchestrate`，通常是当前 Claude 会话还没重新加载插件。执行 `/reload-plugins` 或重启 `claude`，然后用 `/workflowprogram-orchestrate ...` 入口，不要让模型手写 `Skill(workflowprogram-orchestrate)`。
+- 如果出现 `bin/workflowprogram-python: Permission denied`，说明安装缓存里的 launcher 没有执行权限。更新到最新 marketplace 载荷后重新安装；临时修复可执行 `chmod +x ~/.claude/plugins/cache/logic70-plugins/workflowprogram-cn/0.1.0/bin/workflowprogram-*`。
+
 开发和调试仍可使用源码构建 `dist/plugin/`，但那不再是面向最终用户的主安装模型。
 
 ## 使用

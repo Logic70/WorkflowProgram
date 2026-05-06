@@ -199,6 +199,17 @@ def build_plugin_root_assets() -> None:
     copy_plugin_root_assets(PLUGIN_ROOT_ASSETS, DIST)
 
 
+def ensure_executable_bits() -> None:
+    """确保 marketplace 载荷中的 launcher 在新安装缓存里可直接执行。"""
+    for relative in (
+        "bin/workflowprogram-python",
+        "bin/workflowprogram-doctor",
+    ):
+        path = DIST / relative
+        if path.exists():
+            path.chmod(path.stat().st_mode | 0o755)
+
+
 def sha256_file(path: Path) -> str:
     """返回文件 SHA-256，用于 build trace manifest。"""
     digest = hashlib.sha256()
@@ -285,6 +296,7 @@ def main() -> None:
     prepare_output_dirs(DIST)
     build_plugin_manifest_dir()
     build_plugin_root_assets()
+    ensure_executable_bits()
     build_agents()
     build_rules()
     build_scripts()

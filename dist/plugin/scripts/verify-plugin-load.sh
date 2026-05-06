@@ -40,6 +40,11 @@ checks=(
   "/commit"
   "/doc"
   "/workflow-audit"
+  "/workflowprogram-orchestrate smoke-test"
+  "/workflowprogram-develop smoke-test"
+  "/workflowprogram-audit"
+  "/workflowprogram-validate"
+  "/workflowprogram-iterate"
 )
 
 pass=0

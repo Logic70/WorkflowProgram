@@ -43,6 +43,13 @@ FORBIDDEN_LEGACY_PATHS = [
     'tools/quick_install.sh',
 ]
 
+PLUGIN_EXECUTABLE_PATHS = [
+    ".claude-plugin/root/bin/workflowprogram-python",
+    ".claude-plugin/root/bin/workflowprogram-doctor",
+    "dist/plugin/bin/workflowprogram-python",
+    "dist/plugin/bin/workflowprogram-doctor",
+]
+
 ACTIVE_DESIGN_DOCS = {
     "docs/workflowprogram-stage-highlevel-design.md": [
         "runtime_contract",
@@ -276,6 +283,25 @@ def sha256_file(path: Path) -> str:
     return hasher.hexdigest()
 
 
+def git_index_mode(root: Path, relative_path: str) -> Optional[str]:
+    """返回 git index 中记录的文件模式；git 不可用时返回 None。"""
+
+    try:
+        completed = subprocess.run(
+            ["git", "ls-files", "--stage", "--", relative_path],
+            cwd=root,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+    except FileNotFoundError:
+        return None
+    if completed.returncode != 0:
+        return None
+    first_line = completed.stdout.strip().splitlines()[0] if completed.stdout.strip() else ""
+    return first_line.split()[0] if first_line else None
+
+
 def iter_source_files(root: Path) -> List[Path]:
     """递归枚举源码文件，并跳过 Python 缓存产物。"""
     files: List[Path] = []
@@ -413,6 +439,20 @@ def validate_required_paths(root: Path, result: ValidationResult) -> None:
             result.add_error(f"Legacy compatibility path must not exist: {relative_path}")
         else:
             result.add_pass(f"Legacy compatibility path removed: {relative_path}")
+
+    for relative_path in PLUGIN_EXECUTABLE_PATHS:
+        full_path = root / relative_path
+        if full_path.exists() and full_path.stat().st_mode & 0o111:
+            result.add_pass(f"Plugin executable has local execute bit: {relative_path}")
+        else:
+            result.add_error(f"Plugin executable is missing local execute bit: {relative_path}")
+        git_mode = git_index_mode(root, relative_path)
+        if git_mode is None:
+            result.add_pass(f"Git mode check skipped for {relative_path}")
+        elif git_mode == "100755":
+            result.add_pass(f"Plugin executable has git mode 100755: {relative_path}")
+        else:
+            result.add_error(f"Plugin executable git mode must be 100755: {relative_path} is {git_mode}")
 
 
 def validate_document_contracts(root: Path, result: ValidationResult) -> None:

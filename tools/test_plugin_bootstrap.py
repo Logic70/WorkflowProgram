@@ -57,6 +57,14 @@ def main() -> int:
         env["CLAUDE_PLUGIN_DATA"] = str(plugin_data)
         env["PYTHONNOUSERSITE"] = "1"
 
+        for launcher_name in ("workflowprogram-python", "workflowprogram-doctor"):
+            launcher_path = plugin_root / "bin" / launcher_name
+            add(
+                f"{launcher_name}_executable",
+                launcher_path.exists() and os.access(launcher_path, os.X_OK),
+                f"{launcher_path} must exist and be executable after marketplace install",
+            )
+
         bootstrap = run(
             [
                 sys.executable,
