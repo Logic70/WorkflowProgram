@@ -98,6 +98,20 @@ claude
 
 所有入口都会先经过 `S0` 路由；`workflow-spec.yaml.intent_flows` 继续定义 `S1-S6` 的逻辑阶段需求。当前默认模板中：`develop` 走 `S1-S6`，`audit` 走 `S5-S6`，`validate` 走 `S5`（可选 `S6`），`iterate` 走 `S6`（可选 `S5`）。
 
+### S1 需求逻辑访谈
+
+`develop` 的 S1 不再只是泛泛澄清输入输出，而是按七个 logic lenses 追问需求逻辑：
+
+- `purpose`：为什么要做，成功信号是什么
+- `object_model`：读取、转换、分类、产出的对象是什么
+- `process_model`：目标工作流需要哪些业务步骤或节点
+- `decision_model`：哪些分支、策略、阈值或人工确认会改变执行
+- `evidence_model`：什么证据能证明中间产物和最终结论可信
+- `acceptance_model`：哪些正向、负向、歧义场景能验收
+- `boundary_model`：何时停止、降级、延后或明确不做
+
+S1 会生成 `question-backlog.json` 和 `requirement-logic-map.json`。前者记录每个追问为什么会影响设计，后者把 `REQ-*` 链接到 process/evidence/acceptance 等逻辑元素。对 `L/XL` 复杂度请求，只问“还有哪些边界场景”这类泛问题会被 `validate-workflow-draft.py` 拦截，不能进入设计阶段。
+
 ### AI 和 Python 的分工
 
 - **AI**：理解需求、补充设计、在每个节点内生成候选资产。

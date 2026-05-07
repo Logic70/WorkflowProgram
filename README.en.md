@@ -98,6 +98,20 @@ Then describe what you want in natural language:
 
 Every request passes through `S0` first. `workflow-spec.yaml.intent_flows` then defines the logical requirements for `S1-S6`. In the default template, `develop` uses `S1-S6`, `audit` uses `S5-S6`, `validate` uses `S5` with optional `S6`, and `iterate` uses `S6` with optional `S5`.
 
+### S1 Requirement Logic Interview
+
+For `develop`, S1 is no longer a generic input/output clarification step. It now asks through seven logic lenses:
+
+- `purpose`: why the workflow exists and what success looks like
+- `object_model`: what the workflow reads, transforms, classifies, or produces
+- `process_model`: which business steps or target workflow nodes are needed
+- `decision_model`: which branches, strategies, thresholds, or approvals change execution
+- `evidence_model`: what evidence makes intermediate and final outputs trustworthy
+- `acceptance_model`: which positive, negative, and ambiguous scenarios prove behavior
+- `boundary_model`: when the workflow must stop, degrade, defer, or stay out of scope
+
+S1 emits `question-backlog.json` and `requirement-logic-map.json`. The backlog records why each question changes design; the logic map links `REQ-*` items to process/evidence/acceptance elements. For `L/XL` requests, broad prompts such as "what edge cases should we consider?" are rejected by `validate-workflow-draft.py` and cannot be treated as design-ready.
+
 ### AI vs Python Responsibilities
 
 - **AI**: understand user intent, refine design decisions, and generate candidate assets inside each stage.

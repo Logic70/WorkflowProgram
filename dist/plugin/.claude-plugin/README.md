@@ -53,6 +53,20 @@ Claude Code 加载插件后，会在 `SessionStart` 自动执行 Python runtime 
 
 旧 commands 仅作为兼容入口保留。
 
+## 新增能力：S1 需求逻辑访谈
+
+`workflowprogram-develop` 的 S1 会用七个 logic lenses 深挖需求，而不是只收集“输入/输出/边界场景”：
+
+- `purpose`
+- `object_model`
+- `process_model`
+- `decision_model`
+- `evidence_model`
+- `acceptance_model`
+- `boundary_model`
+
+运行时会生成 `RUN_ROOT/outputs/stages/question-backlog.json` 与 `RUN_ROOT/outputs/stages/requirement-logic-map.json`。`validate-workflow-draft.py` 会阻止缺少关键 lens、缺少 `REQ-* -> process/evidence/acceptance` 链接，或 L/XL 复杂度下只有泛问题的草案进入设计阶段。
+
 ## Python Runtime
 
 - 插件在 `SessionStart` 通过 `${CLAUDE_PLUGIN_ROOT}/scripts/bootstrap-python-runtime.py` 准备私有 Python 依赖。

@@ -28,6 +28,7 @@
           <a href="#philosophy">Four-Layer Philosophy</a>
           <a href="#three-roots">Three Roots</a>
           <a href="#stage-model">Stage Model</a>
+          <a href="#logic-interview">Requirement Logic Interview</a>
           <a href="#orchestration">Main Orchestration Chain</a>
           <a href="#routing">Entry Routing</a>
           <a href="#managed-apply">Managed Apply</a>
@@ -224,6 +225,34 @@
           <div class="note-strip">
             <strong>One important detail:</strong>
             <span>`S0` is the universal route layer. The minimum required path through `S1-S6` is declared by `intent_flows`: the default template uses `develop=S1-S6`, `audit=S5-S6`, `validate=S5 (+ optional S6)`, and `iterate=S6 (+ optional S5)`.</span>
+          </div>
+        </section>
+
+        <section class="panel" id="logic-interview">
+          <div class="section-heading">
+            <p class="eyebrow">Step 4b: Ask deeper questions</p>
+            <h2>S1 now uses seven logic lenses before a request becomes design-ready</h2>
+          </div>
+
+          <p style="color:var(--muted);max-width:72ch;margin:8px 0 0">
+            Requirement clarification is not just asking for inputs, outputs, and edge cases.
+            WorkflowProgram turns the original request into a designable and verifiable logic model.
+            If a complex request only has generic questions, <code>validate-workflow-draft.py</code> blocks it from entering S2/S3.
+          </p>
+
+          <div class="matrix-grid">
+            <article class="matrix-card"><h3>purpose</h3><p>Why the workflow exists, who uses the result, and what success means.</p></article>
+            <article class="matrix-card"><h3>object_model</h3><p>Input objects, intermediate objects, output objects, and source-of-truth rules.</p></article>
+            <article class="matrix-card"><h3>process_model</h3><p>Business steps, candidate nodes, and human touchpoints.</p></article>
+            <article class="matrix-card"><h3>decision_model</h3><p>Branches, strategies, thresholds, confidence, and approval points that change execution.</p></article>
+            <article class="matrix-card"><h3>evidence_model</h3><p>Evidence required to trust intermediate artifacts, decisions, and final outputs.</p></article>
+            <article class="matrix-card"><h3>acceptance_model</h3><p>Positive, negative, and ambiguous scenarios that prove the workflow is useful.</p></article>
+            <article class="matrix-card"><h3>boundary_model</h3><p>When the workflow must stop, degrade, defer, or stay out of scope.</p></article>
+          </div>
+
+          <div class="note-strip">
+            <strong>New evidence:</strong>
+            <span><code>question-backlog.json</code> records why each question changes design; <code>requirement-logic-map.json</code> links <code>REQ-*</code> items to process / evidence / acceptance elements.</span>
           </div>
         </section>
 

@@ -28,6 +28,7 @@
           <a href="#philosophy">四层设计哲学</a>
           <a href="#three-roots">三根目录</a>
           <a href="#stage-model">阶段模型 S0..S6</a>
+          <a href="#logic-interview">需求逻辑访谈</a>
           <a href="#orchestration">编排主链</a>
           <a href="#routing">入口路由与技能/脚本关系</a>
           <a href="#managed-apply">受控写入</a>
@@ -309,6 +310,34 @@
           <div class="note-strip">
             <strong>关键判断：</strong>
             <span>生成成功不等于验证通过（S4 ok &ne; S5 ok）；验证失败不等于这次运行没价值（S5 fail 但 S6 可以回流 lessons）。</span>
+          </div>
+        </section>
+
+        <!-- ==================== 需求逻辑访谈 ==================== -->
+        <section class="panel" id="logic-interview">
+          <div class="section-heading">
+            <p class="eyebrow">第四步补充：把需求问深</p>
+            <h2>S1 现在会用七个 logic lenses 追问需求逻辑</h2>
+          </div>
+
+          <p style="color:var(--muted);max-width:72ch;margin:8px 0 0">
+            需求澄清不是把“输入、输出、边界场景”问一遍就结束。WorkflowProgram 会把用户原始诉求转成可设计、可验证的逻辑模型；
+            如果复杂请求只留下泛问题，<code>validate-workflow-draft.py</code> 会阻止它进入 S2/S3。
+          </p>
+
+          <div class="matrix-grid">
+            <article class="matrix-card"><h3>purpose</h3><p>为什么要做，谁使用结果，成功信号是什么。</p></article>
+            <article class="matrix-card"><h3>object_model</h3><p>输入对象、中间对象、输出对象和 source of truth 是什么。</p></article>
+            <article class="matrix-card"><h3>process_model</h3><p>目标工作流需要哪些业务步骤、候选节点和人工触点。</p></article>
+            <article class="matrix-card"><h3>decision_model</h3><p>哪些分支、策略、阈值、置信度或审批会改变执行。</p></article>
+            <article class="matrix-card"><h3>evidence_model</h3><p>哪些证据能证明中间产物、判断和最终结果可信。</p></article>
+            <article class="matrix-card"><h3>acceptance_model</h3><p>哪些正向、负向、歧义场景能验收工作流真的有用。</p></article>
+            <article class="matrix-card"><h3>boundary_model</h3><p>什么时候必须停止、降级、延后或明确不做。</p></article>
+          </div>
+
+          <div class="note-strip">
+            <strong>新增证据：</strong>
+            <span><code>question-backlog.json</code> 记录每个追问为什么会影响设计；<code>requirement-logic-map.json</code> 把 <code>REQ-*</code> 链接到 process / evidence / acceptance 等逻辑元素。</span>
           </div>
         </section>
 
