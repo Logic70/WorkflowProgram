@@ -14,6 +14,8 @@ import sys
 from pathlib import Path
 from typing import Dict, List
 
+from lib.io_utils import write_json
+
 
 ENTRY_SKILL_BY_INTENT = {
     "develop": "workflowprogram-develop",
@@ -23,7 +25,24 @@ ENTRY_SKILL_BY_INTENT = {
 }
 
 INTENT_KEYWORDS = {
-    "develop": [("设计", 3), ("创建", 3), ("新建", 3), ("搭建", 2), ("develop", 3), ("workflow", 1), ("工作流", 1), ("生成", 2)],
+    "develop": [
+        ("设计", 3),
+        ("创建", 3),
+        ("新建", 3),
+        ("搭建", 2),
+        ("develop", 3),
+        ("workflow", 1),
+        ("工作流", 1),
+        ("生成", 2),
+        ("修改", 3),
+        ("更新", 3),
+        ("调整", 3),
+        ("扩展", 3),
+        ("拆分", 3),
+        ("删除", 2),
+        ("应用", 3),
+        ("落地", 3),
+    ],
     "audit": [("审计", 4), ("盘点", 3), ("扫描", 2), ("audit", 4), ("review", 2), ("结构问题", 3), ("偏离", 2)],
     "iterate": [("迭代", 4), ("优化", 2), ("改进", 2), ("evolve", 3), ("iterate", 4), ("lessons", 3)],
     "validate": [("验证", 4), ("校验", 4), ("检查", 2), ("validate", 4), ("test", 2), ("合规", 3)],
@@ -35,6 +54,7 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Route natural-language request to workflowprogram-* intent")
     parser.add_argument("--request", required=True, help="User request text")
     parser.add_argument("--target-root", default="", help="Target project path")
+    parser.add_argument("--out", default="", help="Optional path to write route evidence JSON")
     parser.add_argument("--strict", action="store_true", help="Fail when intent cannot be determined confidently")
     parser.add_argument("--json", action="store_true", help="Print JSON")
     return parser.parse_args()
@@ -97,6 +117,47 @@ def choose_intent(request: str) -> Dict[str, object]:
     }
 
 
+def detect_request_kind(request: str) -> str:
+    """给 change-context 使用的非权威请求形态提示。"""
+
+    text = request.lower()
+    redesign_tokens = [
+        "redesign",
+        "重新设计",
+        "重做",
+        "重构",
+        "整体替换",
+        "替换整个",
+        "推倒重来",
+    ]
+    modify_tokens = [
+        "修改",
+        "更新",
+        "调整",
+        "扩展",
+        "拆分",
+        "删除",
+        "增加",
+        "补充",
+        "改成",
+        "应用",
+        "落地",
+        "采纳",
+    ]
+    create_tokens = ["创建", "新建", "设计一个", "生成", "搭建", "build", "create"]
+    proposal_tokens = ["建议", "方案", "优化建议", "改进建议", "lessons", "iterate"]
+
+    if any(token in text for token in redesign_tokens):
+        return "redesign_existing"
+    if any(token in text for token in modify_tokens):
+        return "modify_existing"
+    if any(token in text for token in create_tokens):
+        return "create_new"
+    if any(token in text for token in proposal_tokens):
+        return "proposal_only"
+    return "unknown"
+
+
 def main() -> int:
     """解析目标意图，并在需要时对歧义路由直接失败。"""
     args = parse_args()
@@ -116,10 +177,14 @@ def main() -> int:
         "reason": routed["reason"],
         "scores": routed["scores"],
         "ambiguous": ambiguous,
+        "request_kind": detect_request_kind(args.request),
         "strict_mode": strict_mode,
         "target_root": str(Path(target_root).resolve()),
         "request": args.request,
     }
+
+    if args.out.strip():
+        write_json(Path(args.out).resolve(), result)
 
     if args.json:
         print(json.dumps(result, ensure_ascii=False, indent=2))

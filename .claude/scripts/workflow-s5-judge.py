@@ -141,6 +141,30 @@ def matching_paths(paths: List[str], pattern: str) -> List[str]:
     return [path for path in paths if fnmatch.fnmatch(path, pattern)]
 
 
+def string_list(value: Any) -> List[str]:
+    """Normalize a JSON value to a list of non-empty strings."""
+
+    if not isinstance(value, list):
+        return []
+    return [str(item).strip() for item in value if str(item).strip()]
+
+
+def managed_plan_paths(managed_plan: Dict[str, Any], managed_result: Dict[str, Any]) -> List[str]:
+    """Collect target relative paths from managed plan/result evidence."""
+
+    paths: set[str] = set()
+    entries = managed_plan.get("entries", []) if isinstance(managed_plan.get("entries"), list) else []
+    for item in entries:
+        if isinstance(item, dict) and str(item.get("relative_path", "")).strip():
+            paths.add(str(item.get("relative_path", "")).strip())
+    for section in ("applied", "conflicts"):
+        values = managed_result.get(section, []) if isinstance(managed_result.get(section), list) else []
+        for item in values:
+            if isinstance(item, dict) and str(item.get("relative_path", "")).strip():
+                paths.add(str(item.get("relative_path", "")).strip())
+    return sorted(paths)
+
+
 def find_first_status(
     checks: Dict[str, List[Dict[str, str]]],
     statuses: set[str],
@@ -164,6 +188,8 @@ def failure_kind_for_check(category: str, name: str) -> str:
         return "environment"
     if "environment" in lowered_name:
         return "environment"
+    if "change_policy" in lowered_name or "change_context" in lowered_name or "change_approval" in lowered_name:
+        return "design"
     if "team_fan_out" in lowered_name or "team_join" in lowered_name or "team_execution" in lowered_name:
         return "implementation"
     if "team_contract" in lowered_name or "team_evidence" in lowered_name:
@@ -649,7 +675,15 @@ def build_checks(
 
     checks: Dict[str, List[Dict[str, str]]] = {name: [] for name in CATEGORY_ORDER}
     spec = load_yaml(run_root / "workflow-spec.yaml")
-    route_payload = load_json(run_root / "outputs" / "stages" / "s0-route.json")
+    s0_route_payload = load_json(run_root / "outputs" / "stages" / "s0-route.json")
+    route_intent_payload = load_json(run_root / "outputs" / "stages" / "route-intent.json")
+    route_payload = s0_route_payload or route_intent_payload
+    change_context = load_json(run_root / "outputs" / "stages" / "change-context.json")
+    change_policy = load_json(run_root / "outputs" / "stages" / "change-policy.json")
+    impact_analysis = load_json(run_root / "outputs" / "stages" / "impact-analysis.json")
+    policy_validation = load_json(run_root / "outputs" / "stages" / "validate-change-policy.json")
+    existing_readback = load_json(run_root / "outputs" / "stages" / "existing-workflow-readback.json")
+    entry_summary = load_json(run_root / "outputs" / "stages" / "entry-orchestration-summary.json")
     runtime_contract = contract.get("runtime_contract", {})
     test_contract = contract.get("test_contract", {})
     derived_failure_kind = failure_kind_for_result(result, failure_code)
@@ -969,6 +1003,10 @@ def build_checks(
         raw_history = values.get("stage_history", [])
         if isinstance(raw_history, list):
             stage_history = [str(item) for item in raw_history]
+    pre_run_change_blocked = (
+        str(entry_summary.get("status", "")).strip() == "BLOCKED"
+        and str(entry_summary.get("block_reason", "")).strip().startswith("change_")
+    )
     if flow:
         intent_flow = expected_flow_for_intent(spec, observed_intent_text)
         required_stage_source = "test_contract.flow.required_stages"
@@ -994,7 +1032,7 @@ def build_checks(
                 add_check(
                     checks["flow"],
                     "required_stages_executed",
-                    "PASS" if not missing else "FAIL",
+                    "PASS" if not missing else ("INFO" if pre_run_change_blocked else "FAIL"),
                     f"Observed stage_history={stage_history}; missing={missing or 'none'}",
                     required_stage_source,
                 )
@@ -1041,7 +1079,7 @@ def build_checks(
                 add_check(
                     checks["flow"],
                     "terminal_condition_observed",
-                    "PASS" if provider_stage_status == expected_stage_status else "FAIL",
+                    "PASS" if provider_stage_status == expected_stage_status else ("INFO" if pre_run_change_blocked else "FAIL"),
                     f"Observed stage_status={provider_stage_status}; expected={expected_stage_status}",
                     "test_contract.flow.terminal_conditions",
                 )
@@ -1134,6 +1172,134 @@ def build_checks(
                 f"Observed route entry_skill={route_entry or '<missing>'}; intent={route_intent or '<missing>'}; expected entry_skill={entry_skill}; intent={expected_intent}",
                 "outputs/stages/s0-route.json",
             )
+        if route_intent_payload and s0_route_payload:
+            mismatched_keys = [
+                key
+                for key in ("intent", "entry_skill", "request_kind")
+                if key in route_intent_payload
+                and key in s0_route_payload
+                and str(route_intent_payload.get(key, "")).strip() != str(s0_route_payload.get(key, "")).strip()
+            ]
+            add_check(
+                checks["artifacts"],
+                "route_context_consistent",
+                "PASS" if not mismatched_keys else "FAIL",
+                f"route-intent vs s0-route mismatched keys={mismatched_keys or ['<none>']}",
+                "outputs/stages/route-intent.json",
+            )
+        change_policy_required = bool(change_context.get("change_policy_required", False)) if change_context else False
+        if change_context:
+            add_check(
+                checks["artifacts"],
+                "change_context_present",
+                "PASS",
+                (
+                    f"target_state={change_context.get('target_state', '<missing>')}; "
+                    f"request_kind={change_context.get('request_kind', '<missing>')}; "
+                    f"required={change_context.get('change_policy_required', False)}"
+                ),
+                "outputs/stages/change-context.json",
+            )
+        if change_policy_required:
+            add_check(
+                checks["artifacts"],
+                "change_policy_present_when_required",
+                "PASS" if change_policy else "FAIL",
+                "change-policy.json present." if change_policy else "change-policy.json missing while change_policy_required=true.",
+                "outputs/stages/change-policy.json",
+            )
+            add_check(
+                checks["artifacts"],
+                "impact_analysis_present_when_required",
+                "PASS" if impact_analysis else "FAIL",
+                "impact-analysis.json present." if impact_analysis else "impact-analysis.json missing while change_policy_required=true.",
+                "outputs/stages/impact-analysis.json",
+            )
+            validation_status = str(policy_validation.get("status", "")).strip()
+            add_check(
+                checks["artifacts"],
+                "change_policy_schema_valid",
+                "PASS" if validation_status == "PASS" else "FAIL",
+                f"validate-change-policy status={validation_status or '<missing>'}; errors={policy_validation.get('errors', ['<missing>'])}",
+                "outputs/stages/validate-change-policy.json",
+            )
+            stale = policy_validation.get("stale_fingerprints", []) if isinstance(policy_validation.get("stale_fingerprints"), list) else []
+            add_check(
+                checks["artifacts"],
+                "change_context_not_stale",
+                "PASS" if not stale else "FAIL",
+                f"stale_fingerprints={stale or ['<none>']}",
+                "outputs/stages/validate-change-policy.json",
+            )
+            entry_status = str(entry_summary.get("status", "")).strip()
+            entry_block_reason = str(entry_summary.get("block_reason", "")).strip()
+            if validation_status and validation_status != "PASS":
+                add_check(
+                    checks["flow"],
+                    "pre_run_blocked_status_explained",
+                    "PASS" if entry_status == "BLOCKED" and entry_block_reason else "FAIL",
+                    f"entry_status={entry_status or '<missing>'}; block_reason={entry_block_reason or '<missing>'}",
+                    "outputs/stages/entry-orchestration-summary.json",
+                )
+            approval_required = bool(change_policy.get("requires_approval", False)) if change_policy else False
+            approval_mode = str(policy_validation.get("approval_mode", "")).strip()
+            if approval_required:
+                add_check(
+                    checks["flow"],
+                    "change_approval_recorded",
+                    "PASS" if approval_mode in {"approved", "auto-approved"} or entry_block_reason == "change_approval_missing" else "FAIL",
+                    f"approval_mode={approval_mode or '<missing>'}; entry_block_reason={entry_block_reason or '<none>'}",
+                    "outputs/stages/validate-change-policy.json",
+                )
+            managed_plan_for_policy = load_json(run_root / "outputs" / "managed-change-plan.json")
+            managed_result_for_policy = load_json(run_root / "outputs" / "managed-change-result.json")
+            managed_paths = managed_plan_paths(managed_plan_for_policy, managed_result_for_policy)
+            affected = string_list(change_policy.get("affected_artifacts")) if change_policy else []
+            derived = string_list(change_policy.get("allowed_derived_artifacts")) if change_policy else []
+            allowed_patterns = [*affected, *derived]
+            disallowed = [path for path in managed_paths if not path_matches_any(path, allowed_patterns)] if allowed_patterns else managed_paths
+            if managed_paths or validation_status == "PASS":
+                add_check(
+                    checks["boundary"],
+                    "managed_changes_within_affected_artifacts",
+                    "PASS" if not disallowed else "FAIL",
+                    f"managed_paths={managed_paths or ['<none>']}; allowed={allowed_patterns or ['<none>']}; disallowed={disallowed or ['<none>']}",
+                    "outputs/managed-change-plan.json",
+                )
+            if str(change_policy.get("mode", "")).strip() == "redesign_from_existing":
+                add_check(
+                    checks["artifacts"],
+                    "redesign_from_existing_has_readback",
+                    "PASS" if existing_readback else "FAIL",
+                    "existing-workflow-readback.json present." if existing_readback else "redesign_from_existing missing readback evidence.",
+                    "outputs/stages/existing-workflow-readback.json",
+                )
+            semantic_paths = [
+                path
+                for path in managed_paths
+                if path.startswith(".claude/") or path.startswith(".workflowprogram/runtime/")
+            ]
+            if semantic_paths and str(change_policy.get("scope", "")).strip() != "docs":
+                spec_in_change = ".workflowprogram/design/workflow-spec.yaml" in managed_paths
+                spec_justified = impact_analysis.get("spec_change_required") is False and bool(str(impact_analysis.get("spec_change_reason", "")).strip())
+                test_justified = (
+                    impact_analysis.get("test_contract_change_required") is not False
+                    or bool(str(impact_analysis.get("test_contract_change_reason", "")).strip())
+                )
+                add_check(
+                    checks["flow"],
+                    "no_spec_bypass_for_semantic_change",
+                    "PASS" if spec_in_change or spec_justified else "FAIL",
+                    f"semantic_paths={semantic_paths}; spec_in_change={spec_in_change}; spec_justified={spec_justified}",
+                    "outputs/stages/impact-analysis.json",
+                )
+                add_check(
+                    checks["flow"],
+                    "no_test_contract_bypass_for_semantic_change",
+                    "PASS" if test_justified else "FAIL",
+                    f"test_contract_change_required={impact_analysis.get('test_contract_change_required', '<missing>')}; reason_present={bool(str(impact_analysis.get('test_contract_change_reason', '')).strip())}",
+                    "outputs/stages/impact-analysis.json",
+                )
         runner_summary = load_json(run_root / "outputs" / "stages" / "runner-summary.json")
         if runner_summary:
             summary_entry = str(runner_summary.get("entry_skill", "")).strip()

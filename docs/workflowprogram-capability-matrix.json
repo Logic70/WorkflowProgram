@@ -293,6 +293,35 @@
       ]
     },
     {
+      "id": "workflow-change-policy-controlled-evolution",
+      "checks": [
+        {
+          "file": "docs/workflowprogram-stage-highlevel-design.md",
+          "markers": ["change-policy.json", "change-context.json", "controlled evolution"]
+        },
+        {
+          "file": "docs/workflowprogram-stage-lowlevel-design.md",
+          "markers": ["validate-change-policy.py", "change_policy_validation", "existing-workflow-readback.json"]
+        },
+        {
+          "file": ".claude/scripts/resolve-change-context.py",
+          "markers": ["change_policy_required", "existing_managed_workflow", "fingerprints"]
+        },
+        {
+          "file": ".claude/scripts/validate-change-policy.py",
+          "markers": ["CHANGE_POLICY_FAILURE", "change_context_stale", "expanded_allowed_artifacts"]
+        },
+        {
+          "file": ".claude/scripts/workflow-s5-judge.py",
+          "markers": ["change_policy_present_when_required", "managed_changes_within_affected_artifacts", "pre_run_blocked_status_explained"]
+        },
+        {
+          "file": "tools/runtime_smoke_matrix.py",
+          "markers": ["change-policy-incremental-pass", "change-policy-missing-fail", "change-policy-undeclared-write-fail"]
+        }
+      ]
+    },
+    {
       "id": "workflow-lessons-and-progress",
       "checks": [
         {

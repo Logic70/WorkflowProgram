@@ -47,6 +47,8 @@
 - 决策 D15：复杂目标业务节点不拆成新的 WorkflowProgram `S1..S6`，而是升级为 `node-design`，并由 `workflow_graph.nodes[*]`、可选 `loop_policy`、可选 agent/team 契约承接。
 - 决策 D16：node 是流程单位，agent 是执行角色；二者不强制一一对应，只有复杂认知边界、专业能力边界或独立上下文边界才需要独立 agent。
 - 决策 D17：简单工作流不得被强行重型化；`node-designs/**`、agent team、loop policy、host bootstrap 都是按复杂度和需求触发的条件性设计，不是所有工作流的默认负担。
+- 决策 D18：修改已有目标工作流不新增 `workflowprogram-change` 入口，而是在 `workflowprogram-develop` 内启用 controlled evolution；`change-policy.json`、`impact-analysis.json`、`existing-workflow-readback.json` 是单次运行证据，不是 `workflow-spec.yaml` 顶层字段。
+- 决策 D19：change policy 的提示词规则是“候选资产生成前先分析”，确定性硬门禁是 `workflow-entry.py` 在 managed apply 前复核 `route-intent.json`、`change-context.json`、policy、impact、审批与 stale context。
 
 ## 3. 项目结构（高层）
 
@@ -137,6 +139,8 @@ TARGET_ROOT/
   - `target_root` 必须解析为绝对路径。
   - `S0` 准出前 `target_root` 必须已存在；若路径不存在，系统必须先创建目录并记录该结果。
   - 路由证据必须记录 `intent`、`entry_skill`、`target_root` 与“目录原本已存在/本阶段创建”的事实。
+  - 路由阶段必须写入 `RUN_ROOT/outputs/stages/route-intent.json`。
+  - 若目标目录已有 `.workflowprogram/design/workflow-spec.yaml`、`.workflowprogram/managed-files.json` 或 `.claude/**` workflow 资产，必须写入 `RUN_ROOT/outputs/stages/change-context.json`，其中包含 `target_state`、`request_kind`、`change_policy_required` 与关键文件 fingerprints。
 
 ### S1 需求澄清阶段（Explore Requirement）
 
@@ -223,6 +227,9 @@ TARGET_ROOT/
   - `RUN_ROOT/outputs/candidate/.claude/*`
   - `RUN_ROOT/outputs/candidate/.workflowprogram/design/*`
   - `RUN_ROOT/outputs/candidate/.workflowprogram/runtime/*`
+  - 条件性 `RUN_ROOT/outputs/stages/change-policy.json`
+  - 条件性 `RUN_ROOT/outputs/stages/impact-analysis.json`
+  - 条件性 `RUN_ROOT/outputs/stages/validate-change-policy.json`
   - `managed-change-plan/result/summary`
   - `managed-rollback-manifest.json`
   - `managed-recover-instructions.md`
@@ -231,6 +238,9 @@ TARGET_ROOT/
   - 应用后的 `TARGET_ROOT/.workflowprogram/design/{workflow-spec.yaml,workflow-view.md,workflow-lowlevel.md}`（无冲突场景）
   - 应用后的 `TARGET_ROOT/.workflowprogram/runtime/{workflow-entry.py,workflow-runner.py,validate-run-state.py,runtime-manifest.json}`（无冲突场景）
 - 规范要求：
+  - 若 `change-context.json.change_policy_required=true`，S4 不得进入 managed apply，直到 `validate-change-policy.py` 返回 PASS。
+  - `workflow-entry.py` 必须在写入前重新解析 target state；如果 design spec、lowlevel 或 managed manifest fingerprint 变化，则以 `change_context_stale` 阻断。
+  - policy 中的 `affected_artifacts` 表示语义修改范围；`allowed_derived_artifacts` 表示由 entry 自动派生的 view/lowlevel/runtime 输出。
   - 目标侧 runtime 继续采用 `shared-control-plane-wrapper`，通过 wrapper 调共享控制面，不复制独立引擎。
   - 若声明 `capability_discovery`，产品入口与目标侧 runtime 入口都必须先生成 `host-capability-candidates.json` 与 `host-bootstrap-instructions.md`，再进入 host probe / runner。
   - 若能力发现启用领域画像，则 `host-capability-candidates.json` 必须保留画像来源、被排除能力、被替换能力，以及是否推荐默认 team 拓扑。

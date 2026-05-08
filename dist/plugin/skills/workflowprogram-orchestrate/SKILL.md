@@ -25,6 +25,8 @@ version: 1.0.0
 - 其他 `workflowprogram-develop/audit/iterate/validate` 仍应优先通过显式 slash 调用。
 - 若请求不明确，只提出最小必要的一个澄清问题。
 - 路由前应优先调用 `workflowprogram-python ${CLAUDE_PLUGIN_ROOT}/scripts/route-intent.py --request "<用户请求>" --target-root <TARGET_ROOT> --json`。
+- 路由结果必须写入 `RUN_ROOT/outputs/stages/route-intent.json`；随后调用 `${CLAUDE_PLUGIN_ROOT}/scripts/resolve-change-context.py` 写入 `RUN_ROOT/outputs/stages/change-context.json`。
+- 若 `change-context.json.change_policy_required=true`，必须把该证据交给 `workflowprogram-develop`，不得直接当作普通新建 workflow 处理。
 - 当路由结果进入叶子入口后，确定性脚本链应通过 `${CLAUDE_PLUGIN_ROOT}/scripts/workflow-entry.py` 驱动，而不是只靠口头步骤串联。
 - 当 `WORKFLOWPROGRAM_STRICT_ROUTE=1` 或显式 strict 模式开启时，若路由歧义则必须先澄清，不得直接分发到叶子 skill。
 
@@ -32,8 +34,9 @@ version: 1.0.0
 
 1. 识别当前工作目录是否为 `TARGET_ROOT`。
 2. 若用户显式给出路径，以该路径作为 `TARGET_ROOT`。
-3. 通过 `route-intent.py` 得到意图与置信度。
-4. 明确本次操作是“设计 / 审计 / 迭代 / 验证”中的哪一类。
+3. 通过 `route-intent.py --out <RUN_ROOT>/outputs/stages/route-intent.json` 得到意图、置信度和 `request_kind`。
+4. 通过 `resolve-change-context.py --route <RUN_ROOT>/outputs/stages/route-intent.json --out <RUN_ROOT>/outputs/stages/change-context.json` 判断目标是空项目、已有托管 workflow、已有非托管 workflow 还是 partial workflow。
+5. 明确本次操作是“设计 / 审计 / 迭代 / 验证”中的哪一类，以及是否需要 change policy。
 
 ## Step 2: Route Request
 
@@ -50,6 +53,8 @@ version: 1.0.0
 
 - `TARGET_ROOT`
 - 用户原始需求
+- `RUN_ROOT/outputs/stages/route-intent.json`
+- `RUN_ROOT/outputs/stages/change-context.json`
 - 必要的约束或范围说明
 - 当前已知的 `.claude/` 现状
 

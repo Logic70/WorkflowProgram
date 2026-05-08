@@ -62,6 +62,12 @@ VALID_KIND = {
     "implementation_plan",
     "acceptance_tests",
     "traceability_matrix",
+    "change_context",
+    "existing_workflow_readback",
+    "change_policy",
+    "impact_analysis",
+    "change_policy_validation",
+    "change_traceability",
     "host_capability_report",
     "host_bootstrap_plan",
     "host_bootstrap_apply",
@@ -451,6 +457,18 @@ def infer_kind(path: str) -> str:
         return "acceptance_tests"
     if cleaned.endswith("outputs/stages/traceability-matrix.json"):
         return "traceability_matrix"
+    if cleaned.endswith("outputs/stages/change-context.json"):
+        return "change_context"
+    if cleaned.endswith("outputs/stages/existing-workflow-readback.json"):
+        return "existing_workflow_readback"
+    if cleaned.endswith("outputs/stages/change-policy.json"):
+        return "change_policy"
+    if cleaned.endswith("outputs/stages/impact-analysis.json"):
+        return "impact_analysis"
+    if cleaned.endswith("outputs/stages/validate-change-policy.json"):
+        return "change_policy_validation"
+    if cleaned.endswith("outputs/stages/change-traceability.json"):
+        return "change_traceability"
     if cleaned.endswith("workflow-spec.md") or cleaned.endswith("workflow-spec.yaml"):
         return "spec"
     if cleaned.endswith("workflow-view.md"):

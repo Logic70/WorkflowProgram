@@ -149,6 +149,36 @@ FIXTURE_PRESETS: Dict[str, Dict[str, str]] = {
         "request": "触发 deterministic node loop max_iterations 失败路径",
         "contract_categories": "flow,artifacts,failure",
     },
+    "change-policy-incremental-pass": {
+        "workspace_fixture": "existing-workflow",
+        "entry_skill": "workflowprogram-develop",
+        "request": "修改已有工作流的 example 节点并应用",
+        "contract_categories": "boundary,flow,artifacts,failure",
+    },
+    "change-policy-redesign-pass": {
+        "workspace_fixture": "existing-workflow",
+        "entry_skill": "workflowprogram-develop",
+        "request": "重新设计已有工作流并保留历史设计作为输入",
+        "contract_categories": "boundary,flow,artifacts,failure",
+    },
+    "change-policy-missing-fail": {
+        "workspace_fixture": "existing-workflow",
+        "entry_skill": "workflowprogram-develop",
+        "request": "修改已有工作流但缺少 change policy",
+        "contract_categories": "flow,artifacts,failure",
+    },
+    "change-policy-undeclared-write-fail": {
+        "workspace_fixture": "existing-workflow",
+        "entry_skill": "workflowprogram-develop",
+        "request": "修改已有工作流但写出未声明资产",
+        "contract_categories": "boundary,flow,artifacts,failure",
+    },
+    "change-policy-stale-context-fail": {
+        "workspace_fixture": "existing-workflow",
+        "entry_skill": "workflowprogram-develop",
+        "request": "修改已有工作流但目标状态已变化",
+        "contract_categories": "flow,artifacts,failure",
+    },
 }
 
 

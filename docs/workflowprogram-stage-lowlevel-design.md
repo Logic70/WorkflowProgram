@@ -207,6 +207,12 @@ Artifact 使用固定结构：
 | `implementation_plan` | 设计后实施计划 | `md` | `RUN_ROOT/outputs/stages/s3-implementation-plan.md` |
 | `acceptance_tests` | 验收测试契约 | `yaml` | `RUN_ROOT/outputs/stages/acceptance-tests.yaml` |
 | `traceability_matrix` | 需求到设计/实现/证据映射 | `json` | `RUN_ROOT/outputs/stages/traceability-matrix.json` |
+| `change_context` | 既有工作流上下文与是否需要 change policy | `json` | `RUN_ROOT/outputs/stages/change-context.json` |
+| `existing_workflow_readback` | 既有设计与 managed 状态回读 | `json` | `RUN_ROOT/outputs/stages/existing-workflow-readback.json` |
+| `change_policy` | 单次修改策略与影响范围 | `json` | `RUN_ROOT/outputs/stages/change-policy.json` |
+| `impact_analysis` | 修改影响分析与验证计划 | `json` | `RUN_ROOT/outputs/stages/impact-analysis.json` |
+| `change_policy_validation` | change policy 门禁结果 | `json` | `RUN_ROOT/outputs/stages/validate-change-policy.json` |
+| `change_traceability` | 修改请求到设计/资产/证据的增量映射 | `json` | `RUN_ROOT/outputs/stages/change-traceability.json` |
 | `candidate_asset` | 待应用候选资产 | `dir` | `RUN_ROOT/outputs/candidate/.claude/` |
 | `managed_manifest` | managed 资产清单 | `json` | `TARGET_ROOT/.workflowprogram/managed-files.json` |
 | `managed_plan` | managed 变更计划 | `json` | `RUN_ROOT/outputs/managed-change-plan.json` |
@@ -1041,12 +1047,18 @@ WorkflowProgram 自身必须按原子能力组织，每个 Stage 必须可拆分
 - `workflow-spec.yaml`
 - `target_root`
 - `run_root`
+- 条件性 `RUN_ROOT/outputs/stages/route-intent.json`
+- 条件性 `RUN_ROOT/outputs/stages/change-context.json`
 
 ### 输出
 
 - `RUN_ROOT/outputs/candidate/.claude/*`
 - `RUN_ROOT/outputs/candidate/.workflowprogram/design/*`
 - `RUN_ROOT/outputs/candidate/.workflowprogram/runtime/*`
+- 条件性 `RUN_ROOT/outputs/stages/existing-workflow-readback.json`
+- 条件性 `RUN_ROOT/outputs/stages/change-policy.json`
+- 条件性 `RUN_ROOT/outputs/stages/impact-analysis.json`
+- 条件性 `RUN_ROOT/outputs/stages/validate-change-policy.json`
 - `managed-change-plan.json`
 - `managed-change-result.json`
 - `managed-change-summary.md`
@@ -1064,27 +1076,36 @@ WorkflowProgram 自身必须按原子能力组织，每个 Stage 必须可拆分
 - 冲突文件必须落盘到冲突目录
 - 更新文件前必须保存 before snapshot，并在 `managed-rollback-manifest.json` 中记录安全回退条件
 - 面向用户共享的 managed 报告必须包含 `schema_version`、`error_code`、`failure_kind`、`remediation` 并做 secret-like 脱敏
+- 若 `change-context.json.change_policy_required=true`，`validate-change-policy.py` 必须在 managed apply 前返回 PASS；否则 `workflow-entry.py` 以 `BLOCKED/design` 写入 `entry-orchestration-summary.json`。
 
 ### 执行过程（封装级）
 
-1. `generate_candidates`（script_node）
+1. `resolve_change_context`（script_node）
+   - 调 `route-intent.py --out RUN_ROOT/outputs/stages/route-intent.json` 与 `resolve-change-context.py --out RUN_ROOT/outputs/stages/change-context.json`，得到 `target_state`、`request_kind`、fingerprints 与 `change_policy_required`。
+2. `read_existing_workflow`（skill_node）
+   - 当 `change_policy_required=true` 时，读取旧设计与 managed manifest，写入 `existing-workflow-readback.json`。
+3. `generate_change_policy`（skill_node）
+   - 当 `change_policy_required=true` 时，生成 `change-policy.json` 与 `impact-analysis.json`；`change-policy.json` 是运行证据，不得写入 `workflow-spec.yaml` 顶层。
+4. `generate_candidates`（script_node）
    - 按 `workflow-spec.yaml` 生成 `RUN_ROOT/outputs/candidate/.claude/*`，并同步准备 `RUN_ROOT/outputs/candidate/.workflowprogram/design/*` 与 `RUN_ROOT/outputs/candidate/.workflowprogram/runtime/*`。
-2. `validate_generated_files`（skill_node）
+5. `validate_generated_files`（skill_node）
    - 调 `validate-file` 检查关键候选文件格式与约束。
-3. `plan_apply_managed_assets`（script_node）
+6. `validate_change_policy_gate`（script_node）
+   - `workflow-entry.py` 在 managed apply 前重新调用 `resolve-change-context.py` 生成 current context，并调用 `validate-change-policy.py` 比较 stale fingerprints、审批来源与 policy/impact schema。
+7. `plan_apply_managed_assets`（script_node）
    - 调 `managed-assets.py plan` 生成变更计划。
-4. `apply_or_conflict`（script_node）
+8. `apply_or_conflict`（script_node）
    - 无冲突执行 `apply-staged`；有冲突写入 `outputs/conflicts/` 并标记失败分类。
-5. `product_entry_finalize`（script_node）
-   - develop 主链必须通过 `${CLAUDE_PLUGIN_ROOT}/scripts/workflow-entry.py run --spec <RUN_ROOT>/workflow-spec.yaml --run-root <RUN_ROOT> --target-root <TARGET_ROOT> --entry-skill workflowprogram-develop --request "<原始需求>"` 驱动，而不是只在 skill 中罗列口头顺序。
-   - 该脚本必须顺序调用 `validate-workflow-spec.py`、`generate-workflow-view.py`、`generate-workflow-lowlevel.py`、`generate-target-runtime.py`、`managed-assets.py`、`discover-host-capabilities.py`、`probe-host-capabilities.py`、`apply-host-bootstrap.py`（条件执行）、`generate-environment-remediation.py`、`workflow-runner.py`、`validate-run-state.py`，并写入 `outputs/stages/entry-orchestration-summary.json`。
-6. `run_transition_control_plane`（script_node）
+9. `product_entry_finalize`（script_node）
+   - develop 主链必须通过 `${CLAUDE_PLUGIN_ROOT}/scripts/workflow-entry.py run --spec <RUN_ROOT>/workflow-spec.yaml --run-root <RUN_ROOT> --target-root <TARGET_ROOT> --entry-skill workflowprogram-develop --request "<原始需求>" --route-evidence <RUN_ROOT>/outputs/stages/route-intent.json --change-context <RUN_ROOT>/outputs/stages/change-context.json` 驱动，而不是只在 skill 中罗列口头顺序。
+   - 该脚本必须顺序调用 `resolve-change-context.py`（复核）、`validate-workflow-spec.py`、`generate-workflow-view.py`、`generate-workflow-lowlevel.py`、`validate-change-policy.py`（条件执行且在 managed apply 前）、`generate-target-runtime.py`、`managed-assets.py`、`discover-host-capabilities.py`、`probe-host-capabilities.py`、`apply-host-bootstrap.py`（条件执行）、`generate-environment-remediation.py`、`workflow-runner.py`、`validate-run-state.py`，并写入 `outputs/stages/entry-orchestration-summary.json`。
+10. `run_transition_control_plane`（script_node）
    - 调 `${CLAUDE_PLUGIN_ROOT}/scripts/workflow-runner.py run --spec <RUN_ROOT>/workflow-spec.yaml --run-root <RUN_ROOT> --target-root <TARGET_ROOT>`，由程序执行状态转移并产出 `state.json` / `events.jsonl`。
-7. `validate_state_artifacts`（script_node）
+11. `validate_state_artifacts`（script_node）
    - 调 `${CLAUDE_PLUGIN_ROOT}/scripts/validate-run-state.py --state <RUN_ROOT>/state.json`，强制检查 `kind/producer/status` 枚举。
-8. `persist_apply_summary`（script_node）
+12. `persist_apply_summary`（script_node）
    - 写入 managed plan/result/summary 与更新 `managed-files.json`。
-9. `emit_stage_progress`（script_node）
+13. `emit_stage_progress`（script_node）
    - 记录 S4 关键节点结果并更新用户进展。
 
 ### 可验证检查
@@ -1097,11 +1118,12 @@ WorkflowProgram 自身必须按原子能力组织，每个 Stage 必须可拆分
 6. `user-progress.md` 必须包含“已应用/冲突”摘要。
 7. `RUN_ROOT/state.json` 必须存在且通过 `validate-run-state.py`。
 8. `RUN_ROOT/outputs/stages/runner-summary.json` 必须存在。
-8. `TARGET_ROOT/.workflowprogram/runtime/runtime-manifest.json` 必须存在，并通过 `${CLAUDE_PLUGIN_ROOT}/scripts/validate-generated-runtime.py` 校验。
-9. 若声明 `host_capabilities`，则 `RUN_ROOT/outputs/stages/host-capability-report.json` 必须存在。
-10. 若声明 `capability_discovery`，则 `RUN_ROOT/outputs/stages/host-capability-candidates.json` 与 `RUN_ROOT/outputs/stages/host-bootstrap-instructions.md` 必须存在。
-11. 若声明 `host_capabilities`，则 `RUN_ROOT/outputs/stages/environment-remediation-report.json` 与 `RUN_ROOT/outputs/stages/environment-remediation-guide.md` 必须存在。
-12. 若声明 `workflow_graph.nodes[*].loop_policy.enabled=true`，则 `RUN_ROOT/outputs/stages/loops/<node_id>/loop-plan.json`、`iteration-summary.jsonl`、`final-verdict.json` 与 `LoopStart/LoopStop` 等事件必须存在。
+9. 若 `change_policy_required=true`，`RUN_ROOT/outputs/stages/validate-change-policy.json` 必须存在；若其状态不是 PASS，S5 必须把 change-policy 失败作为主问题，而不是用缺完整 runner state 覆盖主问题。
+10. `TARGET_ROOT/.workflowprogram/runtime/runtime-manifest.json` 必须存在，并通过 `${CLAUDE_PLUGIN_ROOT}/scripts/validate-generated-runtime.py` 校验。
+11. 若声明 `host_capabilities`，则 `RUN_ROOT/outputs/stages/host-capability-report.json` 必须存在。
+12. 若声明 `capability_discovery`，则 `RUN_ROOT/outputs/stages/host-capability-candidates.json` 与 `RUN_ROOT/outputs/stages/host-bootstrap-instructions.md` 必须存在。
+13. 若声明 `host_capabilities`，则 `RUN_ROOT/outputs/stages/environment-remediation-report.json` 与 `RUN_ROOT/outputs/stages/environment-remediation-guide.md` 必须存在。
+14. 若声明 `workflow_graph.nodes[*].loop_policy.enabled=true`，则 `RUN_ROOT/outputs/stages/loops/<node_id>/loop-plan.json`、`iteration-summary.jsonl`、`final-verdict.json` 与 `LoopStart/LoopStop` 等事件必须存在。
 
 ### 实现方案
 

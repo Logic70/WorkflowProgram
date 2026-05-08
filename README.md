@@ -137,6 +137,16 @@ AI 不直接写目标项目。而是：
 3. `managed-assets.py apply-staged` 执行受控写入
 4. 冲突时保留副本，不静默覆盖
 
+如果目标项目已经有 WorkflowProgram 生成过的 workflow，后续“修改/拆分/替换/重新设计”不会直接 patch，也不会默认全量重做。`workflowprogram-develop` 会先生成：
+
+- `outputs/stages/route-intent.json`
+- `outputs/stages/change-context.json`
+- `outputs/stages/existing-workflow-readback.json`
+- `outputs/stages/change-policy.json`
+- `outputs/stages/impact-analysis.json`
+
+`workflow-entry.py` 会在 managed apply 前复核这些证据、审批状态和目标文件 fingerprints。缺少 change policy、审批缺失或目标状态已变化时，会先以 `BLOCKED/design` 停止，不会写入目标项目。
+
 ### 三层验证
 
 | 层 | 职责 | 关键文件 |

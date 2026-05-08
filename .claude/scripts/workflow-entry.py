@@ -48,6 +48,8 @@ def parse_args() -> argparse.Namespace:
     run.add_argument("--entry-skill", default="", help="Explicit workflowprogram-* entry skill")
     run.add_argument("--candidate-root", default="", help="Candidate .claude root for develop flows")
     run.add_argument("--plugin-root", default="", help="Explicit PLUGIN_ROOT path")
+    run.add_argument("--route-evidence", default="", help="Optional precomputed route-intent.json evidence")
+    run.add_argument("--change-context", default="", help="Optional precomputed change-context.json evidence")
     run.add_argument("--auto-approve", action="store_true", help="Resolve approval gates automatically")
     run.add_argument("--approve-host-global-bootstrap", action="store_true", help="Deprecated no-op; host-global bootstrap is plan-only")
     run.add_argument(
@@ -113,6 +115,18 @@ def run_command(cmd: List[str]) -> Tuple[int, Dict[str, Any], str]:
     return completed.returncode, parse_json_output(text), text
 
 
+def load_json_file(path: Path) -> Dict[str, Any]:
+    """尽力读取本地 JSON 证据文件。"""
+
+    if not path.exists():
+        return {}
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+    return payload if isinstance(payload, dict) else {}
+
+
 def entry_intent_for(entry_skill: str) -> str:
     """把显式 workflowprogram-* 入口技能映射为逻辑 intent。"""
 
@@ -127,6 +141,7 @@ def resolve_requested_entry(
     target_root: Path,
     explicit_entry_skill: str,
     strict_route: bool,
+    route_evidence_path: Path,
 ) -> Dict[str, Any]:
     """解析本次调用实际应使用的入口技能和 intent。
 
@@ -134,6 +149,7 @@ def resolve_requested_entry(
     这样严格模式才能发现“用户请求和入口不匹配”，并把原始路由证据保存在编排摘要里。
     """
 
+    precomputed_payload = load_json_file(route_evidence_path)
     cmd = [
         sys.executable,
         str(script_dir() / "route-intent.py"),
@@ -143,6 +159,8 @@ def resolve_requested_entry(
         str(target_root),
         "--json",
     ]
+    if not precomputed_payload:
+        cmd.extend(["--out", str(route_evidence_path)])
     if strict_route:
         cmd.append("--strict")
     code, payload, text = run_command(cmd)
@@ -150,6 +168,20 @@ def resolve_requested_entry(
         raise RuntimeError(f"route-intent.py failed: {text}")
     if code == 2:
         raise RuntimeError("route-intent.py blocked on ambiguous request under strict mode")
+
+    if precomputed_payload:
+        fresh_payload = payload
+        comparable_keys = ("intent", "entry_skill", "request_kind", "target_root")
+        evidence_mismatch = any(
+            str(precomputed_payload.get(key, "")).strip() != str(fresh_payload.get(key, "")).strip()
+            for key in comparable_keys
+            if fresh_payload
+        )
+        if evidence_mismatch and strict_route:
+            raise RuntimeError("provided route evidence does not match fresh route-intent.py result under strict mode")
+        payload = precomputed_payload
+    else:
+        evidence_mismatch = False
 
     # 显式叶子入口可以覆盖路由结果，但原始路由载荷仍要保留，
     # 这样后续审计才能看见是否存在不匹配。
@@ -171,6 +203,8 @@ def resolve_requested_entry(
             "route_payload": payload,
             "route_source": "explicit-entry-skill",
             "route_mismatch": mismatch,
+            "route_evidence_path": str(route_evidence_path),
+            "route_evidence_mismatch": evidence_mismatch,
         }
 
     if not payload:
@@ -181,7 +215,85 @@ def resolve_requested_entry(
         "route_payload": payload,
         "route_source": "route-intent",
         "route_mismatch": False,
+        "route_evidence_path": str(route_evidence_path),
+        "route_evidence_mismatch": evidence_mismatch,
     }
+
+
+def resolve_change_context(
+    *,
+    request: str,
+    target_root: Path,
+    route_evidence_path: Path,
+    context_path: Path,
+    use_existing: bool,
+) -> Dict[str, Any]:
+    """解析或加载 change-context 证据。"""
+
+    if use_existing and context_path.exists():
+        payload = load_json_file(context_path)
+        if payload:
+            return payload
+    return run_required_json_command(
+        "resolve-change-context.py",
+        [
+            sys.executable,
+            str(script_dir() / "resolve-change-context.py"),
+            "--request",
+            request,
+            "--target-root",
+            str(target_root),
+            "--route",
+            str(route_evidence_path),
+            "--out",
+            str(context_path),
+            "--json",
+        ],
+    )
+
+
+def validate_change_policy(
+    *,
+    run_root: Path,
+    target_root: Path,
+    context_path: Path,
+    current_context_path: Path,
+    auto_approve: bool,
+    approval_status: str,
+) -> Dict[str, Any]:
+    """调用 change-policy validator，并允许它用退出码 2 表达阻断。"""
+
+    cmd = [
+        sys.executable,
+        str(script_dir() / "validate-change-policy.py"),
+        "--policy",
+        str(run_root / "outputs" / "stages" / "change-policy.json"),
+        "--impact",
+        str(run_root / "outputs" / "stages" / "impact-analysis.json"),
+        "--change-context",
+        str(context_path),
+        "--current-context",
+        str(current_context_path),
+        "--readback",
+        str(run_root / "outputs" / "stages" / "existing-workflow-readback.json"),
+        "--target-root",
+        str(target_root),
+        "--run-root",
+        str(run_root),
+        "--out",
+        str(run_root / "outputs" / "stages" / "validate-change-policy.json"),
+        "--json",
+    ]
+    if auto_approve:
+        cmd.append("--auto-approve")
+    if approval_status:
+        cmd.extend(["--approval-status", approval_status])
+    code, payload, text = run_command(cmd)
+    if code not in {0, 2}:
+        raise RuntimeError(f"validate-change-policy.py failed: {text}")
+    if not payload:
+        raise RuntimeError("validate-change-policy.py did not return JSON output")
+    return payload
 
 
 def run_required_json_command(name: str, cmd: List[str]) -> Dict[str, Any]:
@@ -547,6 +659,10 @@ def command_run(args: argparse.Namespace) -> int:
     plugin_root = resolve_plugin_root(args.plugin_root)
     candidate_root = Path(args.candidate_root).resolve() if args.candidate_root else (run_root / "outputs" / "candidate")
     run_root.mkdir(parents=True, exist_ok=True)
+    stages_root = run_root / "outputs" / "stages"
+    stages_root.mkdir(parents=True, exist_ok=True)
+    route_evidence_path = Path(args.route_evidence).resolve() if args.route_evidence else stages_root / "route-intent.json"
+    change_context_path = Path(args.change_context).resolve() if args.change_context else stages_root / "change-context.json"
 
     # 在碰 spec 之前先固化路由证据，保证每次运行都能回答“为什么执行了这个入口”。
     resolved = resolve_requested_entry(
@@ -554,9 +670,17 @@ def command_run(args: argparse.Namespace) -> int:
         target_root=target_root,
         explicit_entry_skill=args.entry_skill.strip(),
         strict_route=bool(args.strict_route),
+        route_evidence_path=route_evidence_path,
     )
     intent = str(resolved["intent"])
     entry_skill = str(resolved["entry_skill"])
+    change_context = resolve_change_context(
+        request=args.request,
+        target_root=target_root,
+        route_evidence_path=route_evidence_path,
+        context_path=change_context_path,
+        use_existing=bool(args.change_context),
+    )
 
     spec_validation = validate_spec(spec_path)
     view_path = run_root / "workflow-view.md"
@@ -577,34 +701,59 @@ def command_run(args: argparse.Namespace) -> int:
     final_status = "PASS"
     design_assets: Dict[str, str] | None = None
     target_runtime_assets: Dict[str, Any] | None = None
+    change_policy_validation: Dict[str, Any] | None = None
+    block_reason: str | None = None
 
     # 只有 develop 流程允许修改 TARGET_ROOT。
     # audit/iterate/validate 流程会直接进入控制面 runner。
     if intent == "develop":
-        candidate_stage_root, candidate_claude_root = resolve_candidate_layout(candidate_root)
-        if not candidate_stage_root.exists():
-            raise RuntimeError(f"develop flow requires candidate root before orchestration: {candidate_stage_root}")
-        if not candidate_stage_root.is_dir():
-            raise RuntimeError(f"candidate root must be a directory: {candidate_stage_root}")
-        if not candidate_claude_root.exists() or not candidate_claude_root.is_dir():
-            raise RuntimeError(f"develop flow requires candidate .claude root before orchestration: {candidate_claude_root}")
-        design_assets = stage_persistent_design_assets(
-            candidate_stage_root=candidate_stage_root,
-            spec_path=spec_path,
-            view_path=view_path,
-            lowlevel_path=lowlevel_path,
-        )
-        target_runtime_assets = stage_target_runtime_assets(
-            candidate_stage_root=candidate_stage_root,
-            spec_path=spec_path,
-        )
-        managed_plan, managed_result, conflicts = run_managed_apply(target_root, run_root, candidate_stage_root)
-        # managed apply 冲突要在 runner 之前中止。
-        # 这样既能保持 S4 归属清晰，也避免在写入门禁未打开时假装控制面已经执行。
-        if conflicts:
-            stopped_before_runner = True
-            final_status = "CONFLICT"
-        else:
+        if bool(change_context.get("change_policy_required", False)):
+            current_context_path = stages_root / "change-context-current.json"
+            resolve_change_context(
+                request=args.request,
+                target_root=target_root,
+                route_evidence_path=route_evidence_path,
+                context_path=current_context_path,
+                use_existing=False,
+            )
+            change_policy_validation = validate_change_policy(
+                run_root=run_root,
+                target_root=target_root,
+                context_path=change_context_path,
+                current_context_path=current_context_path,
+                auto_approve=bool(args.auto_approve),
+                approval_status=args.approval_status,
+            )
+            if change_policy_validation.get("status") != "PASS":
+                stopped_before_runner = True
+                final_status = "BLOCKED"
+                block_reason = str(change_policy_validation.get("block_reason", "")).strip() or "change_policy_invalid"
+
+        if final_status != "BLOCKED":
+            candidate_stage_root, candidate_claude_root = resolve_candidate_layout(candidate_root)
+            if not candidate_stage_root.exists():
+                raise RuntimeError(f"develop flow requires candidate root before orchestration: {candidate_stage_root}")
+            if not candidate_stage_root.is_dir():
+                raise RuntimeError(f"candidate root must be a directory: {candidate_stage_root}")
+            if not candidate_claude_root.exists() or not candidate_claude_root.is_dir():
+                raise RuntimeError(f"develop flow requires candidate .claude root before orchestration: {candidate_claude_root}")
+            design_assets = stage_persistent_design_assets(
+                candidate_stage_root=candidate_stage_root,
+                spec_path=spec_path,
+                view_path=view_path,
+                lowlevel_path=lowlevel_path,
+            )
+            target_runtime_assets = stage_target_runtime_assets(
+                candidate_stage_root=candidate_stage_root,
+                spec_path=spec_path,
+            )
+            managed_plan, managed_result, conflicts = run_managed_apply(target_root, run_root, candidate_stage_root)
+            # managed apply 冲突要在 runner 之前中止。
+            # 这样既能保持 S4 归属清晰，也避免在写入门禁未打开时假装控制面已经执行。
+            if conflicts:
+                stopped_before_runner = True
+                final_status = "CONFLICT"
+        if final_status not in {"CONFLICT", "BLOCKED"}:
             capability_discovery_report = discover_host_capabilities(spec_path, target_root, run_root, args.request)
             host_capability_report = probe_host_capabilities(spec_path, target_root, run_root)
             auto_project_local = [
@@ -703,7 +852,14 @@ def command_run(args: argparse.Namespace) -> int:
         "resolved_entry_skill": entry_skill,
         "route_source": resolved["route_source"],
         "route_mismatch": resolved["route_mismatch"],
+        "route_evidence_path": str(route_evidence_path),
+        "route_evidence_mismatch": resolved.get("route_evidence_mismatch", False),
         "route_payload": resolved["route_payload"],
+        "change_context_path": str(change_context_path),
+        "change_context": change_context,
+        "change_policy_validation": change_policy_validation,
+        "block_reason": block_reason,
+        "failure_kind": "design" if final_status == "BLOCKED" else ("conflict" if final_status == "CONFLICT" else ("environment" if required_host_missing else "none")),
         "view_path": str(view_path),
         "lowlevel_path": str(lowlevel_path),
         "candidate_root": str(resolve_candidate_layout(candidate_root)[0]) if intent == "develop" else None,

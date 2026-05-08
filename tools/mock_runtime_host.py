@@ -506,6 +506,196 @@ def run_json_script(repo_root: Path, script_name: str, *args: str) -> Dict[str, 
     return payload
 
 
+def run_json_script_allow(repo_root: Path, script_name: str, allowed: set[int], *args: str) -> Dict[str, Any]:
+    completed = subprocess.run(
+        [sys.executable, str(repo_root / ".claude" / "scripts" / script_name), *args, "--json"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if completed.returncode not in allowed:
+        raise RuntimeError(completed.stderr.strip() or completed.stdout.strip() or f"{script_name} failed")
+    try:
+        payload = json.loads(completed.stdout)
+    except json.JSONDecodeError as exc:
+        raise RuntimeError(f"{script_name} returned invalid JSON: {exc}") from exc
+    if not isinstance(payload, dict):
+        raise RuntimeError(f"{script_name} must return a JSON object")
+    return payload
+
+
+def write_existing_managed_seed(target_root: Path) -> None:
+    """Create enough target-side evidence for resolve-change-context to see a managed workflow."""
+
+    write_text(target_root / ".workflowprogram" / "design" / "workflow-spec.yaml", "name: existing-managed\n")
+    write_text(target_root / ".workflowprogram" / "design" / "workflow-lowlevel.md", "# Existing LowLevel\n")
+    write_json(
+        manifest_path_for(target_root),
+        {
+            "schema_version": 1,
+            "updated_at": iso_now(),
+            "entries": [
+                {
+                    "relative_path": ".claude/settings.json",
+                    "producer_version": "mock",
+                    "last_applied_hash": "",
+                    "ownership": "managed",
+                    "last_applied_at": iso_now(),
+                    "last_run_id": "seed",
+                }
+            ],
+        },
+    )
+
+
+def write_change_policy_inputs(
+    repo_root: Path,
+    run_root: Path,
+    target_root: Path,
+    request: str,
+    *,
+    mode: str = "incremental",
+    allowed_extra: List[str] | None = None,
+    include_policy: bool = True,
+    stale: bool = False,
+) -> Dict[str, Any]:
+    stages = run_root / "outputs" / "stages"
+    route = run_json_script(
+        repo_root,
+        "route-intent.py",
+        "--request",
+        request,
+        "--target-root",
+        str(target_root),
+        "--out",
+        str(stages / "route-intent.json"),
+    )
+    context = run_json_script(
+        repo_root,
+        "resolve-change-context.py",
+        "--request",
+        request,
+        "--target-root",
+        str(target_root),
+        "--route",
+        str(stages / "route-intent.json"),
+        "--out",
+        str(stages / "change-context.json"),
+    )
+    write_json(
+        stages / "existing-workflow-readback.json",
+        {
+            "generated_at": iso_now(),
+            "sources": [
+                {
+                    "path": ".workflowprogram/design/workflow-spec.yaml",
+                    "sha256": context.get("fingerprints", {}).get("design_spec_sha256"),
+                    "summary": "Existing managed workflow spec was read before change.",
+                }
+            ],
+            "managed_manifest_status": "present",
+        },
+    )
+    if not include_policy:
+        write_json(
+            stages / "entry-orchestration-summary.json",
+            {
+                "generated_at": iso_now(),
+                "status": "BLOCKED",
+                "failure_kind": "design",
+                "block_reason": "change_policy_required",
+                "change_context": context,
+            },
+        )
+        return {"route": route, "context": context}
+
+    affected = [
+        ".workflowprogram/design/workflow-spec.yaml",
+        ".claude/settings.json",
+        ".claude/rules/constraints.md",
+        ".claude/commands/example.md",
+        *(allowed_extra or []),
+    ]
+    write_json(
+        stages / "change-policy.json",
+        {
+            "schema_version": 1,
+            "mode": mode,
+            "scope": "node" if mode == "incremental" else "graph",
+            "target_state": context.get("target_state"),
+            "affected_nodes": ["example"],
+            "affected_artifacts": affected,
+            "allowed_derived_artifacts": [
+                ".workflowprogram/design/workflow-view.md",
+                ".workflowprogram/design/workflow-lowlevel.md",
+                ".workflowprogram/runtime/**",
+            ],
+            "preserve_user_edits": True,
+            "requires_approval": True,
+            "approval_reason": "Existing managed workflow assets are being modified.",
+            "escalate_to_redesign": mode == "redesign_from_existing",
+            "reason": "Mock change-policy fixture.",
+        },
+    )
+    write_json(
+        stages / "impact-analysis.json",
+        {
+            "old_design_sources_read": [".workflowprogram/design/workflow-spec.yaml"],
+            "readback_evidence_path": "outputs/stages/existing-workflow-readback.json",
+            "existing_managed_manifest_status": "present",
+            "changed_requirement_ids": ["REQ-001"],
+            "affected_spec_sections": ["workflow_graph.nodes.example"],
+            "spec_change_required": True,
+            "affected_design_source_sections": ["example node"],
+            "test_contract_change_required": False,
+            "test_contract_change_reason": "Mock fixture keeps test contract categories stable.",
+            "affected_test_contract_categories": ["flow", "artifacts"],
+            "affected_target_assets": affected,
+            "approval_requirement": "required",
+            "risks": ["managed scope drift"],
+            "verification_plan": ["validate-change-policy", "S5 judge"],
+        },
+    )
+    current_context_path = stages / "change-context-current.json"
+    current_context = dict(context)
+    if stale:
+        current_context["fingerprints"] = dict(current_context.get("fingerprints", {}))
+        current_context["fingerprints"]["design_spec_sha256"] = "stale"
+    write_json(current_context_path, current_context)
+    validation = run_json_script_allow(
+        repo_root,
+        "validate-change-policy.py",
+        {0, 2},
+        "--policy",
+        str(stages / "change-policy.json"),
+        "--impact",
+        str(stages / "impact-analysis.json"),
+        "--change-context",
+        str(stages / "change-context.json"),
+        "--current-context",
+        str(current_context_path),
+        "--readback",
+        str(stages / "existing-workflow-readback.json"),
+        "--run-root",
+        str(run_root),
+        "--approval-status",
+        "approved",
+    )
+    if validation.get("status") != "PASS":
+        write_json(
+            stages / "entry-orchestration-summary.json",
+            {
+                "generated_at": iso_now(),
+                "status": "BLOCKED",
+                "failure_kind": "design",
+                "block_reason": validation.get("block_reason") or "change_policy_invalid",
+                "change_policy_validation": validation,
+                "change_context": context,
+            },
+        )
+    return {"route": route, "context": context, "validation": validation}
+
+
 def write_host_capability_outputs(
     repo_root: Path,
     run_root: Path,
@@ -2050,6 +2240,137 @@ def main() -> int:
                 "next_action": "tighten loop feedback or raise max_iterations",
                 "generated_files": generated_files,
             }
+        elif args.fixture in {
+            "change-policy-incremental-pass",
+            "change-policy-redesign-pass",
+            "change-policy-missing-fail",
+            "change-policy-undeclared-write-fail",
+            "change-policy-stale-context-fail",
+        }:
+            write_existing_managed_seed(target_root)
+            copy_runtime_spec(
+                repo_root,
+                run_root,
+                "valid-minimal.yaml",
+                entry_skill=args.entry_skill,
+            )
+            design_docs = generate_design_docs(repo_root, run_root)
+            candidate_root = run_root / "outputs" / "candidate"
+            write_text(candidate_root / ".claude" / "rules" / "constraints.md", "# Constraints\n\n- Keep workflow assets managed.\n")
+            write_text(candidate_root / ".claude" / "commands" / "example.md", "## Usage\n\n1. Goal\n2. Verify\n")
+            for source_name, target_name in (
+                ("workflow_spec", "workflow-spec.yaml"),
+                ("workflow_view", "workflow-view.md"),
+                ("workflow_lowlevel", "workflow-lowlevel.md"),
+            ):
+                destination = candidate_root / ".workflowprogram" / "design" / target_name
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                destination.write_text(design_docs[source_name].read_text(encoding="utf-8"), encoding="utf-8", newline="\n")
+            generate_target_runtime_assets(repo_root, run_root / "workflow-spec.yaml", candidate_root / ".workflowprogram" / "runtime")
+
+            if args.fixture == "change-policy-missing-fail":
+                write_change_policy_inputs(
+                    repo_root,
+                    run_root,
+                    target_root,
+                    args.request,
+                    include_policy=False,
+                )
+                write_progress_outputs(
+                    run_root,
+                    stage_history[:-1],
+                    "FAIL",
+                    "CHANGE_POLICY_REQUIRED",
+                    current_stage="generate",
+                    next_action="generate change-policy.json and impact-analysis.json",
+                )
+                write_runner_evidence(run_root, target_root, intent, args.entry_skill, stage_history[:-1], "FAIL", "CHANGE_POLICY_REQUIRED")
+                payload = {
+                    "result": "FAIL",
+                    "failure_code": "CHANGE_POLICY_REQUIRED",
+                    "message": "Mock host blocked before managed apply because change policy is missing.",
+                    "is_error": True,
+                    "stage_history": stage_history[:-1],
+                    "stage_status": "blocked",
+                    "current_stage": "generate",
+                    "next_action": "generate change-policy evidence",
+                    "generated_files": [],
+                }
+            elif args.fixture == "change-policy-stale-context-fail":
+                write_change_policy_inputs(
+                    repo_root,
+                    run_root,
+                    target_root,
+                    args.request,
+                    stale=True,
+                )
+                write_progress_outputs(
+                    run_root,
+                    stage_history[:-1],
+                    "FAIL",
+                    "CHANGE_CONTEXT_STALE",
+                    current_stage="generate",
+                    next_action="rerun change-context resolution and impact analysis",
+                )
+                write_runner_evidence(run_root, target_root, intent, args.entry_skill, stage_history[:-1], "FAIL", "CHANGE_CONTEXT_STALE")
+                payload = {
+                    "result": "FAIL",
+                    "failure_code": "CHANGE_CONTEXT_STALE",
+                    "message": "Mock host blocked before managed apply because change context is stale.",
+                    "is_error": True,
+                    "stage_history": stage_history[:-1],
+                    "stage_status": "blocked",
+                    "current_stage": "generate",
+                    "next_action": "refresh change context",
+                    "generated_files": [],
+                }
+            else:
+                mode = "redesign_from_existing" if args.fixture == "change-policy-redesign-pass" else "incremental"
+                allowed_extra = [] if args.fixture != "change-policy-undeclared-write-fail" else []
+                if args.fixture != "change-policy-undeclared-write-fail":
+                    allowed_extra = []
+                write_change_policy_inputs(
+                    repo_root,
+                    run_root,
+                    target_root,
+                    args.request,
+                    mode=mode,
+                    allowed_extra=allowed_extra,
+                )
+                if args.fixture == "change-policy-undeclared-write-fail":
+                    # Narrow the declared scope after validation so S5 proves actual managed writes exceed policy.
+                    policy_path = run_root / "outputs" / "stages" / "change-policy.json"
+                    policy_payload = json.loads(policy_path.read_text(encoding="utf-8"))
+                    policy_payload["affected_artifacts"] = [".claude/settings.json"]
+                    policy_payload["allowed_derived_artifacts"] = []
+                    write_json(policy_path, policy_payload)
+                generated_files = create_target_outputs(run_root, target_root)
+                if "requirement" in stage_history:
+                    write_workflow_spec_draft(run_root, args.entry_skill, args.request)
+                if "lessons" in stage_history:
+                    write_lessons_delta(run_root, intent, derive_failure_kind(""), args.request)
+                write_progress_outputs(
+                    run_root,
+                    stage_history,
+                    "PASS",
+                    "",
+                    current_stage=stage_history[-1] if stage_history else "lessons",
+                    next_action="complete",
+                )
+                write_runner_evidence(run_root, target_root, intent, args.entry_skill, stage_history, "PASS", "")
+                write_managed_outputs(run_root, target_root, conflict=False)
+                result = "FAIL" if args.fixture == "change-policy-undeclared-write-fail" else "PASS"
+                payload = {
+                    "result": result,
+                    "failure_code": "" if result == "PASS" else "CHANGE_POLICY_FAILURE",
+                    "message": "Mock host completed change-policy fixture.",
+                    "is_error": result == "FAIL",
+                    "stage_history": stage_history,
+                    "stage_status": "done" if result == "PASS" else "failed",
+                    "current_stage": stage_history[-1] if stage_history else "lessons",
+                    "next_action": "complete" if result == "PASS" else "repair change policy scope",
+                    "generated_files": generated_files,
+                }
         elif args.fixture == "existing-workflow":
             # audit/iterate 类流程复用已有 target，主要生成验证产物，
             # 而不是创建新的 managed 资产。
