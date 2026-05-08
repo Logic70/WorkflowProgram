@@ -40,6 +40,7 @@ claude plugin install workflowprogram-cn@logic70-plugins
 1. 重新启动 `claude`，或在会话内执行 `/reload-plugins`
 2. 首次启动会在 `${CLAUDE_PLUGIN_DATA}/python/site-packages` 自动准备插件私有 Python 依赖
 3. 如需最小化排障，执行 `workflowprogram-doctor`
+4. 如需清理插件 Python 缓存、测试产物或目标工作流旧 run，执行 `workflowprogram-clean`；默认只 dry-run，删除必须加 `--apply`
 
 排障：
 
@@ -187,6 +188,9 @@ python tools/runtime_smoke.py --fixture empty-project --runtime-provider fixture
 
 # 烟雾测试（完整矩阵，含 capability / host / team 场景）
 python tools/runtime_smoke_matrix.py
+
+# 清理维护命令回归
+python tools/test_clean_workflowprogram.py
 
 # 重新构建插件
 python tools/build_plugin.py

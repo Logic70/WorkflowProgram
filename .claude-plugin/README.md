@@ -72,6 +72,7 @@ Claude Code 加载插件后，会在 `SessionStart` 自动执行 Python runtime 
 - 插件在 `SessionStart` 通过 `${CLAUDE_PLUGIN_ROOT}/scripts/bootstrap-python-runtime.py` 准备私有 Python 依赖。
 - 插件内的 Python 主入口应通过 `workflowprogram-python` 调用，而不是裸 `python3`。
 - 如需最小化排障，执行 `workflowprogram-doctor`。
+- 如需清理插件 Python runtime、测试产物或目标项目旧 run，执行 `workflowprogram-clean`；默认 dry-run，删除必须显式传 `--apply`。
 - 如果出现 `Unknown skill: workflowprogram-orchestrate`，先执行 `/reload-plugins` 或重启 `claude`，并使用 `/workflowprogram-orchestrate ...` 入口；不要让模型手写 `Skill(workflowprogram-orchestrate)`。
 - 如果出现 `bin/workflowprogram-python: Permission denied`，说明安装缓存中的 launcher 缺少执行权限。更新并重新安装最新 marketplace 载荷；临时修复可执行 `chmod +x ~/.claude/plugins/cache/logic70-plugins/workflowprogram-cn/0.1.2/bin/workflowprogram-*`。
 
@@ -83,6 +84,7 @@ Claude Code 加载插件后，会在 `SessionStart` 自动执行 Python runtime 
 - 插件 trace manifest：`dist/plugin/build-manifest.json`
 - Python launcher：`dist/plugin/bin/workflowprogram-python`
 - 安装 doctor：`dist/plugin/bin/workflowprogram-doctor`
+- 清理维护命令：`dist/plugin/bin/workflowprogram-clean`
 - 进展脚本：`dist/plugin/scripts/stage-progress.py`
 - 路由脚本：`dist/plugin/scripts/route-intent.py`
 - 规格校验脚本：`dist/plugin/scripts/validate-workflow-spec.py`

@@ -40,6 +40,7 @@ After installation:
 1. Restart `claude`, or run `/reload-plugins` in the current session
 2. On first session start, the plugin bootstraps its private Python dependency layer into `${CLAUDE_PLUGIN_DATA}/python/site-packages`
 3. For minimal troubleshooting, run `workflowprogram-doctor`
+4. To clean plugin Python caches, test artifacts, or old target workflow runs, run `workflowprogram-clean`; it is dry-run by default and requires `--apply` to delete files
 
 Troubleshooting:
 
@@ -188,6 +189,9 @@ python tools/runtime_smoke.py --fixture empty-project --runtime-provider fixture
 
 # Run the smoke matrix, including capability / host / team cases
 python tools/runtime_smoke_matrix.py
+
+# Cleanup maintenance regression
+python tools/test_clean_workflowprogram.py
 
 # Rebuild the plugin
 python tools/build_plugin.py

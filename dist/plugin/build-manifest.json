@@ -1,16 +1,16 @@
 {
   "manifest_version": 1,
-  "generated_at": "2026-05-07T07:44:51Z",
+  "generated_at": "2026-05-08T04:09:03Z",
   "builder": "tools/build_plugin.py",
   "plugin_name": "workflowprogram-cn",
   "plugin_version": "0.1.2",
-  "source_commit": "46b060da26f3b3ec5d6dd6b1afd71a3c2e9ad616",
+  "source_commit": "f709a5c5cd7e0fef34154547f7f9e9ec589b628b",
   "source_dirty": true,
   "files": [
     {
       "path": ".claude-plugin/README.md",
-      "sha256": "9a6fe1fd55f596f43e5ac6c4132a0df5be1f8e20fe7290a7263c29d3bc8be552",
-      "size": 4286
+      "sha256": "089ccf728c5b769a3a3fabe4ec73ddfc5ee5dfc690ef1ad3eeeeb97db1ae50b1",
+      "size": 4509
     },
     {
       "path": ".claude-plugin/marketplace.json",
@@ -61,6 +61,11 @@
       "path": "agents/workflow-verifier.md",
       "sha256": "24b5ff2fd94eecdfba28fcafa57ba9ca5755be1ca2aebfc64b76d0c7ca1f835b",
       "size": 4521
+    },
+    {
+      "path": "bin/workflowprogram-clean",
+      "sha256": "a0614e307d466247b63a4cf9d821f7495f2195f8cb321fb01da28fd49b8c948f",
+      "size": 377
     },
     {
       "path": "bin/workflowprogram-doctor",
@@ -131,6 +136,11 @@
       "path": "scripts/bootstrap-python-runtime.py",
       "sha256": "c2e8b2b883d3d84145c454b1cb2b381ce2f9242a0f77f29418f020cf671498d0",
       "size": 7125
+    },
+    {
+      "path": "scripts/clean-workflowprogram.py",
+      "sha256": "71b42a5f027aadbacee5d9bb918bb25880b6a17d1c30e26d52b58c7396931613",
+      "size": 13085
     },
     {
       "path": "scripts/discover-host-capabilities.py",
@@ -299,8 +309,8 @@
     },
     {
       "path": "scripts/validate-workflow.py",
-      "sha256": "89d2c825510354e2585c5f6a2c61ca1880a13b36d3a94b0a1eaea53168d8c45e",
-      "size": 57465
+      "sha256": "c634b3fc005382ea602cccb457020e060db41c2ed2c9a43acdb20d72daf4d687",
+      "size": 57832
     },
     {
       "path": "scripts/verify-plugin-load.sh",
