@@ -8,7 +8,9 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -35,6 +37,16 @@ def append_jsonl(path: Path, payload: Dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("a", encoding="utf-8", newline="\n") as handle:
         handle.write(json.dumps(payload, ensure_ascii=False) + "\n")
+
+
+def load_json(path: Path) -> Dict[str, Any]:
+    if not path.exists():
+        return {}
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+    return payload if isinstance(payload, dict) else {}
 
 
 def manifest_path_for(target_root: Path) -> Path:
@@ -305,6 +317,7 @@ def copy_runtime_spec(
         encoding="utf-8",
         newline="\n",
     )
+    write_design_review_evidence(repo_root, run_root, request="mock request", mode="closed")
 
 
 def host_capability_missing_contract() -> List[Dict[str, Any]]:
@@ -522,6 +535,136 @@ def run_json_script_allow(repo_root: Path, script_name: str, allowed: set[int], 
     if not isinstance(payload, dict):
         raise RuntimeError(f"{script_name} must return a JSON object")
     return payload
+
+
+def sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def write_design_review_evidence(
+    repo_root: Path,
+    run_root: Path,
+    *,
+    request: str,
+    mode: str = "closed",
+) -> Dict[str, Any]:
+    """Write deterministic S3 design-review evidence for smoke fixtures."""
+
+    review_root = run_root / "outputs" / "stages" / "design-review"
+    if mode == "missing":
+        if review_root.exists():
+            shutil.rmtree(review_root)
+        return {"status": "MISSING"}
+
+    packet = run_json_script_allow(
+        repo_root,
+        "generate-design-review-packet.py",
+        {0, 2},
+        "--run-root",
+        str(run_root),
+        "--request",
+        request,
+    )
+    packet_path = review_root / "design-review-packet.json"
+    packet_sha = sha256_file(packet_path)
+    artifact_fingerprints = packet.get("artifact_fingerprints", {}) if isinstance(packet.get("artifact_fingerprints"), dict) else {}
+
+    if mode == "blocker":
+        issues = [
+            {
+                "id": "DRV-001",
+                "round_found": 1,
+                "status": "open",
+                "severity": "blocker",
+                "blocking": True,
+                "lens": "spec_projection",
+                "affected_requirements": ["REQ-001"],
+                "affected_artifacts": ["outputs/stages/s3-design-highlevel.md", "workflow-spec.yaml"],
+                "problem": "The high-level design changed executable flow but workflow-spec.yaml was not updated.",
+                "why_it_matters": "S4 would generate assets from a stale control-plane projection.",
+                "required_fix": "Update workflow-spec.yaml and traceability before implementation.",
+                "resolved_by": "",
+                "resolution_evidence": [],
+                "residual_risk": "",
+            }
+        ]
+        closure_status = "FAIL"
+    elif mode == "accepted_risk":
+        issues = [
+            {
+                "id": "DRV-001",
+                "round_found": 1,
+                "status": "accepted_risk",
+                "severity": "minor",
+                "blocking": False,
+                "lens": "complexity_control",
+                "affected_requirements": ["REQ-001"],
+                "affected_artifacts": ["outputs/stages/s3-design-lowlevel.md"],
+                "problem": "The generated lowlevel guide is slightly more verbose than necessary for the fixture.",
+                "why_it_matters": "It may add reading overhead but does not change runtime behavior.",
+                "required_fix": "Trim wording in a later docs pass if needed.",
+                "resolved_by": "",
+                "resolution_evidence": [],
+                "residual_risk": "Accepted for deterministic smoke coverage; no runtime semantics are affected.",
+            }
+        ]
+        closure_status = "PASS"
+    else:
+        issues = []
+        closure_status = "PASS"
+
+    write_json(
+        review_root / "round-1.json",
+        {
+            "schema_version": 1,
+            "round": 1,
+            "status": "PASS" if closure_status == "PASS" else "FAIL",
+            "summary": "Deterministic design-review fixture.",
+            "issues": issues,
+        },
+    )
+    write_json(
+        review_root / "issues.json",
+        {
+            "schema_version": 1,
+            "generated_at": iso_now(),
+            "issues": issues,
+        },
+    )
+    write_text(
+        review_root / "report.md",
+        "# Design Review Report\n\n"
+        f"- mode: `{mode}`\n"
+        f"- status: `{closure_status}`\n"
+        f"- issues: `{len(issues)}`\n",
+    )
+    open_blocking = [item for item in issues if item.get("blocking") and item.get("status") == "open"]
+    write_json(
+        review_root / "closure.json",
+        {
+            "schema_version": 1,
+            "schema_name": "design-review-closure",
+            "generated_at": iso_now(),
+            "status": closure_status,
+            "packet_path": "outputs/stages/design-review/design-review-packet.json",
+            "packet_sha256": packet_sha,
+            "artifact_fingerprints": artifact_fingerprints,
+            "issue_count": len(issues),
+            "open_blocking_count": len(open_blocking),
+            "accepted_risk_count": len([item for item in issues if item.get("status") == "accepted_risk"]),
+        },
+    )
+    return run_json_script_allow(
+        repo_root,
+        "validate-design-review-gate.py",
+        {0, 2},
+        "--run-root",
+        str(run_root),
+    )
 
 
 def write_existing_managed_seed(target_root: Path) -> None:
@@ -1710,6 +1853,86 @@ def main() -> int:
                 "next_action": "resolve managed conflicts and rerun generate",
                 "generated_files": generated_files,
             }
+        elif args.fixture in {
+            "design-review-closed-pass",
+            "design-review-missing-fail",
+            "design-review-blocker-fail",
+            "design-review-accepted-risk-pass",
+        }:
+            copy_runtime_spec(
+                repo_root,
+                run_root,
+                "valid-minimal.yaml",
+                entry_skill=args.entry_skill,
+            )
+            design_docs = generate_design_docs(repo_root, run_root)
+            candidate_root = run_root / "outputs" / "candidate"
+            write_text(candidate_root / ".claude" / "rules" / "constraints.md", "# Constraints\n\n- Keep workflow assets managed.\n")
+            write_text(candidate_root / ".claude" / "commands" / "example.md", "## Usage\n\n1. Goal\n2. Verify\n")
+            for source_name, target_name in (
+                ("workflow_spec", "workflow-spec.yaml"),
+                ("workflow_view", "workflow-view.md"),
+                ("workflow_lowlevel", "workflow-lowlevel.md"),
+            ):
+                destination = candidate_root / ".workflowprogram" / "design" / target_name
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                destination.write_text(design_docs[source_name].read_text(encoding="utf-8"), encoding="utf-8", newline="\n")
+            generate_target_runtime_assets(repo_root, run_root / "workflow-spec.yaml", candidate_root / ".workflowprogram" / "runtime")
+            if args.fixture == "design-review-missing-fail":
+                write_design_review_evidence(repo_root, run_root, request=args.request, mode="missing")
+                result = "FAIL"
+                failure_code = "DESIGN_REVIEW_MISSING"
+                generated_files = []
+            elif args.fixture == "design-review-blocker-fail":
+                write_design_review_evidence(repo_root, run_root, request=args.request, mode="blocker")
+                result = "FAIL"
+                failure_code = "DESIGN_REVIEW_UNRESOLVED"
+                generated_files = []
+            else:
+                review_mode = "accepted_risk" if args.fixture == "design-review-accepted-risk-pass" else "closed"
+                write_design_review_evidence(repo_root, run_root, request=args.request, mode=review_mode)
+                generated_files = create_target_outputs(run_root, target_root)
+                write_managed_outputs(run_root, target_root, conflict=False)
+                result = "PASS"
+                failure_code = ""
+            if result != "PASS":
+                write_json(
+                    run_root / "outputs" / "stages" / "entry-orchestration-summary.json",
+                    {
+                        "generated_at": iso_now(),
+                        "status": "BLOCKED",
+                        "failure_kind": "design",
+                        "block_reason": "design_review_unresolved",
+                        "design_review_gate": load_json(
+                            run_root / "outputs" / "stages" / "design-review" / "gate-validation.json"
+                        ),
+                    },
+                )
+            if "requirement" in stage_history:
+                write_workflow_spec_draft(run_root, args.entry_skill, args.request)
+            if "lessons" in stage_history:
+                write_lessons_delta(run_root, intent, derive_failure_kind(failure_code), args.request)
+            effective_history = stage_history if result == "PASS" else stage_history[:-1]
+            write_progress_outputs(
+                run_root,
+                effective_history,
+                result,
+                failure_code,
+                current_stage="lessons" if result == "PASS" else "design",
+                next_action="complete" if result == "PASS" else "resolve design-review issues before implementation",
+            )
+            write_runner_evidence(run_root, target_root, intent, args.entry_skill, effective_history, result, failure_code)
+            payload = {
+                "result": result,
+                "failure_code": failure_code,
+                "message": "Mock host completed design-review fixture.",
+                "is_error": result != "PASS",
+                "stage_history": effective_history,
+                "stage_status": "done" if result == "PASS" else "blocked",
+                "current_stage": "lessons" if result == "PASS" else "design",
+                "next_action": "complete" if result == "PASS" else "resolve design-review issues before implementation",
+                "generated_files": generated_files,
+            }
         elif args.fixture == "host-capability-missing-develop":
             copy_runtime_spec(
                 repo_root,
@@ -2276,6 +2499,7 @@ def main() -> int:
                     args.request,
                     include_policy=False,
                 )
+                write_design_review_evidence(repo_root, run_root, request=args.request, mode="missing")
                 write_progress_outputs(
                     run_root,
                     stage_history[:-1],
@@ -2304,6 +2528,7 @@ def main() -> int:
                     args.request,
                     stale=True,
                 )
+                write_design_review_evidence(repo_root, run_root, request=args.request, mode="closed")
                 write_progress_outputs(
                     run_root,
                     stage_history[:-1],
@@ -2337,6 +2562,7 @@ def main() -> int:
                     mode=mode,
                     allowed_extra=allowed_extra,
                 )
+                write_design_review_evidence(repo_root, run_root, request=args.request, mode="closed")
                 if args.fixture == "change-policy-undeclared-write-fail":
                     # Narrow the declared scope after validation so S5 proves actual managed writes exceed policy.
                     policy_path = run_root / "outputs" / "stages" / "change-policy.json"

@@ -63,6 +63,10 @@ VALID_KIND = {
     "implementation_plan",
     "acceptance_tests",
     "traceability_matrix",
+    "design_review_packet",
+    "design_review_issue",
+    "design_review_closure",
+    "design_review_gate",
     "change_context",
     "existing_workflow_readback",
     "change_policy",
@@ -458,6 +462,14 @@ def infer_kind(path: str) -> str:
         return "acceptance_tests"
     if cleaned.endswith("outputs/stages/traceability-matrix.json"):
         return "traceability_matrix"
+    if cleaned.endswith("outputs/stages/design-review/design-review-packet.json"):
+        return "design_review_packet"
+    if cleaned.endswith("outputs/stages/design-review/issues.json") or cleaned.endswith("outputs/stages/design-review/round-1.json"):
+        return "design_review_issue"
+    if cleaned.endswith("outputs/stages/design-review/closure.json"):
+        return "design_review_closure"
+    if cleaned.endswith("outputs/stages/design-review/gate-validation.json"):
+        return "design_review_gate"
     if cleaned.endswith("outputs/stages/change-context.json"):
         return "change_context"
     if cleaned.endswith("outputs/stages/existing-workflow-readback.json"):

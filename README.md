@@ -45,7 +45,7 @@ claude plugin install workflowprogram-cn@logic70-plugins
 排障：
 
 - 如果出现 `Unknown skill: workflowprogram-orchestrate`，通常是当前 Claude 会话还没重新加载插件。执行 `/reload-plugins` 或重启 `claude`，然后用 `/workflowprogram-cn:workflowprogram-orchestrate ...` 入口，不要让模型手写 `Skill(workflowprogram-orchestrate)`。
-- 如果出现 `bin/workflowprogram-python: Permission denied`，说明安装缓存里的 launcher 没有执行权限。更新到最新 marketplace 载荷后重新安装；临时修复可执行 `chmod +x ~/.claude/plugins/cache/logic70-plugins/workflowprogram-cn/0.1.4/bin/workflowprogram-*`。
+- 如果出现 `bin/workflowprogram-python: Permission denied`，说明安装缓存里的 launcher 没有执行权限。更新到最新 marketplace 载荷后重新安装；临时修复可执行 `chmod +x ~/.claude/plugins/cache/logic70-plugins/workflowprogram-cn/0.1.5/bin/workflowprogram-*`。
 
 开发和调试仍可使用源码构建 `dist/plugin/`，但那不再是面向最终用户的主安装模型。
 
@@ -98,7 +98,7 @@ claude
 | S0 | 路由：识别用户意图，准备目标环境 |
 | S1 | 需求澄清：多轮对话确保规格无歧义 |
 | S2 | 上下文研究：分析目标项目现有结构 |
-| S3 | 设计与审批：生成 `workflow-spec.yaml`，用户审批后才进入下一步 |
+| S3 | 设计、审视与审批：生成 `workflow-spec.yaml`，通过内部 `workflow-design-reviewer` 和 gate 后才进入下一步 |
 | S4 | 受控写入：候选资产生成 &rarr; managed apply &rarr; runner 执行 |
 | S5 | 验证判定：S5 judge 消费 test_contract 给出 verdict |
 | S6 | 经验回流：提炼 lessons 和约束候选 |
@@ -118,6 +118,10 @@ claude
 - `boundary_model`：何时停止、降级、延后或明确不做
 
 S1 会生成 `question-backlog.json` 和 `requirement-logic-map.json`。前者记录每个追问为什么会影响设计，后者把 `REQ-*` 链接到 process/evidence/acceptance 等逻辑元素。对 `L/XL` 复杂度请求，只问“还有哪些边界场景”这类泛问题会被 `validate-workflow-draft.py` 拦截，不能进入设计阶段。
+
+### S3 设计审视 Gate
+
+`develop` 在 S3 设计源和 `workflow-spec.yaml` 完成后，会生成 `design-review-packet.json` 并交给内部 `workflow-design-reviewer` 从新上下文审视目标一致性、需求覆盖、流程闭合、YAML 投影、证据质量、修改影响和运行时兼容性。只有 `closure.json` 与 `gate-validation.json` 都通过，S4 才能继续受控写入；未闭合 blocker 会以 `design_review_unresolved` 阻断。
 
 ### AI 和 Python 的分工
 

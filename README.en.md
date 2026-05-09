@@ -45,7 +45,7 @@ After installation:
 Troubleshooting:
 
 - If you see `Unknown skill: workflowprogram-orchestrate`, the current Claude session usually has not reloaded the plugin. Run `/reload-plugins` or restart `claude`, then use `/workflowprogram-cn:workflowprogram-orchestrate ...`; do not ask the model to hand-write `Skill(workflowprogram-orchestrate)`.
-- If you see `bin/workflowprogram-python: Permission denied`, the installed launcher lost its executable bit. Update/reinstall from the latest marketplace payload. As a temporary local fix, run `chmod +x ~/.claude/plugins/cache/logic70-plugins/workflowprogram-cn/0.1.4/bin/workflowprogram-*`.
+- If you see `bin/workflowprogram-python: Permission denied`, the installed launcher lost its executable bit. Update/reinstall from the latest marketplace payload. As a temporary local fix, run `chmod +x ~/.claude/plugins/cache/logic70-plugins/workflowprogram-cn/0.1.5/bin/workflowprogram-*`.
 
 Source builds of `dist/plugin/` remain useful for repository development and debugging, but they are no longer the primary end-user install model.
 
@@ -98,7 +98,7 @@ Natural-language examples:
 | `S0` | Route: identify intent and prepare the target environment |
 | `S1` | Clarify requirements through multi-turn dialogue |
 | `S2` | Explore project context and reusable assets |
-| `S3` | Design and approval: produce `workflow-spec.yaml` |
+| `S3` | Design, review, and approval: produce `workflow-spec.yaml`, then pass the internal `workflow-design-reviewer` gate |
 | `S4` | Generate candidate assets and apply them in a managed way |
 | `S5` | Validate the workflow and produce the verdict |
 | `S6` | Feed lessons and constraint candidates back into the next run |
@@ -118,6 +118,10 @@ For `develop`, S1 is no longer a generic input/output clarification step. It now
 - `boundary_model`: when the workflow must stop, degrade, defer, or stay out of scope
 
 S1 emits `question-backlog.json` and `requirement-logic-map.json`. The backlog records why each question changes design; the logic map links `REQ-*` items to process/evidence/acceptance elements. For `L/XL` requests, broad prompts such as "what edge cases should we consider?" are rejected by `validate-workflow-draft.py` and cannot be treated as design-ready.
+
+### S3 Design Review Gate
+
+After S3 design sources and `workflow-spec.yaml` are ready, `develop` generates `design-review-packet.json` and asks the internal `workflow-design-reviewer` to review goal fidelity, requirement coverage, flow closure, YAML projection, evidence quality, change impact, and runtime compatibility from a fresh context. S4 managed writes continue only when both `closure.json` and `gate-validation.json` pass; unresolved blockers stop the run as `design_review_unresolved`.
 
 ### AI vs Python Responsibilities
 

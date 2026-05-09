@@ -35,6 +35,7 @@ disable-model-invocation: true
 - S1 必须把 `REQ-*` 映射到 `requirement-logic-map.json` 中的 process/evidence/acceptance refs；M+ 请求不得缺少这些链接。
 - S2 必须把上下文研究结构化为 `RUN_ROOT/outputs/stages/s2-context-findings.yaml`，并把可复用资产、能力候选、风险、约束候选回溯到 `REQ-*`。
 - S3 必须先产出 `s3-design-highlevel.md`、`s3-design-lowlevel.md`、`acceptance-tests.yaml`、`traceability-matrix.json` 和 `s3-implementation-plan.md`，再把可执行语义投影成 `workflow-spec.yaml`。
+- S3 完成后、S4 候选资产或 managed 写入前，必须生成 `outputs/stages/design-review/design-review-packet.json`，调用内部 `workflow-design-reviewer` 做隔离上下文审视，并产出 `issues.json`、`closure.json`、`gate-validation.json`；只有 `gate-validation.json.status=PASS` 才能进入实现。
 - 若某个目标业务节点需要跨模块推理、专业工具、独立 agent/team、loop 或会影响多个下游节点，必须为它生成 `RUN_ROOT/outputs/stages/node-designs/<node-id>.md`；简单整理节点不得强制拆独立 agent。
 - `workflow-spec.yaml` 是机器控制面投影，不是完整设计文档；完整设计推理留在 S3 设计源，YAML 只通过可选 `design_refs` 引用这些文件路径。
 - `workflow-spec.yaml` 产出后必须调用 `${CLAUDE_PLUGIN_ROOT}/scripts/validate-workflow-spec.py` 进行结构校验。
@@ -62,6 +63,7 @@ disable-model-invocation: true
 - S5 主判定必须由 `workflowprogram-validate` 承担，`runtime_smoke.py` 仅作为动态 harness 补证据。
 - S5 必须检查 `REQ -> design node -> asset -> acceptance test -> evidence` 的需求血缘；缺设计节点、缺验收测试、缺证据映射或 node-design 未投影到 YAML 时，不得给出 clean PASS。
 - `RUN_ROOT/state.json` 必须通过 `${CLAUDE_PLUGIN_ROOT}/scripts/validate-run-state.py`，确保 `kind/producer/status` 枚举合规。
+- S5 必须检查 design-review gate 证据；缺 packet、缺 closure、存在 open blocking issue、stale fingerprint 或 managed apply 发生在 gate 未通过时，不得给出 clean PASS。
 
 ## Step 1: Resolve Target
 
@@ -98,6 +100,10 @@ disable-model-invocation: true
 - `outputs/stages/traceability-matrix.json`
 - `outputs/stages/s3-implementation-plan.md`
 - `workflow-spec.yaml`，其中可选 `design_refs` 只引用上述文件路径
+- `outputs/stages/design-review/design-review-packet.json`
+- `outputs/stages/design-review/issues.json`
+- `outputs/stages/design-review/closure.json`
+- `outputs/stages/design-review/gate-validation.json`
 
 - `settings.json`
 - `skills/`
@@ -107,15 +113,19 @@ disable-model-invocation: true
 - `.workflowprogram/design/{workflow-spec.yaml,workflow-view.md,workflow-lowlevel.md}`
 - `.workflowprogram/runtime/{workflow-entry.py,workflow-runner.py,validate-run-state.py,runtime-manifest.json}`
 
-生成候选资产后，使用以下流程：
+进入 S4 实现与写入链路时，使用以下流程：
 
-1. 调用 `workflowprogram-python ${CLAUDE_PLUGIN_ROOT}/scripts/workflow-entry.py run --spec <RUN_ROOT>/workflow-spec.yaml --run-root <RUN_ROOT> --target-root <TARGET_ROOT> --entry-skill workflowprogram-develop --request "<原始需求>" --route-evidence <RUN_ROOT>/outputs/stages/route-intent.json --change-context <RUN_ROOT>/outputs/stages/change-context.json [--auto-approve|--approval-status approved]`
-2. `workflow-entry.py` 必须按固定顺序调用：
+1. 在真正生成或应用候选资产前，先调用 `workflowprogram-python ${CLAUDE_PLUGIN_ROOT}/scripts/generate-design-review-packet.py --run-root <RUN_ROOT> --target-root <TARGET_ROOT> --request "<原始需求>"`。
+2. 调用内部 `workflow-design-reviewer` 审视 packet；若发现 blocking issue，先回到 S3 修复设计源、traceability 或 `workflow-spec.yaml`，再重新生成 packet 与审视结果。
+3. 写入 `outputs/stages/design-review/closure.json` 后，调用 `workflowprogram-python ${CLAUDE_PLUGIN_ROOT}/scripts/validate-design-review-gate.py --run-root <RUN_ROOT>`；未 PASS 不得进入候选资产生成或 managed apply。
+4. 调用 `workflowprogram-python ${CLAUDE_PLUGIN_ROOT}/scripts/workflow-entry.py run --spec <RUN_ROOT>/workflow-spec.yaml --run-root <RUN_ROOT> --target-root <TARGET_ROOT> --entry-skill workflowprogram-develop --request "<原始需求>" --route-evidence <RUN_ROOT>/outputs/stages/route-intent.json --change-context <RUN_ROOT>/outputs/stages/change-context.json [--auto-approve|--approval-status approved]`
+5. `workflow-entry.py` 必须按固定顺序调用：
    - `resolve-change-context.py`（复核目标状态与 stale context）
    - `validate-workflow-spec.py`
    - `generate-workflow-view.py`
    - `generate-workflow-lowlevel.py`
    - `validate-change-policy.py`（仅当 `change_policy_required=true`，且必须发生在 managed apply 前）
+   - `validate-design-review-gate.py`（必须发生在 candidate/runtime staging 与 managed apply 前）
    - `generate-target-runtime.py`
    - `managed-assets.py plan`
    - `managed-assets.py apply-staged`
@@ -125,10 +135,10 @@ disable-model-invocation: true
    - `generate-environment-remediation.py`
    - `workflow-runner.py run`
    - `validate-run-state.py`
-3. 若 `managed-assets.py apply-staged` 报冲突，停止在 S4，保留 candidate 与 conflict 副本，不静默覆盖目标项目
-4. 交由 `workflowprogram-validate` 形成 S5 主判定，并在可用时运行 `runtime_smoke.py` 补充动态证据；S5 必须检查 traceability 和 node-design 投影一致性
-5. 读取 `RUN_ROOT/outputs/stages/entry-orchestration-summary.json` 作为产品入口编排摘要
-6. 写入进展事件：`S4 StageStarted`、`S4 StageCheckpoint`、`S4 StageCompleted`
+6. 若 `managed-assets.py apply-staged` 报冲突，停止在 S4，保留 candidate 与 conflict 副本，不静默覆盖目标项目
+7. 交由 `workflowprogram-validate` 形成 S5 主判定，并在可用时运行 `runtime_smoke.py` 补充动态证据；S5 必须检查 traceability、node-design 投影一致性与 design-review gate 证据
+8. 读取 `RUN_ROOT/outputs/stages/entry-orchestration-summary.json` 作为产品入口编排摘要
+9. 写入进展事件：`S4 StageStarted`、`S4 StageCheckpoint`、`S4 StageCompleted`
 
 ## Step 4: Verify Readiness
 

@@ -125,7 +125,7 @@ CI=true /develop "设计一个用于审计 Markdown 链接有效性的工作流"
 **Progress hooks**：
 - Stage 开始：`S3 StageStarted`
 - YAML/View 生成后：`S3 StageCheckpoint`
-- gate 通过后：`S3 StageCompleted`
+- design-review gate 通过后：`S3 StageCompleted`
 
 设计前先阅读 `${CLAUDE_PLUGIN_ROOT}/rules/constraints.md`。
 
@@ -171,6 +171,7 @@ CI=true /develop "设计一个用于审计 Markdown 链接有效性的工作流"
 - Hook 清单：只有确实需要 hooks 时才添加
 - 文件清单：要创建或修改的每个文件
 - 每一阶段的 TDD 目标和验证条件
+- S3 设计审视计划：审视 lens、阻塞问题闭合方式、accepted risk 记录方式
 
 **三层设计输出（Design Package）**：
 
@@ -235,6 +236,17 @@ workflow-view.md     workflow-lowlevel.md
 - 如需修改设计 → 编辑 `workflow-spec.yaml`
 - 重新生成视图 → 运行 `workflowprogram-python ${CLAUDE_PLUGIN_ROOT}/scripts/generate-workflow-view.py --spec <RUN_ROOT>/workflow-spec.yaml --out <RUN_ROOT>/workflow-view.md`
 - 重新生成维护指导 → 运行 `workflowprogram-python ${CLAUDE_PLUGIN_ROOT}/scripts/generate-workflow-lowlevel.py --spec <RUN_ROOT>/workflow-spec.yaml --out <RUN_ROOT>/workflow-lowlevel.md`
+
+### S3 Design Review Gate
+
+在进入 S4 候选资产生成或 managed apply 前，必须先完成设计审视闭环：
+
+1. 调用 `${CLAUDE_PLUGIN_ROOT}/scripts/generate-design-review-packet.py --run-root <RUN_ROOT> --target-root <TARGET_ROOT> --request "$ARGUMENTS"`。
+2. 调用内部 `workflow-design-reviewer`，按 goal fidelity、requirement coverage、flow closure、spec projection、evidence quality、change impact、runtime compatibility、complexity control、context propagation 审视。
+3. 每轮写入 `outputs/stages/design-review/round-<n>.json`，汇总 `issues.json` 与 `report.md`。
+4. 若存在 blocking issue，回到 S3 修改设计源、traceability 或 `workflow-spec.yaml`，重新生成 packet 并复审。
+5. 写入 `outputs/stages/design-review/closure.json` 后，调用 `${CLAUDE_PLUGIN_ROOT}/scripts/validate-design-review-gate.py --run-root <RUN_ROOT>`。
+6. 只有 `gate-validation.json.status=PASS` 才能进入 S4；accepted risk 必须记录 residual risk，允许继续但由 S5 作为 INFO 证据保留。
 - 结构校验规格 → 运行 `workflowprogram-python ${CLAUDE_PLUGIN_ROOT}/scripts/validate-workflow-spec.py --spec <RUN_ROOT>/workflow-spec.yaml`
 - 需要先推荐宿主能力时 → 运行 `workflowprogram-python ${CLAUDE_PLUGIN_ROOT}/scripts/discover-host-capabilities.py --spec <RUN_ROOT>/workflow-spec.yaml --target-root <TARGET_ROOT> --run-root <RUN_ROOT> --request "<原始需求>"`
 - 禁止直接编辑 `workflow-view.md` 与 `workflow-lowlevel.md`（会被覆盖）
@@ -303,12 +315,13 @@ workflow-view.md     workflow-lowlevel.md
 7. 生成 `workflow-lowlevel.md`（从 YAML 单向渲染，只作维护指导）
 8. 生成目标侧 deterministic runtime 资产：`.workflowprogram/runtime/{workflow-entry.py,workflow-runner.py,validate-run-state.py,runtime-manifest.json}`
 9. 更新 `CLAUDE.md`（如需要）
-10. 候选资产生成完成后，必须调用确定性脚本入口：
+10. 候选资产生成或应用前，必须已有 `outputs/stages/design-review/{design-review-packet.json,issues.json,closure.json,gate-validation.json}`，且 gate status 为 `PASS`。
+11. 候选资产生成完成后，必须调用确定性脚本入口：
    - `workflowprogram-python ${CLAUDE_PLUGIN_ROOT}/scripts/workflow-entry.py run --spec <RUN_ROOT>/workflow-spec.yaml --run-root <RUN_ROOT> --target-root <TARGET_ROOT> --entry-skill workflowprogram-develop --request "$ARGUMENTS" [--auto-approve|--approval-status approved]`
-   - 该脚本负责按固定顺序执行 `validate-workflow-spec.py -> generate-workflow-view.py -> generate-workflow-lowlevel.py -> generate-target-runtime.py -> managed-assets.py -> discover-host-capabilities.py -> probe-host-capabilities.py -> apply-host-bootstrap.py -> generate-environment-remediation.py -> workflow-runner.py -> validate-run-state.py`
+   - 该脚本负责按固定顺序执行 `validate-workflow-spec.py -> generate-workflow-view.py -> generate-workflow-lowlevel.py -> validate-design-review-gate.py -> generate-target-runtime.py -> managed-assets.py -> discover-host-capabilities.py -> probe-host-capabilities.py -> apply-host-bootstrap.py -> generate-environment-remediation.py -> workflow-runner.py -> validate-run-state.py`
    - 它会把 `RUN_ROOT/workflow-spec.yaml`、`RUN_ROOT/workflow-view.md`、`RUN_ROOT/workflow-lowlevel.md` 复制到 `RUN_ROOT/outputs/candidate/.workflowprogram/design/`，并把目标侧 runtime 资产写入 `RUN_ROOT/outputs/candidate/.workflowprogram/runtime/`，再与 `.claude/*` 一起走 managed apply
    - 若 `managed-assets.py` 发现冲突，脚本必须停在 S4，并输出 `RUN_ROOT/outputs/stages/entry-orchestration-summary.json`
-10. 交由 `workflowprogram-validate` 形成 S5 主判定与运行态证据：
+12. 交由 `workflowprogram-validate` 形成 S5 主判定与运行态证据：
    - `workflowprogram-validate` 是 S5 主 judge，负责消费 `test_contract`
    - `runtime_smoke.py` 作为动态 harness，在 Claude 可用时补充 `validation-runtime-report.md`
    - `RUN_ROOT/outputs/stages/s5-validation-summary.json` 由验证链路汇总写入，不由 runner 独占

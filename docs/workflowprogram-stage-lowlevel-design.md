@@ -101,6 +101,7 @@
 | 层级 | 责任 | 典型产物 |
 |---|---|---|
 | 设计源 | 解释用户需求为何被这样拆解、节点为何这样组织、复杂节点如何分析与验证 | `outputs/stages/s3-design-highlevel.md`、`outputs/stages/s3-design-lowlevel.md`、`outputs/stages/node-designs/<node-id>.md` |
+| 设计审视门禁 | 由隔离上下文复核 S3 设计是否可进入 S4，并冻结参与审视的 artifact fingerprints | `outputs/stages/design-review/design-review-packet.json`、`issues.json`、`closure.json`、`gate-validation.json` |
 | 机器投影 | 提供脚本、validator、runner、judge 可执行和可验证的最小契约 | `workflow-spec.yaml`、可选 `workflow-spec.yaml.design_refs` |
 | 派生视图 | 从机器投影生成维护说明，不新增执行语义 | `workflow-view.md`、`workflow-lowlevel.md` |
 | 运行证据 | 证明生成结果是否满足需求、设计与契约 | `state.json`、`events.jsonl`、`validation-runtime-report.md`、`outputs/stages/s5-validation-summary.json` |
@@ -112,6 +113,7 @@
 3. S5 必须按 `REQ -> design node -> asset -> acceptance test -> evidence` 检查需求血缘；缺少映射时不得给出 clean PASS。
 4. 简单工作流可以没有 `node-designs/**`；复杂节点必须有节点级设计或明确豁免理由。
 5. 任何修改执行语义的变更必须先更新 `workflow-spec.yaml`，再重生成 `workflow-view.md` 与 `workflow-lowlevel.md`；任何修改设计理由的变更必须先更新 S3 设计源，再检查是否需要同步投影。
+6. S3 设计审视产物属于 run evidence，只证明“本轮设计进入实现前已被复核并闭合”，不得作为 `workflow-spec.yaml` 顶层字段长期持久化。
 
 ### 2.2 State.artifacts 字段
 
@@ -207,6 +209,10 @@ Artifact 使用固定结构：
 | `implementation_plan` | 设计后实施计划 | `md` | `RUN_ROOT/outputs/stages/s3-implementation-plan.md` |
 | `acceptance_tests` | 验收测试契约 | `yaml` | `RUN_ROOT/outputs/stages/acceptance-tests.yaml` |
 | `traceability_matrix` | 需求到设计/实现/证据映射 | `json` | `RUN_ROOT/outputs/stages/traceability-matrix.json` |
+| `design_review_packet` | S3 设计审视输入包 | `json` | `RUN_ROOT/outputs/stages/design-review/design-review-packet.json` |
+| `design_review_issue` | S3 设计审视问题台账或轮次结果 | `json` | `RUN_ROOT/outputs/stages/design-review/issues.json` |
+| `design_review_closure` | S3 设计审视闭合证明 | `json` | `RUN_ROOT/outputs/stages/design-review/closure.json` |
+| `design_review_gate` | S3 设计审视确定性门禁结果 | `json` | `RUN_ROOT/outputs/stages/design-review/gate-validation.json` |
 | `change_context` | 既有工作流上下文与是否需要 change policy | `json` | `RUN_ROOT/outputs/stages/change-context.json` |
 | `existing_workflow_readback` | 既有设计与 managed 状态回读 | `json` | `RUN_ROOT/outputs/stages/existing-workflow-readback.json` |
 | `change_policy` | 单次修改策略与影响范围 | `json` | `RUN_ROOT/outputs/stages/change-policy.json` |
@@ -244,6 +250,10 @@ Artifact 使用固定结构：
 - `RUN_ROOT/outputs/stages/s3-implementation-plan.md`
 - `RUN_ROOT/outputs/stages/acceptance-tests.yaml`
 - `RUN_ROOT/outputs/stages/traceability-matrix.json`
+- `RUN_ROOT/outputs/stages/design-review/design-review-packet.json`
+- `RUN_ROOT/outputs/stages/design-review/issues.json`
+- `RUN_ROOT/outputs/stages/design-review/closure.json`
+- `RUN_ROOT/outputs/stages/design-review/gate-validation.json`
 - `RUN_ROOT/workflow-spec.yaml`
 - `RUN_ROOT/workflow-view.md`
 - `RUN_ROOT/workflow-lowlevel.md`
@@ -957,6 +967,10 @@ WorkflowProgram 自身必须按原子能力组织，每个 Stage 必须可拆分
 - `RUN_ROOT/outputs/stages/s3-implementation-plan.md`
 - `RUN_ROOT/outputs/stages/acceptance-tests.yaml`
 - `RUN_ROOT/outputs/stages/traceability-matrix.json`
+- `RUN_ROOT/outputs/stages/design-review/design-review-packet.json`
+- `RUN_ROOT/outputs/stages/design-review/issues.json`
+- `RUN_ROOT/outputs/stages/design-review/closure.json`
+- `RUN_ROOT/outputs/stages/design-review/gate-validation.json`
 - `RUN_ROOT/workflow-spec.yaml`（机器可读控制面投影）
 - `RUN_ROOT/workflow-view.md`（只读视图）
 - `RUN_ROOT/workflow-lowlevel.md`（由 YAML 派生的维护指导）
@@ -975,6 +989,7 @@ WorkflowProgram 自身必须按原子能力组织，每个 Stage 必须可拆分
 - 覆盖执行契约（`runtime_contract`）与基础运行测试契约（`test_contract`）
 - 用户 gate 通过（或自动批准）
 - YAML 可解析且关键字段齐全
+- S3 design-review gate 已闭合，且 closure 中的 artifact fingerprints 与当前 S1/S2/S3/YAML 输入一致
 
 ### 执行过程（封装级）
 
@@ -990,11 +1005,21 @@ WorkflowProgram 自身必须按原子能力组织，每个 Stage 必须可拆分
    - 再调用 `python ${CLAUDE_PLUGIN_ROOT}/scripts/generate-workflow-lowlevel.py --spec <RUN_ROOT>/workflow-spec.yaml --out <RUN_ROOT>/workflow-lowlevel.md` 生成维护指导文档。
 4. `validate_yaml_contract`（script_node）
    - 调用 `${CLAUDE_PLUGIN_ROOT}/scripts/validate-workflow-spec.py --spec <RUN_ROOT>/workflow-spec.yaml`，同时校验 `runtime_contract` 与 `test_contract`；失败则回退到设计步骤。
-5. `persist_design_summary`（script_node）
+5. `generate_design_review_packet`（script_node）
+   - 调用 `${CLAUDE_PLUGIN_ROOT}/scripts/generate-design-review-packet.py --run-root <RUN_ROOT> --target-root <TARGET_ROOT> --request "<原始需求>"`。
+   - 输入包必须覆盖 S1 requirements、S2 findings、S3 highlevel/lowlevel、node-designs、acceptance tests、traceability、implementation plan、`workflow-spec.yaml`，以及存在时的 change policy/readback/impact evidence。
+6. `design_review_loop`（agent_node）
+   - 调用内部 `workflow-design-reviewer`，只读 `design-review-packet.json` 与引用文件，不直接写候选资产。
+   - 审视 lens 包括 goal fidelity、requirement coverage、flow closure、spec projection、evidence quality、change impact、runtime compatibility、complexity control、context propagation。
+   - 每轮写入 `outputs/stages/design-review/round-<n>.json`，并汇总为 `issues.json` 与 `report.md`；若存在 blocking issue，必须先回到 S3 设计源/YAML/traceability 修复，再重新生成 packet。
+7. `validate_design_review_gate`（script_node）
+   - 调用 `${CLAUDE_PLUGIN_ROOT}/scripts/validate-design-review-gate.py --run-root <RUN_ROOT>`。
+   - 只有 `closure.json.status=PASS`、无 open blocking issue、无 stale artifact fingerprint 时才允许进入 S4。
+8. `persist_design_summary`（script_node）
    - 写入 `RUN_ROOT/outputs/stages/s3-design-summary.json`。
-6. `approval_gate`（gate_node）
+9. `approval_gate`（gate_node）
    - 用户审批或 CI 自动批准；人工批准与自动批准必须分别记录为 `approved` 和 `auto-approved`。
-7. `emit_stage_progress`（script_node）
+10. `emit_stage_progress`（script_node）
    - 记录 S3 关键节点和审批结果，更新用户进展。
 
 ### 可验证检查
@@ -1021,6 +1046,8 @@ WorkflowProgram 自身必须按原子能力组织，每个 Stage 必须可拆分
 20. 若声明 `agent_team_contract.enabled=true`，则 `generated_runtime_contract.runtime_capabilities` 必须包含 `team_orchestration`。
 21. 若声明 `workflow_graph`，validator 必须校验 graph entrypoints、nodes、transitions、templates_used、可达性与目标资产声明。
 22. 若声明 `workflow_graph.nodes[*].loop_policy.enabled=true`，则 validator 必须校验 loop policy、要求 `node_loop_execution` runtime capability，并确保 loop evidence 路径位于 `outputs/stages/loops/<node_id>/**`。
+23. `design-review-packet.json`、`issues.json`、`closure.json` 与 `gate-validation.json` 必须存在；`gate-validation.json.status` 必须为 `PASS`。
+24. `closure.json.artifact_fingerprints` 必须覆盖当前 packet 中记录的 S1/S2/S3/YAML 输入，且不得存在 stale artifact。
 
 ### 实现方案
 
@@ -1028,6 +1055,9 @@ WorkflowProgram 自身必须按原子能力组织，每个 Stage 必须可拆分
 - YAML 模板来源：`yaml-spec-template.md`
 - 视图渲染脚本：`generate-workflow-view.py`（确定性渲染，不依赖自由文本）
 - 维护指导渲染脚本：`generate-workflow-lowlevel.py`
+- 设计审视输入包：`generate-design-review-packet.py`
+- 设计审视门禁：`validate-design-review-gate.py`
+- 内部审视角色：`workflow-design-reviewer`
 - 维护指导校验脚本：`${CLAUDE_PLUGIN_ROOT}/scripts/validate-workflow-lowlevel.py`
 - 规格校验脚本：`${CLAUDE_PLUGIN_ROOT}/scripts/validate-workflow-spec.py`
 
@@ -1092,20 +1122,23 @@ WorkflowProgram 自身必须按原子能力组织，每个 Stage 必须可拆分
    - 调 `validate-file` 检查关键候选文件格式与约束。
 6. `validate_change_policy_gate`（script_node）
    - `workflow-entry.py` 在 managed apply 前重新调用 `resolve-change-context.py` 生成 current context，并调用 `validate-change-policy.py` 比较 stale fingerprints、审批来源与 policy/impact schema。
-7. `plan_apply_managed_assets`（script_node）
+7. `validate_design_review_gate`（script_node）
+   - `workflow-entry.py` 在 candidate staging、target runtime staging 与 managed apply 前调用 `validate-design-review-gate.py`。
+   - 缺 packet、缺 closure、存在 open blocking issue 或 closure fingerprints 已过期时，写入 `entry-orchestration-summary.json` 并以 `BLOCKED/design_review_unresolved` 停止，不进入 S4 写入链路。
+8. `plan_apply_managed_assets`（script_node）
    - 调 `managed-assets.py plan` 生成变更计划。
-8. `apply_or_conflict`（script_node）
+9. `apply_or_conflict`（script_node）
    - 无冲突执行 `apply-staged`；有冲突写入 `outputs/conflicts/` 并标记失败分类。
-9. `product_entry_finalize`（script_node）
+10. `product_entry_finalize`（script_node）
    - develop 主链必须通过 `${CLAUDE_PLUGIN_ROOT}/scripts/workflow-entry.py run --spec <RUN_ROOT>/workflow-spec.yaml --run-root <RUN_ROOT> --target-root <TARGET_ROOT> --entry-skill workflowprogram-develop --request "<原始需求>" --route-evidence <RUN_ROOT>/outputs/stages/route-intent.json --change-context <RUN_ROOT>/outputs/stages/change-context.json` 驱动，而不是只在 skill 中罗列口头顺序。
-   - 该脚本必须顺序调用 `resolve-change-context.py`（复核）、`validate-workflow-spec.py`、`generate-workflow-view.py`、`generate-workflow-lowlevel.py`、`validate-change-policy.py`（条件执行且在 managed apply 前）、`generate-target-runtime.py`、`managed-assets.py`、`discover-host-capabilities.py`、`probe-host-capabilities.py`、`apply-host-bootstrap.py`（条件执行）、`generate-environment-remediation.py`、`workflow-runner.py`、`validate-run-state.py`，并写入 `outputs/stages/entry-orchestration-summary.json`。
-10. `run_transition_control_plane`（script_node）
+   - 该脚本必须顺序调用 `resolve-change-context.py`（复核）、`validate-workflow-spec.py`、`generate-workflow-view.py`、`generate-workflow-lowlevel.py`、`validate-change-policy.py`（条件执行且在 managed apply 前）、`validate-design-review-gate.py`（在 candidate/runtime staging 与 managed apply 前）、`generate-target-runtime.py`、`managed-assets.py`、`discover-host-capabilities.py`、`probe-host-capabilities.py`、`apply-host-bootstrap.py`（条件执行）、`generate-environment-remediation.py`、`workflow-runner.py`、`validate-run-state.py`，并写入 `outputs/stages/entry-orchestration-summary.json`。
+11. `run_transition_control_plane`（script_node）
    - 调 `${CLAUDE_PLUGIN_ROOT}/scripts/workflow-runner.py run --spec <RUN_ROOT>/workflow-spec.yaml --run-root <RUN_ROOT> --target-root <TARGET_ROOT>`，由程序执行状态转移并产出 `state.json` / `events.jsonl`。
-11. `validate_state_artifacts`（script_node）
+12. `validate_state_artifacts`（script_node）
    - 调 `${CLAUDE_PLUGIN_ROOT}/scripts/validate-run-state.py --state <RUN_ROOT>/state.json`，强制检查 `kind/producer/status` 枚举。
-12. `persist_apply_summary`（script_node）
+13. `persist_apply_summary`（script_node）
    - 写入 managed plan/result/summary 与更新 `managed-files.json`。
-13. `emit_stage_progress`（script_node）
+14. `emit_stage_progress`（script_node）
    - 记录 S4 关键节点结果并更新用户进展。
 
 ### 可验证检查

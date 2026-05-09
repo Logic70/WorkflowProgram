@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import os
+import hashlib
 import json
 import shlex
 import shutil
@@ -703,7 +704,74 @@ def _copy_runtime_spec(repo_root: Path, run_root: Path, entry_skill: str) -> Pat
         raise RuntimeError(f"fixture spec is invalid: {spec_path}")
     target = run_root / "workflow-spec.yaml"
     _write_text(target, yaml.safe_dump(payload, allow_unicode=True, sort_keys=False))
+    _write_design_review_evidence(repo_root, run_root, request="fixture_host request")
     return target
+
+
+def _sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _write_design_review_evidence(repo_root: Path, run_root: Path, *, request: str) -> None:
+    """为 fixture_host 写出最小闭合的 S3 design-review 证据。"""
+
+    review_root = run_root / "outputs" / "stages" / "design-review"
+    script_root = repo_root / ".claude" / "scripts"
+    completed = subprocess.run(
+        [
+            sys.executable,
+            str(script_root / "generate-design-review-packet.py"),
+            "--run-root",
+            str(run_root),
+            "--request",
+            request,
+            "--json",
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if completed.returncode not in {0, 2}:
+        raise RuntimeError(completed.stderr.strip() or completed.stdout.strip() or "generate-design-review-packet.py failed")
+    packet_path = review_root / "design-review-packet.json"
+    packet_payload = json.loads(packet_path.read_text(encoding="utf-8"))
+    artifact_fingerprints = packet_payload.get("artifact_fingerprints", {}) if isinstance(packet_payload.get("artifact_fingerprints"), dict) else {}
+    write_json(review_root / "round-1.json", {"schema_version": 1, "round": 1, "status": "PASS", "summary": "fixture_host design review", "issues": []})
+    write_json(review_root / "issues.json", {"schema_version": 1, "generated_at": iso_now(), "issues": []})
+    _write_text(review_root / "report.md", "# Design Review Report\n\n- status: `PASS`\n- provider: `fixture_host`\n")
+    write_json(
+        review_root / "closure.json",
+        {
+            "schema_version": 1,
+            "schema_name": "design-review-closure",
+            "generated_at": iso_now(),
+            "status": "PASS",
+            "packet_path": "outputs/stages/design-review/design-review-packet.json",
+            "packet_sha256": _sha256_file(packet_path),
+            "artifact_fingerprints": artifact_fingerprints,
+            "issue_count": 0,
+            "open_blocking_count": 0,
+            "accepted_risk_count": 0,
+        },
+    )
+    gate = subprocess.run(
+        [
+            sys.executable,
+            str(script_root / "validate-design-review-gate.py"),
+            "--run-root",
+            str(run_root),
+            "--json",
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if gate.returncode != 0:
+        raise RuntimeError(gate.stderr.strip() or gate.stdout.strip() or "validate-design-review-gate.py failed")
 
 
 def _generate_design_docs(spec_path: Path, run_root: Path) -> Dict[str, Path]:

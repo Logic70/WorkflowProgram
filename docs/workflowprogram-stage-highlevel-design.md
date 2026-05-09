@@ -49,6 +49,7 @@
 - 决策 D17：简单工作流不得被强行重型化；`node-designs/**`、agent team、loop policy、host bootstrap 都是按复杂度和需求触发的条件性设计，不是所有工作流的默认负担。
 - 决策 D18：修改已有目标工作流不新增 `workflowprogram-change` 入口，而是在 `workflowprogram-develop` 内启用 controlled evolution；`change-policy.json`、`impact-analysis.json`、`existing-workflow-readback.json` 是单次运行证据，不是 `workflow-spec.yaml` 顶层字段。
 - 决策 D19：change policy 的提示词规则是“候选资产生成前先分析”，确定性硬门禁是 `workflow-entry.py` 在 managed apply 前复核 `route-intent.json`、`change-context.json`、policy、impact、审批与 stale context。
+- 决策 D20：S3 完成后必须经过内部 `workflow-design-reviewer` 的隔离上下文审视，并由 `validate-design-review-gate.py` 形成确定性写入门禁；设计审视产物属于本轮 run evidence，不写入 `workflow-spec.yaml` 顶层。
 
 ## 3. 项目结构（高层）
 
@@ -190,6 +191,10 @@ TARGET_ROOT/
   - `outputs/stages/s3-implementation-plan.md`
   - `outputs/stages/acceptance-tests.yaml`
   - `outputs/stages/traceability-matrix.json`
+  - `outputs/stages/design-review/design-review-packet.json`
+  - `outputs/stages/design-review/issues.json`
+  - `outputs/stages/design-review/closure.json`
+  - `outputs/stages/design-review/gate-validation.json`
   - `workflow-spec.yaml`（机器可读控制面）
   - 可选 `design_refs`（内嵌于 `workflow-spec.yaml`，只引用设计源、验收与 traceability 文件路径，不承载完整设计推理）
   - `runtime_contract`（内嵌于 `workflow-spec.yaml`，定义写入边界、证据集、失败枚举、环境 skip）
@@ -209,7 +214,10 @@ TARGET_ROOT/
   - 复杂节点满足任一条件时必须产出 `node-design`：跨模块阅读、多步推理、生成中间模型、需要专业工具/agent、需要 verifier/test 循环、输出影响多个后续节点。
   - agent 设计必须基于复杂认知边界，而不是按 node 机械一一拆分；简单格式化、归档、命名、状态更新应优先由 skill 或 script 承接。
   - `traceability-matrix.json` 必须记录 `REQ -> design node -> asset -> acceptance test -> evidence` 的最小覆盖链。
-  - `develop` 主链必须在 S3 完成后经过审批 gate，方可进入 S4。
+  - `develop` 主链必须在 S3 完成后先生成 `design-review-packet.json`，再由内部 `workflow-design-reviewer` 审视目标一致性、复杂度、上下文传递、YAML 投影、change policy 影响与运行时兼容性。
+  - `design-review/closure.json.status=PASS` 且 `gate-validation.json.status=PASS` 是进入 S4 的硬门禁；存在 open blocking issue、stale fingerprint 或缺 closure 时不得生成或应用候选资产。
+  - design review 的 accepted risk 必须记录 residual risk；它可允许 S4 继续，但 S5 必须把 accepted risk 作为 INFO 证据保留。
+  - `develop` 主链必须在 S3 完成后经过审批 gate 与 design-review gate，方可进入 S4。
   - 审批记录必须区分 `approved`（人工批准）与 `auto-approved`（CI 或参数自动放行）。
   - `generated_runtime_contract.mode` 当前固定为 `shared-control-plane-wrapper`；目标工作流必须交付 wrapper，不得只交付提示词与设计文档。
   - 当声明 `capability_discovery.enabled=true` 时，`generated_runtime_contract.runtime_capabilities` 必须包含 `capability_discovery`。
@@ -240,6 +248,7 @@ TARGET_ROOT/
   - 应用后的 `TARGET_ROOT/.workflowprogram/runtime/{workflow-entry.py,workflow-runner.py,validate-run-state.py,runtime-manifest.json}`（无冲突场景）
 - 规范要求：
   - 若 `change-context.json.change_policy_required=true`，S4 不得进入 managed apply，直到 `validate-change-policy.py` 返回 PASS。
+  - S4 不得进入 candidate staging 或 managed apply，直到 `validate-design-review-gate.py` 返回 PASS；该 gate 必须发生在 `stage_persistent_design_assets()`、`stage_target_runtime_assets()` 与 `managed-assets.py` 之前。
   - `workflow-entry.py` 必须在写入前重新解析 target state；如果 design spec、lowlevel 或 managed manifest fingerprint 变化，则以 `change_context_stale` 阻断。
   - policy 中的 `affected_artifacts` 表示语义修改范围；`allowed_derived_artifacts` 表示由 entry 自动派生的 view/lowlevel/runtime 输出。
   - 目标侧 runtime 继续采用 `shared-control-plane-wrapper`，通过 wrapper 调共享控制面，不复制独立引擎。
@@ -282,7 +291,7 @@ TARGET_ROOT/
 | S0 | `intent` 属于 4 个枚举，`target_root` 为绝对路径且目录已存在（不存在时已创建） | `RUN_ROOT/outputs/stages/s0-route.json` |
 | S1 | `workflow-spec.md` 存在、不含 `TBD/待补`，包含 `User Intent`、`Clarification Summary`、`Requirement Logic Interview`、`Open Questions`、`Assumptions and Boundaries`、`Readback Confirmation`；`澄清轮次 >= 2`；`s1-requirements.yaml` 至少包含一条 `REQ-*`；M+ 草案必须有完整七个 logic lenses、`question-backlog.json`、`requirement-logic-map.json` 且 `REQ-*` 链接到 process/evidence/acceptance；`design-readiness-report.json=READY`；`clarification-handoff.json.ready=true`；challenge roles 未直接面向用户 | `RUN_ROOT/workflow-spec.md`、`RUN_ROOT/outputs/stages/s1-requirements.yaml`、`RUN_ROOT/outputs/stages/question-backlog.json`、`RUN_ROOT/outputs/stages/requirement-logic-map.json`、`RUN_ROOT/outputs/stages/clarification-record.json`、`RUN_ROOT/outputs/stages/open-questions.json`、`RUN_ROOT/outputs/stages/assumption-log.md`、`RUN_ROOT/outputs/stages/design-readiness-report.json`、`RUN_ROOT/outputs/stages/clarification-challenge-report.json`、`RUN_ROOT/outputs/stages/clarification-handoff.json`、`RUN_ROOT/outputs/stages/clarification-evidence.json` |
 | S2 | 上下文报告包含“可复用资产/缺口/命名建议”三段，结构化 findings 能回溯到 `REQ-*` | `RUN_ROOT/outputs/stages/s2-context-report.md`、`RUN_ROOT/outputs/stages/s2-context-findings.yaml` |
-| S3 | `s3-design-highlevel.md`、`s3-design-lowlevel.md`、`acceptance-tests.yaml`、`traceability-matrix.json` 存在且覆盖 `REQ-*`；复杂节点已有 `node-design` 或明确豁免；`workflow-spec.yaml` 可解析且关键键存在；`workflow-view.md` 与 `workflow-lowlevel.md` 已生成，且 `workflow-lowlevel.md` 可由 `workflow-spec.yaml` 确定性重算；审批状态已记录且未绕过 gate | `RUN_ROOT/outputs/stages/s3-design-highlevel.md`、`RUN_ROOT/outputs/stages/s3-design-lowlevel.md`、条件性 `RUN_ROOT/outputs/stages/node-designs/`、`RUN_ROOT/outputs/stages/s3-implementation-plan.md`、`RUN_ROOT/outputs/stages/acceptance-tests.yaml`、`RUN_ROOT/outputs/stages/traceability-matrix.json`、`RUN_ROOT/workflow-spec.yaml`、`RUN_ROOT/workflow-view.md`、`RUN_ROOT/workflow-lowlevel.md`、`outputs/stages/s3-design-summary.json` |
+| S3 | `s3-design-highlevel.md`、`s3-design-lowlevel.md`、`acceptance-tests.yaml`、`traceability-matrix.json` 存在且覆盖 `REQ-*`；复杂节点已有 `node-design` 或明确豁免；`workflow-spec.yaml` 可解析且关键键存在；`workflow-view.md` 与 `workflow-lowlevel.md` 已生成，且 `workflow-lowlevel.md` 可由 `workflow-spec.yaml` 确定性重算；审批状态已记录且未绕过 gate；design-review gate 已闭合且 fingerprints 未过期 | `RUN_ROOT/outputs/stages/s3-design-highlevel.md`、`RUN_ROOT/outputs/stages/s3-design-lowlevel.md`、条件性 `RUN_ROOT/outputs/stages/node-designs/`、`RUN_ROOT/outputs/stages/s3-implementation-plan.md`、`RUN_ROOT/outputs/stages/acceptance-tests.yaml`、`RUN_ROOT/outputs/stages/traceability-matrix.json`、`RUN_ROOT/outputs/stages/design-review/design-review-packet.json`、`RUN_ROOT/outputs/stages/design-review/issues.json`、`RUN_ROOT/outputs/stages/design-review/closure.json`、`RUN_ROOT/outputs/stages/design-review/gate-validation.json`、`RUN_ROOT/workflow-spec.yaml`、`RUN_ROOT/workflow-view.md`、`RUN_ROOT/workflow-lowlevel.md`、`outputs/stages/s3-design-summary.json` |
 | S4 | candidate 目录存在；managed plan/result 存在；`TARGET_ROOT/.workflowprogram/managed-files.json` 已写入且带 `updated_at`；目标侧设计包与 `.workflowprogram/runtime/` 已持久化；冲突不覆盖目标文件 | `RUN_ROOT/outputs/candidate/.claude/`、`RUN_ROOT/outputs/candidate/.workflowprogram/design/`、`RUN_ROOT/outputs/candidate/.workflowprogram/runtime/`、`managed-change-plan/result`、`TARGET_ROOT/.workflowprogram/managed-files.json` |
 | S5 | 产生 workflow 级结论，且证据链文件齐全；若声明能力发现、宿主能力或 team 契约，则对应 discovery / probe / team evidence 已纳入判定 | `validation-runtime-report.md`、`outputs/stages/s5-validation-summary.json`、条件性 `outputs/stages/host-capability-candidates.json`、`outputs/stages/host-bootstrap-instructions.md`、`outputs/stages/host-capability-report.json`、`outputs/stages/team-plan.json`、`outputs/stages/team-results.json`、`outputs/stages/team-join-summary.json` |
 | S6 | 输出 lessons 增量与约束候选，关联本次 `run-id` 与 `failure_kind`，且 `user-progress.md` 含“历史关键节点结果” | `RUN_ROOT/outputs/stages/s6-lessons-delta.md` |
@@ -331,6 +340,7 @@ TARGET_ROOT/
   - `validate-workflow-spec.py`
   - `generate-workflow-view.py`
   - `generate-workflow-lowlevel.py`
+  - `validate-design-review-gate.py`（在 S4 写入链路前复核 S3 设计审视闭合状态）
   - `generate-target-runtime.py`
   - `managed-assets.py plan/apply-staged`
   - `discover-host-capabilities.py`

@@ -296,6 +296,24 @@ def validate_change_policy(
     return payload
 
 
+def validate_design_review_gate(run_root: Path) -> Dict[str, Any]:
+    """调用 design-review gate validator，并允许它用退出码 2 表达阻断。"""
+
+    cmd = [
+        sys.executable,
+        str(script_dir() / "validate-design-review-gate.py"),
+        "--run-root",
+        str(run_root),
+        "--json",
+    ]
+    code, payload, text = run_command(cmd)
+    if code not in {0, 2}:
+        raise RuntimeError(f"validate-design-review-gate.py failed: {text}")
+    if not payload:
+        raise RuntimeError("validate-design-review-gate.py did not return JSON output")
+    return payload
+
+
 def run_required_json_command(name: str, cmd: List[str]) -> Dict[str, Any]:
     """运行一个“必须成功且必须返回 JSON”的辅助脚本。"""
 
@@ -702,6 +720,7 @@ def command_run(args: argparse.Namespace) -> int:
     design_assets: Dict[str, str] | None = None
     target_runtime_assets: Dict[str, Any] | None = None
     change_policy_validation: Dict[str, Any] | None = None
+    design_review_validation: Dict[str, Any] | None = None
     block_reason: str | None = None
 
     # 只有 develop 流程允许修改 TARGET_ROOT。
@@ -731,6 +750,22 @@ def command_run(args: argparse.Namespace) -> int:
 
         if final_status != "BLOCKED":
             candidate_stage_root, candidate_claude_root = resolve_candidate_layout(candidate_root)
+            s3_design_markers = [
+                stages_root / "s3-design-highlevel.md",
+                stages_root / "s3-design-lowlevel.md",
+                stages_root / "acceptance-tests.yaml",
+                stages_root / "traceability-matrix.json",
+                stages_root / "s3-implementation-plan.md",
+            ]
+            design_review_required = candidate_stage_root.exists() or any(path.exists() for path in s3_design_markers)
+            if design_review_required:
+                design_review_validation = validate_design_review_gate(run_root)
+                if design_review_validation.get("status") != "PASS":
+                    stopped_before_runner = True
+                    final_status = "BLOCKED"
+                    block_reason = str(design_review_validation.get("block_reason", "")).strip() or "design_review_unresolved"
+
+        if final_status != "BLOCKED":
             if not candidate_stage_root.exists():
                 raise RuntimeError(f"develop flow requires candidate root before orchestration: {candidate_stage_root}")
             if not candidate_stage_root.is_dir():
@@ -858,6 +893,7 @@ def command_run(args: argparse.Namespace) -> int:
         "change_context_path": str(change_context_path),
         "change_context": change_context,
         "change_policy_validation": change_policy_validation,
+        "design_review_validation": design_review_validation,
         "block_reason": block_reason,
         "failure_kind": "design" if final_status == "BLOCKED" else ("conflict" if final_status == "CONFLICT" else ("environment" if required_host_missing else "none")),
         "view_path": str(view_path),

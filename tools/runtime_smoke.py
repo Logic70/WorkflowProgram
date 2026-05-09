@@ -179,6 +179,30 @@ FIXTURE_PRESETS: Dict[str, Dict[str, str]] = {
         "request": "修改已有工作流但目标状态已变化",
         "contract_categories": "flow,artifacts,failure",
     },
+    "design-review-closed-pass": {
+        "workspace_fixture": "empty-project",
+        "entry_skill": "workflowprogram-develop",
+        "request": "触发 S3 设计审视闭合后进入实现的 PASS 路径",
+        "contract_categories": "flow,artifacts,failure",
+    },
+    "design-review-missing-fail": {
+        "workspace_fixture": "empty-project",
+        "entry_skill": "workflowprogram-develop",
+        "request": "触发 S3 设计审视缺失时阻断 S4 的 FAIL 路径",
+        "contract_categories": "flow,artifacts,failure",
+    },
+    "design-review-blocker-fail": {
+        "workspace_fixture": "empty-project",
+        "entry_skill": "workflowprogram-develop",
+        "request": "触发 S3 设计审视存在 blocker 时阻断 S4 的 FAIL 路径",
+        "contract_categories": "flow,artifacts,failure",
+    },
+    "design-review-accepted-risk-pass": {
+        "workspace_fixture": "empty-project",
+        "entry_skill": "workflowprogram-develop",
+        "request": "触发 S3 设计审视仅有 accepted risk 时允许进入实现的 PASS 路径",
+        "contract_categories": "flow,artifacts,failure",
+    },
 }
 
 

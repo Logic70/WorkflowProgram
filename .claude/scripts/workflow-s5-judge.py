@@ -190,6 +190,8 @@ def failure_kind_for_check(category: str, name: str) -> str:
         return "environment"
     if "change_policy" in lowered_name or "change_context" in lowered_name or "change_approval" in lowered_name:
         return "design"
+    if "design_review" in lowered_name:
+        return "design"
     if "team_fan_out" in lowered_name or "team_join" in lowered_name or "team_execution" in lowered_name:
         return "implementation"
     if "team_contract" in lowered_name or "team_evidence" in lowered_name:
@@ -683,6 +685,11 @@ def build_checks(
     impact_analysis = load_json(run_root / "outputs" / "stages" / "impact-analysis.json")
     policy_validation = load_json(run_root / "outputs" / "stages" / "validate-change-policy.json")
     existing_readback = load_json(run_root / "outputs" / "stages" / "existing-workflow-readback.json")
+    design_review_root = run_root / "outputs" / "stages" / "design-review"
+    design_review_packet = load_json(design_review_root / "design-review-packet.json")
+    design_review_issues = load_json(design_review_root / "issues.json")
+    design_review_closure = load_json(design_review_root / "closure.json")
+    design_review_gate = load_json(design_review_root / "gate-validation.json")
     entry_summary = load_json(run_root / "outputs" / "stages" / "entry-orchestration-summary.json")
     runtime_contract = contract.get("runtime_contract", {})
     test_contract = contract.get("test_contract", {})
@@ -1007,6 +1014,14 @@ def build_checks(
         str(entry_summary.get("status", "")).strip() == "BLOCKED"
         and str(entry_summary.get("block_reason", "")).strip().startswith("change_")
     )
+    pre_run_design_blocked = (
+        (
+            str(entry_summary.get("status", "")).strip() == "BLOCKED"
+            and str(entry_summary.get("block_reason", "")).strip().startswith("design_review")
+        )
+        or failure_code.startswith("DESIGN_REVIEW")
+    )
+    pre_run_blocked = pre_run_change_blocked or pre_run_design_blocked
     if flow:
         intent_flow = expected_flow_for_intent(spec, observed_intent_text)
         required_stage_source = "test_contract.flow.required_stages"
@@ -1032,7 +1047,7 @@ def build_checks(
                 add_check(
                     checks["flow"],
                     "required_stages_executed",
-                    "PASS" if not missing else ("INFO" if pre_run_change_blocked else "FAIL"),
+                    "PASS" if not missing else ("INFO" if pre_run_blocked else "FAIL"),
                     f"Observed stage_history={stage_history}; missing={missing or 'none'}",
                     required_stage_source,
                 )
@@ -1079,7 +1094,7 @@ def build_checks(
                 add_check(
                     checks["flow"],
                     "terminal_condition_observed",
-                    "PASS" if provider_stage_status == expected_stage_status else ("INFO" if pre_run_change_blocked else "FAIL"),
+                    "PASS" if provider_stage_status == expected_stage_status else ("INFO" if pre_run_blocked else "FAIL"),
                     f"Observed stage_status={provider_stage_status}; expected={expected_stage_status}",
                     "test_contract.flow.terminal_conditions",
                 )
@@ -1188,6 +1203,9 @@ def build_checks(
                 "outputs/stages/route-intent.json",
             )
         change_policy_required = bool(change_context.get("change_policy_required", False)) if change_context else False
+        managed_plan_for_review = load_json(run_root / "outputs" / "managed-change-plan.json")
+        managed_result_for_review = load_json(run_root / "outputs" / "managed-change-result.json")
+        managed_paths_for_review = managed_plan_paths(managed_plan_for_review, managed_result_for_review)
         if change_context:
             add_check(
                 checks["artifacts"],
@@ -1251,9 +1269,7 @@ def build_checks(
                     f"approval_mode={approval_mode or '<missing>'}; entry_block_reason={entry_block_reason or '<none>'}",
                     "outputs/stages/validate-change-policy.json",
                 )
-            managed_plan_for_policy = load_json(run_root / "outputs" / "managed-change-plan.json")
-            managed_result_for_policy = load_json(run_root / "outputs" / "managed-change-result.json")
-            managed_paths = managed_plan_paths(managed_plan_for_policy, managed_result_for_policy)
+            managed_paths = managed_paths_for_review
             affected = string_list(change_policy.get("affected_artifacts")) if change_policy else []
             derived = string_list(change_policy.get("allowed_derived_artifacts")) if change_policy else []
             allowed_patterns = [*affected, *derived]
@@ -1299,6 +1315,94 @@ def build_checks(
                     "PASS" if test_justified else "FAIL",
                     f"test_contract_change_required={impact_analysis.get('test_contract_change_required', '<missing>')}; reason_present={bool(str(impact_analysis.get('test_contract_change_reason', '')).strip())}",
                     "outputs/stages/impact-analysis.json",
+                )
+        s3_design_paths = [
+            run_root / "outputs" / "stages" / "s3-design-highlevel.md",
+            run_root / "outputs" / "stages" / "s3-design-lowlevel.md",
+            run_root / "outputs" / "stages" / "acceptance-tests.yaml",
+            run_root / "outputs" / "stages" / "traceability-matrix.json",
+            run_root / "outputs" / "stages" / "s3-implementation-plan.md",
+        ]
+        s3_design_present = any(path.exists() for path in s3_design_paths)
+        semantic_managed_paths = [
+            path
+            for path in managed_paths_for_review
+            if path.startswith(".claude/") or path.startswith(".workflowprogram/runtime/")
+        ]
+        design_review_required = observed_intent_text == "develop" and (s3_design_present or bool(managed_paths_for_review))
+        if design_review_required:
+            add_check(
+                checks["artifacts"],
+                "design_review_packet_present",
+                "PASS" if design_review_packet else "FAIL",
+                "design-review-packet.json present." if design_review_packet else "design-review-packet.json missing before S4 implementation.",
+                "outputs/stages/design-review/design-review-packet.json",
+            )
+            issues = design_review_issues.get("issues", []) if isinstance(design_review_issues.get("issues"), list) else []
+            open_blockers = [
+                item
+                for item in issues
+                if isinstance(item, dict)
+                and bool(item.get("blocking", False))
+                and str(item.get("status", "")).strip() == "open"
+            ]
+            accepted_risks = [
+                item
+                for item in issues
+                if isinstance(item, dict) and str(item.get("status", "")).strip() == "accepted_risk"
+            ]
+            add_check(
+                checks["artifacts"],
+                "design_review_issues_ledger_present",
+                "PASS" if design_review_issues else "FAIL",
+                f"issues={len(issues)}; open_blockers={[item.get('id') for item in open_blockers] or ['<none>']}",
+                "outputs/stages/design-review/issues.json",
+            )
+            add_check(
+                checks["artifacts"],
+                "design_review_closure_present",
+                "PASS" if design_review_closure else "FAIL",
+                "closure.json present." if design_review_closure else "closure.json missing before managed apply.",
+                "outputs/stages/design-review/closure.json",
+            )
+            closure_status = str(design_review_closure.get("status", "")).strip()
+            gate_status = str(design_review_gate.get("status", "")).strip()
+            add_check(
+                checks["artifacts"],
+                "design_review_gate_valid",
+                "PASS" if gate_status == "PASS" and closure_status == "PASS" and not open_blockers else "FAIL",
+                (
+                    f"gate_status={gate_status or '<missing>'}; closure_status={closure_status or '<missing>'}; "
+                    f"open_blockers={[item.get('id') for item in open_blockers] or ['<none>']}"
+                ),
+                "outputs/stages/design-review/gate-validation.json",
+            )
+            if accepted_risks:
+                add_check(
+                    checks["flow"],
+                    "design_review_accepted_risks_recorded",
+                    "INFO",
+                    f"accepted_risks={[item.get('id') for item in accepted_risks]}",
+                    "outputs/stages/design-review/issues.json",
+                )
+            if gate_status and gate_status != "PASS":
+                entry_status = str(entry_summary.get("status", "")).strip()
+                entry_block_reason = str(entry_summary.get("block_reason", "")).strip()
+                add_check(
+                    checks["flow"],
+                    "design_review_pre_run_blocked_status_explained",
+                    "PASS" if entry_status == "BLOCKED" and entry_block_reason == "design_review_unresolved" else "FAIL",
+                    f"entry_status={entry_status or '<missing>'}; block_reason={entry_block_reason or '<missing>'}",
+                    "outputs/stages/entry-orchestration-summary.json",
+                )
+            if semantic_managed_paths:
+                traceability_path = run_root / "outputs" / "stages" / "traceability-matrix.json"
+                add_check(
+                    checks["flow"],
+                    "design_review_semantic_changes_have_traceability",
+                    "PASS" if traceability_path.exists() and gate_status == "PASS" else "FAIL",
+                    f"semantic_paths={semantic_managed_paths}; traceability_exists={traceability_path.exists()}; gate_status={gate_status or '<missing>'}",
+                    "outputs/stages/traceability-matrix.json",
                 )
         runner_summary = load_json(run_root / "outputs" / "stages" / "runner-summary.json")
         if runner_summary:
