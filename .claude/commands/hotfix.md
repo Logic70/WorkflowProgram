@@ -5,6 +5,7 @@
 > Compatibility Note
 >
 > `/hotfix` 保留为当前仓库的维护兼容命令，用于热修复和快速交付。它不是 WorkflowProgram 面向 `TARGET_ROOT` 的主入口。
+> 普通 workflow 请求统一从 `/workflowprogram-cn:workflowprogram-orchestrate <需求>` 进入。
 
 ## Usage
 

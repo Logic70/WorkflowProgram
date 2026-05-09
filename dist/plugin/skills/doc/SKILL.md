@@ -1,11 +1,12 @@
-<!-- AUTO-GENERATED FROM .claude/ - DO NOT EDIT DIRECTLY -->
-
 ---
 name: doc
 description: 为变更后的代码或工作流资产生成或更新文档
 version: 1.0.0
 disable-model-invocation: true
 ---
+
+<!-- AUTO-GENERATED FROM .claude/ - DO NOT EDIT DIRECTLY -->
+
 
 为 `$ARGUMENTS` 指定的目标生成或更新文档；若未指定，则默认处理当前变更。
 

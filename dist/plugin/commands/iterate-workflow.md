@@ -1,9 +1,9 @@
-<!-- AUTO-GENERATED FROM .claude/ - DO NOT EDIT DIRECTLY -->
-
 ---
-description: Iterate a workflow from lessons with approval
+description: Compatibility lessons iteration entry; prefer workflowprogram-orchestrate
 argument-hint: [--dry-run] [--apply] [workflow-path]
 ---
+
+<!-- AUTO-GENERATED FROM .claude/ - DO NOT EDIT DIRECTLY -->
 
 基于累积的 lessons 对工作流进行自我迭代。
 
@@ -12,7 +12,9 @@ argument-hint: [--dry-run] [--apply] [workflow-path]
 
 > Compatibility Note
 >
-> `/iterate-workflow` 作为历史兼容入口保留。新的主入口应优先使用 `workflowprogram-iterate`，它面向 `TARGET_ROOT` 基于 lessons 生成 workflow 改进草案。
+> `/iterate-workflow` 作为历史兼容入口保留。普通用户应优先使用
+> `/workflowprogram-cn:workflowprogram-orchestrate <需求>`，再由 orchestrate 路由到
+> `workflowprogram-iterate`。
 
 ## Usage
 

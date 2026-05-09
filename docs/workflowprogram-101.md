@@ -24,7 +24,7 @@
 先看一个最小使用场景：
 
 ```text
-/workflowprogram-develop "为当前项目设计一个 Claude Code 工作流"
+/workflowprogram-cn:workflowprogram-orchestrate "为当前项目设计一个 Claude Code 工作流"
 ```
 
 这一条入口背后，当前实现做的事情是：
@@ -556,7 +556,7 @@ AI -> candidate -> managed plan -> apply-staged -> TARGET_ROOT/.claude/*
 
 如果用 `WorkflowProgram` 自己做案例，可以这样理解一次完整运行：
 
-1. 用户发起 `/workflowprogram-develop`
+1. 用户发起 `/workflowprogram-cn:workflowprogram-orchestrate`
 2. `workflowprogram-orchestrate` 或显式入口确定这是 `develop`
 3. `S1` 产出 `workflow-spec.md`
 4. `S3` 产出 `workflow-spec.yaml`

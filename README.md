@@ -44,8 +44,8 @@ claude plugin install workflowprogram-cn@logic70-plugins
 
 排障：
 
-- 如果出现 `Unknown skill: workflowprogram-orchestrate`，通常是当前 Claude 会话还没重新加载插件。执行 `/reload-plugins` 或重启 `claude`，然后用 `/workflowprogram-orchestrate ...` 入口，不要让模型手写 `Skill(workflowprogram-orchestrate)`。
-- 如果出现 `bin/workflowprogram-python: Permission denied`，说明安装缓存里的 launcher 没有执行权限。更新到最新 marketplace 载荷后重新安装；临时修复可执行 `chmod +x ~/.claude/plugins/cache/logic70-plugins/workflowprogram-cn/0.1.3/bin/workflowprogram-*`。
+- 如果出现 `Unknown skill: workflowprogram-orchestrate`，通常是当前 Claude 会话还没重新加载插件。执行 `/reload-plugins` 或重启 `claude`，然后用 `/workflowprogram-cn:workflowprogram-orchestrate ...` 入口，不要让模型手写 `Skill(workflowprogram-orchestrate)`。
+- 如果出现 `bin/workflowprogram-python: Permission denied`，说明安装缓存里的 launcher 没有执行权限。更新到最新 marketplace 载荷后重新安装；临时修复可执行 `chmod +x ~/.claude/plugins/cache/logic70-plugins/workflowprogram-cn/0.1.4/bin/workflowprogram-*`。
 
 开发和调试仍可使用源码构建 `dist/plugin/`，但那不再是面向最终用户的主安装模型。
 
@@ -58,7 +58,13 @@ cd your-project
 claude
 ```
 
-然后用自然语言描述你的需求：
+然后使用主入口，或直接用自然语言描述你的需求：
+
+```text
+/workflowprogram-cn:workflowprogram-orchestrate 为当前项目设计一个 code review workflow
+```
+
+自然语言示例：
 
 ```
 "为当前项目设计一个 code review workflow"
@@ -66,7 +72,7 @@ claude
 "验证当前项目的 workflow 资产"
 ```
 
-`workflowprogram-orchestrate` 会自动路由到正确的入口技能。你也可以直接调用：
+`workflowprogram-orchestrate` 会自动路由到正确的入口技能。以下叶子入口主要用于高级显式 intent 或调试，普通使用优先走 orchestrate：
 
 | 入口 | 用途 |
 |------|------|

@@ -1,11 +1,12 @@
-<!-- AUTO-GENERATED FROM .claude/ - DO NOT EDIT DIRECTLY -->
-
 ---
 name: test
 description: Run validation or tests for current changes
 version: 1.0.0
 disable-model-invocation: true
 ---
+
+<!-- AUTO-GENERATED FROM .claude/ - DO NOT EDIT DIRECTLY -->
+
 
 运行与当前变更相关的测试或验证命令，并在失败时分析原因。
 

@@ -223,6 +223,14 @@ ACTIVE_STATUS_DOCS = {
     ],
 }
 
+ENTRY_EXPOSURE_DOCS = {
+    "README.md": "/workflowprogram-cn:workflowprogram-orchestrate",
+    "README.en.md": "/workflowprogram-cn:workflowprogram-orchestrate",
+    ".claude-plugin/README.md": "/workflowprogram-cn:workflowprogram-orchestrate",
+    "docs/workflowprogram-stage-highlevel-design.md": "/workflowprogram-cn:workflowprogram-orchestrate",
+    "docs/workflowprogram-stage-lowlevel-design.md": "/workflowprogram-cn:workflowprogram-orchestrate",
+}
+
 CAPABILITY_MATRIX_PATH = "docs/workflowprogram-capability-matrix.json"
 
 SOURCE_DIST_FILE_ROOTS = {
@@ -340,7 +348,7 @@ def expected_dist_bytes(build_plugin: Any, source_root_rel: str, source_file: Pa
         name = source_file.stem
         desc, hint = build_plugin.COMMAND_DESCRIPTIONS[name]
         frontmatter = f"---\ndescription: {desc}\nargument-hint: {hint}\n---\n\n"
-        rendered = build_plugin.MARKDOWN_HEADER + frontmatter + build_plugin.apply_replacements(content)
+        rendered = frontmatter + build_plugin.MARKDOWN_HEADER + build_plugin.apply_replacements(content)
         return rendered.encode("utf-8")
 
     if source_root_rel == ".claude/scripts":
@@ -349,18 +357,6 @@ def expected_dist_bytes(build_plugin: Any, source_root_rel: str, source_file: Pa
 
     rendered = build_plugin.decorate_generated_text(source_file, content)
     return rendered.encode("utf-8")
-
-
-def expected_wrapper_bytes(build_plugin: Any, source_file: Path) -> bytes:
-    """计算 `skills/command-*` 下 wrapper 文件应有的生成内容。"""
-    name = source_file.stem
-    desc, hint = build_plugin.COMMAND_DESCRIPTIONS[name]
-    body = build_plugin.apply_replacements(source_file.read_text(encoding="utf-8"))
-    meta = (
-        f"---\nname: {name}\ndescription: {desc}\nversion: 1.0.0\n"
-        f"argument-hint: {hint}\ndisable-model-invocation: true\n---\n\n"
-    )
-    return (build_plugin.MARKDOWN_HEADER + meta + body).encode("utf-8")
 
 
 def validate_required_paths(root: Path, result: ValidationResult) -> None:
@@ -554,6 +550,26 @@ def validate_document_contracts(root: Path, result: ValidationResult) -> None:
                 result.add_pass(f"Active template doc '{relative_path}' includes '{marker}'")
             else:
                 result.add_error(f"Active template doc '{relative_path}' is missing '{marker}'")
+
+    for relative_path, expected_entry in ENTRY_EXPOSURE_DOCS.items():
+        full_path = root / relative_path
+        if not full_path.exists():
+            result.add_error(f"Missing entry exposure doc: {relative_path}")
+            continue
+        try:
+            content = full_path.read_text(encoding='utf-8')
+        except Exception as e:
+            result.add_error(f"Cannot read entry exposure doc '{relative_path}': {e}")
+            continue
+
+        if expected_entry in content:
+            result.add_pass(f"Entry exposure doc '{relative_path}' recommends namespaced orchestrator")
+        else:
+            result.add_error(f"Entry exposure doc '{relative_path}' must recommend {expected_entry}")
+        if "/workflowprogram-orchestrate ..." in content or "/workflowprogram-develop \"" in content:
+            result.add_error(f"Entry exposure doc '{relative_path}' still presents a non-namespaced primary entry")
+        else:
+            result.add_pass(f"Entry exposure doc '{relative_path}' avoids non-namespaced primary entry examples")
 
     for relative_path, snippets in FORBIDDEN_ACTIVE_DOC_SNIPPETS.items():
         full_path = root / relative_path
@@ -1276,24 +1292,24 @@ def validate_dist_plugin(root: Path, plugin_meta: Optional[Dict[str, Any]], resu
             else:
                 result.add_error(f"build-manifest is missing mapped source file: {dist_relative}")
 
-    command_source_root = root / ".claude" / "commands"
-    for source_file in iter_source_files(command_source_root):
-        name = source_file.stem
-        wrapper_relative = f"skills/command-{name}/SKILL.md"
-        wrapper_file = dist_root / wrapper_relative
-        if wrapper_file.exists():
-            result.add_pass(f"Build output contains command wrapper: {wrapper_relative}")
-            if wrapper_file.read_bytes() == expected_wrapper_bytes(build_plugin, source_file):
-                result.add_pass(f"Build output matches command wrapper source: {wrapper_relative}")
-            else:
-                result.add_error(f"Build output content drift for {wrapper_relative}")
-        else:
-            result.add_error(f"Build output is missing command wrapper: {wrapper_relative}")
+    command_wrappers = sorted((dist_root / "skills").glob("command-*/SKILL.md"))
+    if command_wrappers:
+        for wrapper_file in command_wrappers:
+            wrapper_relative = str(wrapper_file.relative_to(dist_root)).replace("\\", "/")
+            result.add_error(f"Unapproved command wrapper is exposed in dist/plugin: {wrapper_relative}")
+    else:
+        result.add_pass("No generated command-* wrapper skills are exposed in dist/plugin")
+
+    for markdown_file in sorted((dist_root / "commands").glob("*.md")) + sorted((dist_root / "skills").glob("*/SKILL.md")):
+        text = markdown_file.read_text(encoding="utf-8")
+        relative = str(markdown_file.relative_to(dist_root)).replace("\\", "/")
+        if text.startswith(build_plugin.MARKDOWN_HEADER):
+            result.add_error(f"Generated Markdown marker appears before frontmatter in {relative}")
             continue
-        if wrapper_relative in manifest_paths:
-            result.add_pass(f"build-manifest tracks command wrapper: {wrapper_relative}")
+        if text.startswith("---\n"):
+            result.add_pass(f"Generated Markdown preserves leading frontmatter: {relative}")
         else:
-            result.add_error(f"build-manifest is missing command wrapper: {wrapper_relative}")
+            result.add_pass(f"Generated Markdown has no leading frontmatter contract: {relative}")
 
 
 def print_report(result: ValidationResult) -> None:

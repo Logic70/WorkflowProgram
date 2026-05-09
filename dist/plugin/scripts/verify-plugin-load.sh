@@ -29,22 +29,22 @@ if [[ -z "$PLUGIN_ROOT" ]]; then
 fi
 
 checks=(
-  "/develop smoke-test"
-  "/ship"
-  "/preflight"
-  "/hotfix smoke-test"
-  "/evolve-workflow ."
-  "/iterate-workflow --dry-run ."
+  "/workflowprogram-cn:workflowprogram-orchestrate smoke-test"
+  "/workflowprogram-cn:develop smoke-test"
+  "/workflowprogram-cn:ship"
+  "/workflowprogram-cn:preflight"
+  "/workflowprogram-cn:hotfix smoke-test"
+  "/workflowprogram-cn:evolve-workflow ."
+  "/workflowprogram-cn:iterate-workflow --dry-run ."
   "/review"
   "/test"
   "/commit"
   "/doc"
   "/workflow-audit"
-  "/workflowprogram-orchestrate smoke-test"
-  "/workflowprogram-develop smoke-test"
-  "/workflowprogram-audit"
-  "/workflowprogram-validate"
-  "/workflowprogram-iterate"
+  "/workflowprogram-cn:workflowprogram-develop smoke-test"
+  "/workflowprogram-cn:workflowprogram-audit"
+  "/workflowprogram-cn:workflowprogram-validate"
+  "/workflowprogram-cn:workflowprogram-iterate"
 )
 
 pass=0

@@ -1,11 +1,12 @@
-<!-- AUTO-GENERATED FROM .claude/ - DO NOT EDIT DIRECTLY -->
-
 ---
 name: commit
 description: 为当前变更生成结构化的 Conventional Commit 提交信息
 version: 1.0.0
 disable-model-invocation: true
 ---
+
+<!-- AUTO-GENERATED FROM .claude/ - DO NOT EDIT DIRECTLY -->
+
 
 分析当前变更并生成一条结构清晰的 Conventional Commit 提交信息。
 

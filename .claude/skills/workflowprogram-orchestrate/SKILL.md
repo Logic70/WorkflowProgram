@@ -20,12 +20,13 @@ version: 1.0.0
 - 不要把 `WorkflowProgram-CN` 仓库本身误当成默认目标项目。
 - 不要把 `ship`、`preflight`、`hotfix` 这类仓库维护命令当成产品主入口。
 - 这是当前唯一应承接自然语言自动触发的 `workflowprogram-*` 入口。
-- 其他 `workflowprogram-develop/audit/iterate/validate` 仍应优先通过显式 slash 调用。
+- 显式用户入口优先使用 `/workflowprogram-cn:workflowprogram-orchestrate <需求>`。
+- 其他 `workflowprogram-develop/audit/iterate/validate` 是高级显式 leaf 或内部路由目标，不是普通首选入口。
 - 若请求不明确，只提出最小必要的一个澄清问题。
 - 路由前应优先调用 `workflowprogram-python ${CLAUDE_PLUGIN_ROOT}/scripts/route-intent.py --request "<用户请求>" --target-root <TARGET_ROOT> --json`。
 - 路由结果必须写入 `RUN_ROOT/outputs/stages/route-intent.json`；随后调用 `${CLAUDE_PLUGIN_ROOT}/scripts/resolve-change-context.py` 写入 `RUN_ROOT/outputs/stages/change-context.json`。
 - 若 `change-context.json.change_policy_required=true`，必须把该证据交给 `workflowprogram-develop`，不得直接当作普通新建 workflow 处理。
-- 当路由结果进入叶子入口后，确定性脚本链应通过 `${CLAUDE_PLUGIN_ROOT}/scripts/workflow-entry.py` 驱动，而不是只靠口头步骤串联。
+- 当路由结果进入叶子入口后，确定性脚本链必须通过 `${CLAUDE_PLUGIN_ROOT}/scripts/workflow-entry.py run` 驱动，而不是只靠口头步骤串联或读取 prompt 文件后手工修改。
 - 当 `WORKFLOWPROGRAM_STRICT_ROUTE=1` 或显式 strict 模式开启时，若路由歧义则必须先澄清，不得直接分发到叶子 skill。
 
 ## Step 1: Resolve Context

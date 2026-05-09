@@ -3,7 +3,10 @@
 
 > Compatibility Note
 >
-> `/develop` 作为历史兼容入口保留。新的主入口应优先使用 `workflowprogram-develop`，它面向 `TARGET_ROOT` 设计或更新 workflow 资产。
+> `/develop` 作为历史兼容入口保留。普通用户应优先使用
+> `/workflowprogram-cn:workflowprogram-orchestrate <需求>`，再由 orchestrate 路由到
+> `workflowprogram-develop`。
+> 下方 Stage 内容是兼容参考；受控执行必须进入 `${CLAUDE_PLUGIN_ROOT}/scripts/workflow-entry.py run`。
 
 ## Usage
 

@@ -4,7 +4,9 @@
 
 > Compatibility Note
 >
-> `/evolve-workflow` 作为历史兼容入口保留。新的主入口应优先使用 `workflowprogram-audit`，它面向 `TARGET_ROOT` 审计现有 workflow 资产。
+> `/evolve-workflow` 作为历史兼容入口保留。普通用户应优先使用
+> `/workflowprogram-cn:workflowprogram-orchestrate <需求>`，再由 orchestrate 路由到
+> `workflowprogram-audit` 或 `workflowprogram-develop`。
 
 ## Usage
 

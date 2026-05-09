@@ -14,7 +14,7 @@
 - ALWAYS 为用户可见命令保留 `## Usage` 段。
 - ALWAYS 将用户可见命令组织为编号阶段，并为阶段提供 `Goal` 与 `Verify`。
 - ALWAYS 将可复用的失败经验或上下文缺口记录到 `lessons.md`。
-- ALWAYS 在 `/develop` Stage 3 完成后，向用户展示设计文档并获得明确批准，再进入 Stage 4 文件生成。
+- ALWAYS 在 orchestrate 路由到 develop 的 Stage 3 完成后，向用户展示设计文档并获得明确批准，再进入 Stage 4 文件生成；`/develop` 仅作为兼容入口。
 - ALWAYS 在命令设计中考虑非交互（CI/CD）模式下 gate 的行为：支持通过 prompt 参数或环境变量预批准。
 - ALWAYS 通过 control-plane helper 调用高约束控制面脚本，不要让模型手工拼严格 CLI 参数。
 - NEVER 在单个 fan-out 阶段中超过 4 个并行代理。
@@ -25,7 +25,7 @@
 ## 技能与 Agent 设计
 
 - ALWAYS 为每个 `SKILL.md` 提供 `name`、`description`、`version` frontmatter。
-- ALWAYS 当用户以自然语言表达“为当前项目设计 / 审计 / 迭代 / 验证 workflow”时，优先路由到 `workflowprogram-orchestrate`。
+- ALWAYS 当用户以自然语言表达“为当前项目设计 / 审计 / 迭代 / 验证 workflow”时，优先路由到 `workflowprogram-orchestrate`；显式 marketplace 使用优先推荐 `/workflowprogram-cn:workflowprogram-orchestrate <需求>`。
 - ALWAYS 为审查类和校验类 Agent 明确输出格式。
 - ALWAYS 为 AI Agent 提供结构化方法论（Step 1/2/3...），不只给"关注点"列表。
 - NEVER 同时让多个 `workflowprogram-*` 叶子 skill 承担自然语言自动触发职责。
@@ -35,7 +35,7 @@
 
 - ALWAYS 对于与当前仓库技术栈明显不同的工作流，默认抽取为独立仓库。
 - ALWAYS 在要求抽取到外部目录前声明工作区边界与 `--add-dir` 方案。
-- ALWAYS 在 `/develop` Stage 3 增加工具链降级策略设计步骤。
+- ALWAYS 在 orchestrate 路由到 develop 的 Stage 3 增加工具链降级策略设计步骤。
 
 ## 校验
 

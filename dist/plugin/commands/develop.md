@@ -1,16 +1,19 @@
-<!-- AUTO-GENERATED FROM .claude/ - DO NOT EDIT DIRECTLY -->
-
 ---
-description: Design a new workflow from requirements
+description: Compatibility workflow design entry; prefer workflowprogram-orchestrate
 argument-hint: <requirement> [--auto-approve]
 ---
+
+<!-- AUTO-GENERATED FROM .claude/ - DO NOT EDIT DIRECTLY -->
 
 根据用户需求设计一个新工作流。这个命令生成的是工作流文件，
 例如 commands、skills、agents、rules 与 settings 更新，而不是应用代码。
 
 > Compatibility Note
 >
-> `/develop` 作为历史兼容入口保留。新的主入口应优先使用 `workflowprogram-develop`，它面向 `TARGET_ROOT` 设计或更新 workflow 资产。
+> `/develop` 作为历史兼容入口保留。普通用户应优先使用
+> `/workflowprogram-cn:workflowprogram-orchestrate <需求>`，再由 orchestrate 路由到
+> `workflowprogram-develop`。
+> 下方 Stage 内容是兼容参考；受控执行必须进入 `${CLAUDE_PLUGIN_ROOT}/scripts/workflow-entry.py run`。
 
 ## Usage
 

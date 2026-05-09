@@ -1,11 +1,12 @@
-<!-- AUTO-GENERATED FROM .claude/ - DO NOT EDIT DIRECTLY -->
-
 ---
 name: workflow-spec-support
 description: Internal support assets for /develop
 version: 1.0.0
 internal: true
 ---
+
+<!-- AUTO-GENERATED FROM .claude/ - DO NOT EDIT DIRECTLY -->
+
 
 # Workflow Spec Support
 

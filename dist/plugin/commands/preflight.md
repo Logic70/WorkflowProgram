@@ -1,9 +1,9 @@
-<!-- AUTO-GENERATED FROM .claude/ - DO NOT EDIT DIRECTLY -->
-
 ---
-description: Run parallel readiness checks before shipping
+description: Repository preflight compatibility command
 argument-hint: [scope]
 ---
+
+<!-- AUTO-GENERATED FROM .claude/ - DO NOT EDIT DIRECTLY -->
 
 在正式评审或交付前执行一次完整预检查。
 
@@ -13,6 +13,7 @@ argument-hint: [scope]
 > Compatibility Note
 >
 > `/preflight` 保留为当前仓库的就绪性检查命令，不是 WorkflowProgram 在目标项目中的主产品入口。面向 `TARGET_ROOT` 的 workflow 级验证应优先使用 `workflowprogram-validate`。
+> 普通 workflow 请求统一从 `/workflowprogram-cn:workflowprogram-orchestrate <需求>` 进入。
 
 ## Usage
 

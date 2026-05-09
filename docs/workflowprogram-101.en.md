@@ -27,7 +27,7 @@ In other words, WorkflowProgram is not mainly about "how to write a prompt". It 
 Start from the smallest real entry:
 
 ```text
-/workflowprogram-develop "Design a Claude Code workflow for this project"
+/workflowprogram-cn:workflowprogram-orchestrate "Design a Claude Code workflow for this project"
 ```
 
 Behind that single entry, the current implementation does all of this:

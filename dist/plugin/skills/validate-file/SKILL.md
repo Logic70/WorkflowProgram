@@ -1,10 +1,11 @@
-<!-- AUTO-GENERATED FROM .claude/ - DO NOT EDIT DIRECTLY -->
-
 ---
 name: validate-file
 description: Validate generated workflow files (agents, skills, commands, settings)
 version: 1.0.0
 ---
+
+<!-- AUTO-GENERATED FROM .claude/ - DO NOT EDIT DIRECTLY -->
+
 
 验证生成的工作流文件是否符合格式和约束要求。
 

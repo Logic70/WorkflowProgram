@@ -1,5 +1,3 @@
-<!-- AUTO-GENERATED FROM .claude/ - DO NOT EDIT DIRECTLY -->
-
 ---
 name: workflowprogram-audit
 description: Audit workflow assets in the current target project and report structural or pattern issues
@@ -7,7 +5,12 @@ version: 1.0.0
 disable-model-invocation: true
 ---
 
+<!-- AUTO-GENERATED FROM .claude/ - DO NOT EDIT DIRECTLY -->
+
+
 面向 `TARGET_ROOT` 的工作流审计主入口。负责审计目标项目中已有的 workflow 资产，而不是审计插件源码仓本身。
+
+普通用户请求应优先从 `/workflowprogram-cn:workflowprogram-orchestrate <需求>` 进入；本 skill 是 orchestrate 选择 `audit` intent 后的 leaf 入口，也可用于高级显式调试。
 
 ## When To Use
 

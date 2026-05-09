@@ -1,10 +1,11 @@
-<!-- AUTO-GENERATED FROM .claude/ - DO NOT EDIT DIRECTLY -->
-
 ---
 name: workflow-audit
 description: Audit workflow structure patterns and quality
 version: 1.0.0
 ---
+
+<!-- AUTO-GENERATED FROM .claude/ - DO NOT EDIT DIRECTLY -->
+
 
 # Workflow Audit Skill
 

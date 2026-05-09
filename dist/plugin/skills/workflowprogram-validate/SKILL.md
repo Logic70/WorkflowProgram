@@ -1,5 +1,3 @@
-<!-- AUTO-GENERATED FROM .claude/ - DO NOT EDIT DIRECTLY -->
-
 ---
 name: workflowprogram-validate
 description: Validate workflow assets in the current target project at workflow scope
@@ -7,7 +5,12 @@ version: 1.0.0
 disable-model-invocation: true
 ---
 
+<!-- AUTO-GENERATED FROM .claude/ - DO NOT EDIT DIRECTLY -->
+
+
 面向 `TARGET_ROOT` 的 workflow 级验证主入口。负责对目标项目中的 workflow 资产执行统一校验，不等同于仓库维护命令 `/preflight`。
+
+普通用户请求应优先从 `/workflowprogram-cn:workflowprogram-orchestrate <需求>` 进入；本 skill 是 orchestrate 选择 `validate` intent 后的 leaf 入口，也可用于高级显式调试。
 
 ## When To Use
 

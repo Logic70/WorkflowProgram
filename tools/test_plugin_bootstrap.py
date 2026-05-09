@@ -65,6 +65,28 @@ def main() -> int:
                 f"{launcher_path} must exist and be executable after marketplace install",
             )
 
+        command_wrappers = sorted((plugin_root / "skills").glob("command-*/SKILL.md"))
+        add(
+            "command_wrappers_not_exposed",
+            not command_wrappers,
+            "marketplace payload must not expose generated skills/command-* wrappers",
+            {"wrappers": [str(path.relative_to(plugin_root)) for path in command_wrappers]},
+        )
+
+        markdown_frontmatter_failures = []
+        for markdown_path in sorted((plugin_root / "commands").glob("*.md")) + sorted((plugin_root / "skills").glob("*/SKILL.md")):
+            text = markdown_path.read_text(encoding="utf-8")
+            if text.startswith("<!-- AUTO-GENERATED"):
+                markdown_frontmatter_failures.append(str(markdown_path.relative_to(plugin_root)))
+            elif not text.startswith("---\n"):
+                markdown_frontmatter_failures.append(str(markdown_path.relative_to(plugin_root)))
+        add(
+            "frontmatter_precedes_generated_marker",
+            not markdown_frontmatter_failures,
+            "command/skill Markdown must start with frontmatter, not the AUTO-GENERATED marker",
+            {"files": markdown_frontmatter_failures},
+        )
+
         bootstrap = run(
             [
                 sys.executable,

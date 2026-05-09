@@ -3,6 +3,7 @@
 > Compatibility Note
 >
 > `/ship` 保留为当前仓库的交付兼容命令，用于审查、校验和提交准备。它不是 WorkflowProgram 面向 `TARGET_ROOT` 的主入口。
+> 普通 workflow 请求统一从 `/workflowprogram-cn:workflowprogram-orchestrate <需求>` 进入。
 
 ## Usage
 

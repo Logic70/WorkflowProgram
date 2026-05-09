@@ -1,11 +1,12 @@
-<!-- AUTO-GENERATED FROM .claude/ - DO NOT EDIT DIRECTLY -->
-
 ---
 name: review
 description: 对当前变更执行并行多代理代码审查
 version: 1.0.0
 disable-model-invocation: true
 ---
+
+<!-- AUTO-GENERATED FROM .claude/ - DO NOT EDIT DIRECTLY -->
+
 
 对当前变更执行一次并行化代码审查，分别覆盖安全、性能、风格和逻辑四个维度。
 

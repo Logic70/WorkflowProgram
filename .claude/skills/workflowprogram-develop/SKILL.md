@@ -7,6 +7,8 @@ disable-model-invocation: true
 
 面向 `TARGET_ROOT` 的工作流设计主入口。目标是在目标项目中设计或更新 `.claude/` 工作流资产，而不是修改插件源码仓。
 
+普通用户请求应优先从 `/workflowprogram-cn:workflowprogram-orchestrate <需求>` 进入；本 skill 是 orchestrate 选择 `develop` intent 后的 leaf 入口，也可用于高级显式调试。
+
 ## When To Use
 
 - 为当前项目创建新的 Claude Code workflow

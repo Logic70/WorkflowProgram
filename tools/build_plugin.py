@@ -32,12 +32,12 @@ PLUGIN_ROOT_ASSETS = PLUGIN_META / "root"
 DIST = ROOT / "dist" / "plugin"
 
 COMMAND_DESCRIPTIONS = {
-    "develop": ("Design a new workflow from requirements", "<requirement> [--auto-approve]"),
-    "ship": ("Ship current workflow changes", "[scope] [--auto-approve]"),
-    "preflight": ("Run parallel readiness checks before shipping", "[scope]"),
-    "hotfix": ("Fast-track a hotfix with reduced scope", "[description]"),
-    "evolve-workflow": ("Audit and evolve a workflow repository", "[options] <workflow-path>"),
-    "iterate-workflow": ("Iterate a workflow from lessons with approval", "[--dry-run] [--apply] [workflow-path]"),
+    "develop": ("Compatibility workflow design entry; prefer workflowprogram-orchestrate", "<requirement> [--auto-approve]"),
+    "ship": ("Repository shipping compatibility command", "[scope] [--auto-approve]"),
+    "preflight": ("Repository preflight compatibility command", "[scope]"),
+    "hotfix": ("Repository hotfix compatibility command", "[description]"),
+    "evolve-workflow": ("Compatibility workflow audit entry; prefer workflowprogram-orchestrate", "[options] <workflow-path>"),
+    "iterate-workflow": ("Compatibility lessons iteration entry; prefer workflowprogram-orchestrate", "[--dry-run] [--apply] [workflow-path]"),
 }
 
 REPLACEMENTS = {
@@ -66,7 +66,7 @@ def decorate_generated_text(src: Path, content: str) -> str:
     """按输出文件类型添加合适的“自动生成”头部标记。"""
     suffix = src.suffix.lower()
     if suffix == ".md":
-        return MARKDOWN_HEADER + content
+        return add_generated_markdown_header(content)
     if suffix in {".py", ".sh", ".ps1"}:
         banner = f"# {SCRIPT_BANNER}\n"
         if content.startswith("#!"):
@@ -74,6 +74,21 @@ def decorate_generated_text(src: Path, content: str) -> str:
             return f"{first_line}\n{banner}{remainder}"
         return banner + content
     return content
+
+
+def add_generated_markdown_header(content: str) -> str:
+    """为 Markdown 添加生成标记，同时不破坏 Claude Code frontmatter 发现。
+
+    Claude Code 会用文件开头的 frontmatter 解析 command / skill 描述。
+    如果把注释放在 `---` 之前，UI 可能把生成标记当成描述显示。
+    """
+
+    if content.startswith("---\n"):
+        closing = content.find("\n---\n", 4)
+        if closing != -1:
+            end = closing + len("\n---\n")
+            return content[:end] + "\n" + MARKDOWN_HEADER + content[end:]
+    return MARKDOWN_HEADER + content
 
 
 def copy_generated_text(src: Path, dst: Path, *, replace_paths: bool = False) -> None:
@@ -126,17 +141,7 @@ def render_command(src: Path, dst: Path, desc: str, hint: str) -> None:
     """为命令 Markdown 生成带 frontmatter 的分发版本。"""
     body = apply_replacements(src.read_text(encoding="utf-8"))
     frontmatter = f"---\ndescription: {desc}\nargument-hint: {hint}\n---\n\n"
-    write_text(dst, MARKDOWN_HEADER + frontmatter + body)
-
-
-def render_command_wrapper(src: Path, dst: Path, name: str, desc: str, hint: str) -> None:
-    """生成插件分发用的 command-as-skill wrapper。"""
-    body = apply_replacements(src.read_text(encoding="utf-8"))
-    meta = (
-        f"---\nname: {name}\ndescription: {desc}\nversion: 1.0.0\n"
-        f"argument-hint: {hint}\ndisable-model-invocation: true\n---\n\n"
-    )
-    write_text(dst, MARKDOWN_HEADER + meta + body)
+    write_text(dst, frontmatter + MARKDOWN_HEADER + body)
 
 
 def prepare_output_dirs(root: Path) -> None:
@@ -175,18 +180,15 @@ def build_skills() -> None:
 
 
 def build_commands() -> None:
-    """根据源命令生成命令 Markdown 和对应 wrapper skill。"""
+    """根据源命令生成命令 Markdown。
+
+    command-as-skill wrapper 曾用于兼容旧发现模型，但会让 `command-develop`
+    等重复入口暴露给用户。Marketplace 分发只保留 command 本身。
+    """
     for src in sorted((CLAUDE / "commands").glob("*.md")):
         name = src.stem
         desc, hint = COMMAND_DESCRIPTIONS[name]
         render_command(src, DIST / "commands" / src.name, desc, hint)
-        render_command_wrapper(
-            src,
-            DIST / "skills" / f"command-{name}" / "SKILL.md",
-            name,
-            desc,
-            hint,
-        )
 
 
 def build_plugin_manifest_dir() -> None:

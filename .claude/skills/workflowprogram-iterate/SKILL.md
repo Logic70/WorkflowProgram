@@ -7,6 +7,8 @@ disable-model-invocation: true
 
 面向 `TARGET_ROOT` 的工作流迭代主入口。基于 `lessons.md`、当前 workflow 状态和审计结果生成改进草案。
 
+普通用户请求应优先从 `/workflowprogram-cn:workflowprogram-orchestrate <需求>` 进入；本 skill 是 orchestrate 选择 `iterate` intent 后的 leaf 入口，也可用于高级显式调试。
+
 ## When To Use
 
 - 从 `lessons.md` 提炼可执行改进项

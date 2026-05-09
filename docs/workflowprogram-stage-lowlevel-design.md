@@ -871,7 +871,7 @@ WorkflowProgram 自身必须按原子能力组织，每个 Stage 必须可拆分
 
 ### 实现方案
 
-- 主承载：`/develop` Stage 1、`workflowprogram-develop` Step 2
+- 主承载：`workflowprogram-orchestrate` 路由后的 `workflowprogram-develop` Step 2；`/develop` Stage 1 仅为兼容参考
 - 模板来源：`skills/workflow-spec-support/spec-template.md`
 - 校验承载：`validate-workflow-draft.py`
 
@@ -931,7 +931,7 @@ WorkflowProgram 自身必须按原子能力组织，每个 Stage 必须可拆分
 
 ### 实现方案
 
-- 主承载：`/develop` Stage 2
+- 主承载：`workflowprogram-orchestrate` 路由后的 develop Stage 2；`/develop` Stage 2 仅为兼容参考
 - 可调用底层审计技能辅助。
 
 ### 承载文件
@@ -1024,7 +1024,7 @@ WorkflowProgram 自身必须按原子能力组织，每个 Stage 必须可拆分
 
 ### 实现方案
 
-- 主承载：`/develop` Stage 3
+- 主承载：`workflowprogram-orchestrate` 路由后的 develop Stage 3；`/develop` Stage 3 仅为兼容参考
 - YAML 模板来源：`yaml-spec-template.md`
 - 视图渲染脚本：`generate-workflow-view.py`（确定性渲染，不依赖自由文本）
 - 维护指导渲染脚本：`generate-workflow-lowlevel.py`
@@ -1127,7 +1127,7 @@ WorkflowProgram 自身必须按原子能力组织，每个 Stage 必须可拆分
 
 ### 实现方案
 
-- 主承载：`/develop` Stage 4、`workflowprogram-develop` Step 3
+- 主承载：`workflowprogram-orchestrate` 路由后的 `workflowprogram-develop` Step 3；`/develop` Stage 4 仅为兼容参考
 - 关键脚本：`workflow-entry.py`、`managed-assets.py`、`discover-host-capabilities.py`、`probe-host-capabilities.py`、`apply-host-bootstrap.py`、`generate-environment-remediation.py`、`workflow-runner.py`、`validate-run-state.py`
 
 ### 承载文件
@@ -1265,7 +1265,7 @@ WorkflowProgram 自身必须按原子能力组织，每个 Stage 必须可拆分
 
 ### 实现方案
 
-- 主承载：`/develop` Stage 6
+- 主承载：`workflowprogram-orchestrate` 路由后的 develop Stage 6；`/develop` Stage 6 仅为兼容参考
 - 辅助承载：`workflowprogram-iterate`
 - 校验承载：`validate-lessons-delta.py`
 
@@ -1320,4 +1320,4 @@ WorkflowProgram 自身必须按原子能力组织，每个 Stage 必须可拆分
 2. `dist/plugin/hooks/hooks.json` 存在，且 `SessionStart` 会触发 Python runtime bootstrap。
 3. `dist/plugin/bin/workflowprogram-python` 与 `dist/plugin/bin/workflowprogram-doctor` 存在。
 4. `dist/plugin/requirements.lock.txt` 与 `dist/plugin/runtime-manifest.json` 存在。
-5. 启动后可识别 `/workflowprogram-orchestrate` 入口。
+5. 启动后可识别 `/workflowprogram-cn:workflowprogram-orchestrate` 主入口，且描述不显示自动生成注释。

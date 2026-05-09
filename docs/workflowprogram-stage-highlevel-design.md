@@ -9,7 +9,7 @@
 - 输入、最终输出与项目结构
 - 质量要求
 
-本文基于当前实现（`workflowprogram-*` skills、`/develop`、`managed-assets.py`、`RUN_ROOT` 证据模型）编写。  
+本文基于当前实现（`workflowprogram-orchestrate` 主入口、`workflowprogram-*` leaf skills、兼容 `/develop`、`managed-assets.py`、`RUN_ROOT` 证据模型）编写。
 若与历史文档冲突，以本文和本次讨论形成的新方案为准。
 
 ## 2. 设计基线与冲突收敛
@@ -87,14 +87,15 @@ TARGET_ROOT/
 3. 首次 `SessionStart` 自动把 `PyYAML` 安装到 `${CLAUDE_PLUGIN_DATA}/python/site-packages`。
 4. 插件内所有 Python 控制面脚本统一通过 `workflowprogram-python` 访问这层 plugin-local `site-packages`。
 5. 在目标项目目录直接启动 `claude`。
-6. 在会话中执行 `/workflowprogram-orchestrate ...` 或其他 `workflowprogram-*` 入口。
+6. 在会话中执行 `/workflowprogram-cn:workflowprogram-orchestrate ...`。高级显式 intent 可使用对应 `workflowprogram-*` leaf 入口。
 
 ## 4. 用户界面使用流程
 
 ### 4.1 入口方式
 
 - 自然语言入口：`workflowprogram-orchestrate`
-- 显式入口（slash）：`/workflowprogram-orchestrate`、`/workflowprogram-develop`、`/workflowprogram-audit`、`/workflowprogram-iterate`、`/workflowprogram-validate`
+- 显式主入口（slash）：`/workflowprogram-cn:workflowprogram-orchestrate <需求>`
+- 高级显式 leaf：`workflowprogram-develop`、`workflowprogram-audit`、`workflowprogram-iterate`、`workflowprogram-validate`
 
 ### 4.2 使用过程
 

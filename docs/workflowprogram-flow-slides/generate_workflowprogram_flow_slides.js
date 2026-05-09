@@ -383,7 +383,7 @@ function buildQuickUse() {
   const slide = pptx.addSlide();
   addTitle(slide, "3. 快速使用", "推荐让 orchestrate 承接自然语言，再按需要显式进入叶子入口", 4);
   addBox(slide, "推荐入口", 0.85, 1.45, 1.2, 0.42, { fill: C.slateFill, line: C.line, fontSize: 12 });
-  addBox(slide, "/workflowprogram-orchestrate\n\"为当前项目设计一个 Claude Code 工作流\"", 0.85, 1.95, 4.55, 0.92, {
+  addBox(slide, "/workflowprogram-cn:workflowprogram-orchestrate\n\"为当前项目设计一个 Claude Code 工作流\"", 0.85, 1.95, 4.55, 0.92, {
     fill: C.skyFill,
     line: C.skyLine,
     color: C.navy,
@@ -391,7 +391,7 @@ function buildQuickUse() {
   });
 
   addBox(slide, "显式叶子入口", 6.0, 1.45, 1.4, 0.42, { fill: C.slateFill, line: C.line, fontSize: 12 });
-  addBox(slide, "/workflowprogram-develop\n\"创建一个用于每日收集科技新闻的工作流\"", 6.0, 1.95, 2.95, 0.92, {
+  addBox(slide, "workflowprogram-develop\n高级显式 leaf / 调试入口", 6.0, 1.95, 2.95, 0.92, {
     fill: C.greenFill,
     line: C.greenLine,
     color: C.green,

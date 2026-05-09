@@ -1,15 +1,16 @@
-<!-- AUTO-GENERATED FROM .claude/ - DO NOT EDIT DIRECTLY -->
-
 ---
-description: Ship current workflow changes
+description: Repository shipping compatibility command
 argument-hint: [scope] [--auto-approve]
 ---
+
+<!-- AUTO-GENERATED FROM .claude/ - DO NOT EDIT DIRECTLY -->
 
 按顺序交付当前变更：先审查，再校验，最后准备提交。
 
 > Compatibility Note
 >
 > `/ship` 保留为当前仓库的交付兼容命令，用于审查、校验和提交准备。它不是 WorkflowProgram 面向 `TARGET_ROOT` 的主入口。
+> 普通 workflow 请求统一从 `/workflowprogram-cn:workflowprogram-orchestrate <需求>` 进入。
 
 ## Usage
 
