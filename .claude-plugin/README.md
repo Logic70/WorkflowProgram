@@ -50,6 +50,24 @@ Claude Code 加载插件后，会在 `SessionStart` 自动执行 Python runtime 
 
 `workflowprogram-develop`、`workflowprogram-audit`、`workflowprogram-iterate`、`workflowprogram-validate` 是高级显式 intent 或内部路由目标。`workflowprogram-publish` 是独立发布环节，只用于把完整通过 develop 的目标 workflow 打包并发布成 marketplace plugin。旧 commands 仅作为兼容入口保留。
 
+## 发布前准备
+
+在调用 `/workflowprogram-cn:workflowprogram-publish` 前，用户需要先准备：
+
+1. 一个已经完整通过 `workflowprogram-develop` 的目标 workflow。
+2. 目标插件的 `plugin-id`、显示名和版本号。
+3. 一个已经存在的 GitHub 发布仓库；当前 publish 流程不会自动创建仓库。
+4. 已安装并登录的 `gh`，且对目标仓库有 push 权限。
+5. 若要真实执行 push，而不是 `--dry-run`，还需要该仓库的本地 checkout 路径，供 `--repo-path` 使用。
+
+最小入口：
+
+```text
+/workflowprogram-cn:workflowprogram-publish <target-root> --plugin-id <id> --repo <owner/repo-or-url>
+```
+
+真实 GitHub 写入仍要求显式审批；缺少认证、权限、仓库或本地 checkout 时，流程会返回 `BLOCKED` 并给出修复指引。
+
 ## 新增能力：S1 需求逻辑访谈
 
 `workflowprogram-develop` 的 S1 会用七个 logic lenses 深挖需求，而不是只收集“输入/输出/边界场景”：

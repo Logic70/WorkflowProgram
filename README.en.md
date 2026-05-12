@@ -141,6 +141,24 @@ Execution order is decided by programs, not by hoping the model remembers the ne
 - If a workflow declares `agent_team_contract`, S5 also validates structured Team evidence such as `team-plan.json`, `team-results.json`, and `team-join-summary.json`.
 - A target workflow that fully passed `workflowprogram-develop` can enter the independent publish lifecycle. `/workflowprogram-cn:workflowprogram-publish` checks develop/S5/design-review/managed evidence, stages a Claude Code marketplace plugin package, and uses the user's GitHub account for the publish plan or approved execution.
 
+### Before Publishing
+
+Before calling `/workflowprogram-cn:workflowprogram-publish`, the user should have:
+
+1. A target workflow that fully completed `workflowprogram-develop`, with still-valid S5, design-review, and managed evidence.
+2. A chosen `plugin-id`, display name, and version.
+3. An existing GitHub repository dedicated to publishing that target workflow. The current flow does not create a new repository automatically.
+4. `gh` installed and authenticated locally, with push access to the target repository.
+5. For real GitHub writes instead of `--dry-run`, a local checkout of that publishing repository for `--repo-path`.
+
+Minimal command:
+
+```text
+/workflowprogram-cn:workflowprogram-publish <target-root> --plugin-id <id> --repo <owner/repo-or-url>
+```
+
+Real GitHub writes still require explicit approval. If the repository, auth, permissions, or local checkout are missing, the publish flow returns `BLOCKED` with remediation guidance instead of attempting a partial release.
+
 ### Managed Write Flow
 
 AI never writes directly into the target project. Instead it:
