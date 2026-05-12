@@ -29,9 +29,10 @@ def parse_args() -> argparse.Namespace:
     run.add_argument("--version", default="0.1.0")
     run.add_argument("--description", default="WorkflowProgram generated Claude Code workflow plugin")
     run.add_argument("--repository", required=True)
-    run.add_argument("--repo-mode", default="export_repo", choices=["current_repo", "export_repo"])
+    run.add_argument("--repo-mode", default="export_repo", choices=["current_repo", "export_repo", "existing_marketplace"])
     run.add_argument("--repo-path", default="")
     run.add_argument("--marketplace-name", default="target-workflow-plugins")
+    run.add_argument("--update-existing-entry", action="store_true")
     run.add_argument("--runtime-mode", default="workflowprogram_dependency", choices=["workflowprogram_dependency", "vendored_runtime"])
     run.add_argument("--workflowprogram-plugin-root", default="")
     run.add_argument("--allow-warn", action="store_true")
@@ -39,6 +40,7 @@ def parse_args() -> argparse.Namespace:
     run.add_argument("--execute-github", action="store_true")
     run.add_argument("--approve-github", action="store_true")
     run.add_argument("--simulate-github-auth-missing", action="store_true")
+    run.add_argument("--simulate-github-auth-ready", action="store_true")
     run.add_argument("--require-claude-validate", action="store_true")
     run.add_argument("--skip-claude-validate", action="store_true")
     run.add_argument("--claude-bin", default="claude")
@@ -129,6 +131,7 @@ def write_install_instructions(
     version: str,
     runtime_mode: str,
     github_status: str,
+    repo_mode: str,
 ) -> Path:
     lines = [
         "# Target Workflow Plugin Install Instructions",
@@ -167,6 +170,12 @@ def write_install_instructions(
             "## Update",
             "",
             "```text",
+        ]
+    )
+    if repo_mode == "existing_marketplace":
+        lines.append(f"/plugin marketplace update {marketplace_name}")
+    lines.extend(
+        [
             f"/plugin update {plugin_id}@{marketplace_name}",
             "```",
         ]
@@ -195,6 +204,7 @@ def main() -> int:
             "version": args.version,
             "repository": args.repository,
             "repo_mode": args.repo_mode,
+            "marketplace_name": args.marketplace_name,
             "runtime_mode": args.runtime_mode,
             "dry_run": args.dry_run,
         },
@@ -206,6 +216,8 @@ def main() -> int:
             "allow_warn": args.allow_warn,
             "execute_github": args.execute_github,
             "approve_github": args.approve_github,
+            "update_existing_entry": args.update_existing_entry,
+            "simulate_github_auth_ready": args.simulate_github_auth_ready,
             "require_claude_validate": args.require_claude_validate,
             "skip_claude_validate": args.skip_claude_validate,
         },
@@ -247,6 +259,8 @@ def main() -> int:
         args.repository,
         "--marketplace-name",
         args.marketplace_name,
+        "--repo-mode",
+        args.repo_mode,
         "--runtime-mode",
         args.runtime_mode,
     ]
@@ -267,7 +281,16 @@ def main() -> int:
         return 1
 
     package_root = str(package.get("package_root", ""))
-    validation_args = ["--package-root", package_root, "--run-root", str(run_root), "--claude-bin", args.claude_bin]
+    validation_args = [
+        "--package-root",
+        package_root,
+        "--run-root",
+        str(run_root),
+        "--repo-mode",
+        args.repo_mode,
+        "--claude-bin",
+        args.claude_bin,
+    ]
     if args.require_claude_validate:
         validation_args.append("--require-claude-validate")
     if args.skip_claude_validate:
@@ -286,6 +309,42 @@ def main() -> int:
             print(json.dumps(summary, ensure_ascii=False, indent=2))
         return 1
 
+    merge: Dict[str, Any] = {}
+    resolved_marketplace_name = args.marketplace_name
+    if args.repo_mode == "existing_marketplace":
+        merge_args = [
+            "--package-root",
+            package_root,
+            "--run-root",
+            str(run_root),
+            "--repo-path",
+            args.repo_path,
+            "--plugin-id",
+            str(package.get("plugin_id", args.plugin_id)),
+            "--version",
+            args.version,
+            "--marketplace-name",
+            args.marketplace_name,
+        ]
+        if args.update_existing_entry:
+            merge_args.append("--update-existing-entry")
+        merge_code, merge, _ = run_json("merge-target-marketplace.py", merge_args, allowed={0, 1, 2})
+        resolved_marketplace_name = str(merge.get("marketplace_name", args.marketplace_name) or args.marketplace_name)
+        if merge_code != 0 or merge.get("status") != "PASS":
+            status = "BLOCKED" if merge.get("status") == "BLOCKED" else "FAIL"
+            append_event(run_root, "PublishMarketplaceMergeBlocked", "warn" if status == "BLOCKED" else "error", "Existing marketplace merge did not pass.")
+            summary = write_summary(
+                run_root,
+                status=status,
+                failure_kind="conflict" if status == "BLOCKED" else "implementation",
+                block_reason=str(merge.get("block_reason", "existing_marketplace_merge_failed")),
+                message="Existing marketplace merge did not pass.",
+                extra={"marketplace_merge": merge},
+            )
+            if args.json:
+                print(json.dumps(summary, ensure_ascii=False, indent=2))
+            return 2 if status == "BLOCKED" else 1
+
     github_args = [
         "--package-root",
         package_root,
@@ -295,6 +354,8 @@ def main() -> int:
         args.repository,
         "--repo-mode",
         args.repo_mode,
+        "--plugin-id",
+        str(package.get("plugin_id", args.plugin_id)),
         "--version",
         args.version,
     ]
@@ -308,16 +369,19 @@ def main() -> int:
         github_args.append("--dry-run")
     if args.simulate_github_auth_missing:
         github_args.append("--simulate-auth-missing")
+    if args.simulate_github_auth_ready:
+        github_args.append("--simulate-auth-ready")
     github_code, github, _ = run_json("github-publish-target-plugin.py", github_args, allowed={0, 1, 2})
 
     install_path = write_install_instructions(
         run_root,
         repository=args.repository,
-        marketplace_name=args.marketplace_name,
+        marketplace_name=resolved_marketplace_name,
         plugin_id=str(package.get("plugin_id", args.plugin_id)),
         version=args.version,
         runtime_mode=args.runtime_mode,
         github_status=str(github.get("status", "UNKNOWN")),
+        repo_mode=args.repo_mode,
     )
     if github.get("status") == "PASS":
         append_event(run_root, "PublishCompleted", "ok", "Target workflow plugin publish completed.")

@@ -20,6 +20,7 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Validate target workflow plugin package")
     parser.add_argument("--package-root", required=True)
     parser.add_argument("--run-root", required=True)
+    parser.add_argument("--repo-mode", default="export_repo", choices=["current_repo", "export_repo", "existing_marketplace"])
     parser.add_argument("--require-claude-validate", action="store_true")
     parser.add_argument("--skip-claude-validate", action="store_true")
     parser.add_argument("--claude-bin", default="claude")
@@ -58,7 +59,15 @@ def run_claude_plugin_validate(package_root: Path, claude_bin: str, skip: bool, 
     }
 
 
-def validate_package(package_root: Path, run_root: Path, *, claude_bin: str, skip_claude: bool, require_claude: bool) -> Dict[str, Any]:
+def validate_package(
+    package_root: Path,
+    run_root: Path,
+    *,
+    repo_mode: str,
+    claude_bin: str,
+    skip_claude: bool,
+    require_claude: bool,
+) -> Dict[str, Any]:
     errors: List[str] = []
     warnings: List[str] = []
     checks: List[Dict[str, Any]] = []
@@ -76,15 +85,20 @@ def validate_package(package_root: Path, run_root: Path, *, claude_bin: str, ski
     marketplace_json = load_json(package_root / ".claude-plugin" / "marketplace.json")
     publish_meta = load_json(package_root / ".claude-plugin" / "workflowprogram-publish.json")
     check("plugin_json_present", bool(plugin_json), ".claude-plugin/plugin.json")
-    check("marketplace_json_present", bool(marketplace_json), ".claude-plugin/marketplace.json")
+    if repo_mode == "existing_marketplace":
+        check("marketplace_json_deferred_to_existing_checkout", not bool(marketplace_json), "existing marketplace packages do not replace marketplace.json")
+    else:
+        check("marketplace_json_present", bool(marketplace_json), ".claude-plugin/marketplace.json")
     check("publish_metadata_present", bool(publish_meta), ".claude-plugin/workflowprogram-publish.json")
 
     plugin_id = str(plugin_json.get("name", "")).strip()
-    marketplace_plugins = marketplace_json.get("plugins", [])
-    marketplace_name = ""
-    if isinstance(marketplace_plugins, list) and marketplace_plugins and isinstance(marketplace_plugins[0], dict):
-        marketplace_name = str(marketplace_plugins[0].get("name", "")).strip()
-    check("marketplace_plugin_matches_manifest", bool(plugin_id and plugin_id == marketplace_name), f"plugin={plugin_id}; marketplace={marketplace_name}")
+    if repo_mode != "existing_marketplace":
+        marketplace_plugins = marketplace_json.get("plugins", [])
+        marketplace_name = ""
+        if isinstance(marketplace_plugins, list) and marketplace_plugins and isinstance(marketplace_plugins[0], dict):
+            marketplace_name = str(marketplace_plugins[0].get("name", "")).strip()
+        check("marketplace_plugin_matches_manifest", bool(plugin_id and plugin_id == marketplace_name), f"plugin={plugin_id}; marketplace={marketplace_name}")
+    check("publish_metadata_repo_mode_matches", str(publish_meta.get("repo_mode", repo_mode)).strip() == repo_mode, f"repo_mode={repo_mode}")
 
     commands = list((package_root / "commands").glob("*.md")) if (package_root / "commands").exists() else []
     skills = list((package_root / "skills").glob("*/SKILL.md")) if (package_root / "skills").exists() else []
@@ -137,6 +151,7 @@ def main() -> int:
     payload = validate_package(
         Path(args.package_root).resolve(),
         Path(args.run_root).resolve(),
+        repo_mode=args.repo_mode,
         claude_bin=args.claude_bin,
         skip_claude=args.skip_claude_validate,
         require_claude=args.require_claude_validate,

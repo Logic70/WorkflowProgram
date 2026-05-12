@@ -1373,9 +1373,10 @@ workflowprogram-python ${CLAUDE_PLUGIN_ROOT}/scripts/workflow-publish-entry.py r
 
 1. `validate-publish-eligibility.py`：检查目标 workflow 已完整完成 develop，且 design-review、managed apply、state/events、S5 verdict 与 managed manifest 均可用。
 2. `package-target-plugin.py`：把目标 `.claude/{commands,skills,agents,rules,hooks}` 与 `.workflowprogram/{design,runtime}` staging 到 `RUN_ROOT/outputs/stages/publish/package-root/`。
-3. `validate-target-plugin-package.py`：校验 `.claude-plugin/plugin.json`、`marketplace.json`、入口暴露、runtime packaging mode 与可选 `claude plugin validate`。
-4. `github-publish-target-plugin.py`：只通过用户本地 `gh` / `git` 认证生成发布计划或在审批后执行 commit/tag/push。
-5. `workflow-publish-entry.py`：汇总 `publish-summary.json` 与 `install-instructions.md`。
+3. `validate-target-plugin-package.py`：校验 `.claude-plugin/plugin.json`、standalone 模式下的 `marketplace.json`、入口暴露、runtime packaging mode 与可选 `claude plugin validate`。
+4. `merge-target-marketplace.py`：仅在 `repo_mode=existing_marketplace` 时运行，读取已有 `.claude-plugin/marketplace.json`，生成 append/update/block merge plan；同名 plugin 更新必须显式授权且版本提升。
+5. `github-publish-target-plugin.py`：只通过用户本地 `gh` / `git` 认证生成发布计划或在审批后执行 commit/tag/push；existing marketplace 模式只写 `.claude-plugin/marketplace.json` 与 `plugins/<plugin-id>/`，且要求 checkout clean。
+6. `workflow-publish-entry.py`：汇总 `publish-summary.json` 与 `install-instructions.md`。
 
 可验证输出固定为：
 
@@ -1383,6 +1384,10 @@ workflowprogram-python ${CLAUDE_PLUGIN_ROOT}/scripts/workflow-publish-entry.py r
 - `RUN_ROOT/outputs/stages/publish/plugin-package-plan.json`
 - `RUN_ROOT/outputs/stages/publish/plugin-manifest-preview.json`
 - `RUN_ROOT/outputs/stages/publish/plugin-validation-report.json`
+- `RUN_ROOT/outputs/stages/publish/marketplace-resolution.json`
+- `RUN_ROOT/outputs/stages/publish/marketplace-merge-plan.json`
+- `RUN_ROOT/outputs/stages/publish/marketplace-manifest-preview.json`
+- `RUN_ROOT/outputs/stages/publish/marketplace-validation-report.json`
 - `RUN_ROOT/outputs/stages/publish/github-publish-plan.json`
 - `RUN_ROOT/outputs/stages/publish/github-publish-result.json`
 - `RUN_ROOT/outputs/stages/publish/install-instructions.md`

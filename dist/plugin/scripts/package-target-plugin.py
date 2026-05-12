@@ -16,6 +16,7 @@ from lib.io_utils import iso_now, write_json
 
 PUBLISH_DIR = "outputs/stages/publish"
 VALID_RUNTIME_MODES = {"workflowprogram_dependency", "vendored_runtime"}
+VALID_REPO_MODES = {"current_repo", "export_repo", "existing_marketplace"}
 
 
 def parse_args() -> argparse.Namespace:
@@ -28,6 +29,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--description", default="WorkflowProgram generated Claude Code workflow plugin")
     parser.add_argument("--repository-url", default="")
     parser.add_argument("--marketplace-name", default="target-workflow-plugins")
+    parser.add_argument("--repo-mode", default="export_repo", choices=sorted(VALID_REPO_MODES))
     parser.add_argument("--runtime-mode", default="workflowprogram_dependency", choices=sorted(VALID_RUNTIME_MODES))
     parser.add_argument("--workflowprogram-plugin-root", default="")
     parser.add_argument("--json", action="store_true")
@@ -105,6 +107,7 @@ def package_target_plugin(
     description: str,
     repository_url: str,
     marketplace_name: str,
+    repo_mode: str,
     runtime_mode: str,
     workflowprogram_plugin_root: Path | None,
 ) -> Dict[str, Any]:
@@ -117,6 +120,8 @@ def package_target_plugin(
         errors.append("plugin id must match [a-z0-9][a-z0-9-]{1,62}")
     if runtime_mode not in VALID_RUNTIME_MODES:
         errors.append(f"runtime mode must be one of {sorted(VALID_RUNTIME_MODES)}")
+    if repo_mode not in VALID_REPO_MODES:
+        errors.append(f"repo mode must be one of {sorted(VALID_REPO_MODES)}")
     if errors:
         payload = {
             "schema_version": 1,
@@ -165,33 +170,36 @@ def package_target_plugin(
         "license": "MIT",
         "keywords": ["claude-code", "workflow", "workflowprogram"],
     }
-    marketplace_json = {
-        "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
-        "name": marketplace_name,
-        "description": f"Marketplace for {display_name}",
-        "owner": {"name": "<github-user>"},
-        "plugins": [
-            {
-                "name": normalized_id,
-                "source": {"source": "git-subdir", "url": repo, "path": "dist/plugin", "ref": "main"},
-                "description": description,
-                "version": version,
-                "homepage": repo,
-                "repository": repo,
-                "license": "MIT",
-                "keywords": ["workflow", "claude-code", "workflowprogram"],
-                "category": "workflow",
-                "tags": ["workflow", "claude-code"],
-                "strict": False,
-            }
-        ],
-    }
+    marketplace_json = None
+    if repo_mode != "existing_marketplace":
+        marketplace_json = {
+            "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+            "name": marketplace_name,
+            "description": f"Marketplace for {display_name}",
+            "owner": {"name": "<github-user>"},
+            "plugins": [
+                {
+                    "name": normalized_id,
+                    "source": {"source": "git-subdir", "url": repo, "path": "dist/plugin", "ref": "main"},
+                    "description": description,
+                    "version": version,
+                    "homepage": repo,
+                    "repository": repo,
+                    "license": "MIT",
+                    "keywords": ["workflow", "claude-code", "workflowprogram"],
+                    "category": "workflow",
+                    "tags": ["workflow", "claude-code"],
+                    "strict": False,
+                }
+            ],
+        }
     publish_meta = {
         "schema_version": 1,
         "generated_at": iso_now(),
         "plugin_id": normalized_id,
         "plugin_name": display_name,
         "version": version,
+        "repo_mode": repo_mode,
         "runtime_mode": runtime_mode,
         "source_target_root": str(target_root),
         "workflowprogram_dependency": runtime_mode == "workflowprogram_dependency",
@@ -199,8 +207,9 @@ def package_target_plugin(
     }
     write_json(package_root / ".claude-plugin" / "plugin.json", plugin_json)
     included.append(".claude-plugin/plugin.json")
-    write_json(package_root / ".claude-plugin" / "marketplace.json", marketplace_json)
-    included.append(".claude-plugin/marketplace.json")
+    if marketplace_json is not None:
+        write_json(package_root / ".claude-plugin" / "marketplace.json", marketplace_json)
+        included.append(".claude-plugin/marketplace.json")
     write_json(package_root / ".claude-plugin" / "workflowprogram-publish.json", publish_meta)
     included.append(".claude-plugin/workflowprogram-publish.json")
     readme_lines = [
@@ -242,6 +251,7 @@ def package_target_plugin(
         "target_root": str(target_root),
         "package_root": str(package_root),
         "plugin_id": normalized_id,
+        "repo_mode": repo_mode,
         "runtime_mode": runtime_mode,
         "included_files": sorted(set(included)),
         "files": package_files(package_root),
@@ -261,6 +271,7 @@ def main() -> int:
         description=args.description,
         repository_url=args.repository_url,
         marketplace_name=args.marketplace_name,
+        repo_mode=args.repo_mode,
         runtime_mode=args.runtime_mode,
         workflowprogram_plugin_root=Path(args.workflowprogram_plugin_root).resolve() if args.workflowprogram_plugin_root.strip() else None,
     )

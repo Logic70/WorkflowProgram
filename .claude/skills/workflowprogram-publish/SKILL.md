@@ -22,6 +22,8 @@ disable-model-invocation: true
 - 发布依赖用户自己的 GitHub 账户；只调用本地 `gh` / `git`，不得存储 token。
 - 先把插件 payload 写到 `RUN_ROOT/outputs/stages/publish/package-root/`，校验通过后才允许写入发布仓库。
 - 默认使用 `export_repo`，避免把应用源码仓误当成插件 marketplace 仓库。
+- 若用户要把 workflow 加入已有 marketplace，使用 `existing_marketplace`；该模式必须读取已有 `.claude-plugin/marketplace.json`，并把插件 payload 放入 `plugins/<plugin-id>/`。
+- 已有 marketplace 中同名插件不得静默覆盖；只有用户显式选择更新且版本提升时才可继续。
 - 运行态打包模式必须明确：
   - `workflowprogram_dependency`：消费者需要先安装 WorkflowProgram 插件。
   - `vendored_runtime`：发布包携带经过校验的最小 runtime。
@@ -37,6 +39,7 @@ disable-model-invocation: true
 - GitHub 仓库，例如 `owner/stride-security-workflow`
 - 版本号，例如 `0.1.0`
 - 仓库模式：默认 `export_repo`
+- 若复用已有 marketplace，还需确认 checkout 路径、manifest 名称，以及是否允许更新同名 plugin
 - runtime 模式：默认 `workflowprogram_dependency`
 
 缺少 GitHub 登录或仓库权限时，不要尝试绕过；输出 remediation，让用户先完成 `gh auth login` 或仓库授权。
@@ -87,6 +90,22 @@ workflowprogram-python ${CLAUDE_PLUGIN_ROOT}/scripts/workflow-publish-entry.py r
   --json
 ```
 
+若要加入已有 marketplace：
+
+```bash
+workflowprogram-python ${CLAUDE_PLUGIN_ROOT}/scripts/workflow-publish-entry.py run \
+  --target-root <TARGET_ROOT> \
+  --run-root <RUN_ROOT> \
+  --plugin-id <plugin-id> \
+  --version <version> \
+  --repository <github-repo-or-url> \
+  --repo-mode existing_marketplace \
+  --repo-path <existing-marketplace-checkout> \
+  --marketplace-name <existing-marketplace-name> \
+  --dry-run \
+  --json
+```
+
 ## Step 3: Inspect Evidence
 
 发布证据固定在：
@@ -95,6 +114,10 @@ workflowprogram-python ${CLAUDE_PLUGIN_ROOT}/scripts/workflow-publish-entry.py r
 - `RUN_ROOT/outputs/stages/publish/plugin-package-plan.json`
 - `RUN_ROOT/outputs/stages/publish/plugin-manifest-preview.json`
 - `RUN_ROOT/outputs/stages/publish/plugin-validation-report.json`
+- `RUN_ROOT/outputs/stages/publish/marketplace-resolution.json`
+- `RUN_ROOT/outputs/stages/publish/marketplace-merge-plan.json`
+- `RUN_ROOT/outputs/stages/publish/marketplace-manifest-preview.json`
+- `RUN_ROOT/outputs/stages/publish/marketplace-validation-report.json`
 - `RUN_ROOT/outputs/stages/publish/github-publish-plan.json`
 - `RUN_ROOT/outputs/stages/publish/github-publish-result.json`
 - `RUN_ROOT/outputs/stages/publish/install-instructions.md`

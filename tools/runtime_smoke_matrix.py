@@ -271,6 +271,48 @@ def base_cases(provider_command: str) -> List[Dict[str, Any]]:
             "expected_result": "PASS",
         },
         {
+            "name": "fixture-publish-existing-marketplace-append-pass",
+            "fixture": "publish-existing-marketplace-append-pass",
+            "provider": "fixture_host",
+            "expected_result": "PASS",
+        },
+        {
+            "name": "fixture-publish-existing-marketplace-update-pass",
+            "fixture": "publish-existing-marketplace-update-pass",
+            "provider": "fixture_host",
+            "expected_result": "PASS",
+        },
+        {
+            "name": "fixture-publish-existing-marketplace-duplicate-plugin-blocked",
+            "fixture": "publish-existing-marketplace-duplicate-plugin-blocked",
+            "provider": "fixture_host",
+            "expected_result": "FAIL",
+        },
+        {
+            "name": "fixture-publish-existing-marketplace-source-mismatch-fail",
+            "fixture": "publish-existing-marketplace-source-mismatch-fail",
+            "provider": "fixture_host",
+            "expected_result": "FAIL",
+        },
+        {
+            "name": "fixture-publish-existing-marketplace-version-not-bumped-fail",
+            "fixture": "publish-existing-marketplace-version-not-bumped-fail",
+            "provider": "fixture_host",
+            "expected_result": "FAIL",
+        },
+        {
+            "name": "fixture-publish-existing-marketplace-invalid-manifest-fail",
+            "fixture": "publish-existing-marketplace-invalid-manifest-fail",
+            "provider": "fixture_host",
+            "expected_result": "FAIL",
+        },
+        {
+            "name": "fixture-publish-existing-marketplace-dirty-checkout-blocked",
+            "fixture": "publish-existing-marketplace-dirty-checkout-blocked",
+            "provider": "fixture_host",
+            "expected_result": "FAIL",
+        },
+        {
             "name": "fixture-develop-pass",
             "fixture": "empty-project",
             "provider": "fixture_host",

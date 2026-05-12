@@ -1033,6 +1033,61 @@ def _seed_publishable_target(plugin_root: Path, target_root: Path, request: str)
     return prior_run_root
 
 
+def _seed_existing_marketplace_checkout(run_root: Path, scenario: str, plugin_id: str) -> Path:
+    """构造 existing_marketplace publish fixture 所需的 marketplace checkout。"""
+
+    repo_path = run_root / "outputs" / "existing-marketplace-checkout"
+    if repo_path.exists():
+        shutil.rmtree(repo_path)
+    (repo_path / ".claude-plugin").mkdir(parents=True, exist_ok=True)
+    if scenario == "publish-existing-marketplace-invalid-manifest-fail":
+        _write_text(repo_path / ".claude-plugin" / "marketplace.json", "{ invalid marketplace json\n")
+        return repo_path
+
+    plugin_entry = {
+        "name": "other-plugin",
+        "source": "./plugins/other-plugin",
+        "description": "Existing unrelated plugin",
+        "version": "0.1.0",
+    }
+    plugins: List[Dict[str, Any]] = [plugin_entry]
+    if scenario in {
+        "publish-existing-marketplace-update-pass",
+        "publish-existing-marketplace-duplicate-plugin-blocked",
+        "publish-existing-marketplace-source-mismatch-fail",
+        "publish-existing-marketplace-version-not-bumped-fail",
+    }:
+        existing_source = "./legacy/publish-smoke" if scenario == "publish-existing-marketplace-source-mismatch-fail" else f"./plugins/{plugin_id}"
+        existing_version = "0.1.0" if scenario == "publish-existing-marketplace-version-not-bumped-fail" else "0.0.9"
+        plugins.append(
+            {
+                "name": plugin_id,
+                "source": existing_source,
+                "description": "Existing target workflow plugin",
+                "version": existing_version,
+            }
+        )
+    write_json(
+        repo_path / ".claude-plugin" / "marketplace.json",
+        {
+            "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+            "name": "fixture-marketplace",
+            "description": "Existing marketplace fixture",
+            "owner": {"name": "fixture-host"},
+            "plugins": plugins,
+        },
+    )
+
+    if scenario == "publish-existing-marketplace-dirty-checkout-blocked":
+        subprocess.run(["git", "init"], cwd=repo_path, capture_output=True, text=True, check=False)
+        subprocess.run(["git", "config", "user.name", "Fixture Host"], cwd=repo_path, capture_output=True, text=True, check=False)
+        subprocess.run(["git", "config", "user.email", "fixture@example.invalid"], cwd=repo_path, capture_output=True, text=True, check=False)
+        subprocess.run(["git", "add", ".claude-plugin/marketplace.json"], cwd=repo_path, capture_output=True, text=True, check=False)
+        subprocess.run(["git", "commit", "-m", "Seed marketplace"], cwd=repo_path, capture_output=True, text=True, check=False)
+        _write_text(repo_path / "dirty-note.md", "uncommitted fixture change\n")
+    return repo_path
+
+
 def _invoke_fixture_host(
     config: RuntimeHostConfig,
     plugin_root: Path,
@@ -1291,6 +1346,8 @@ def _invoke_fixture_host(
             if stale_path.exists():
                 stale_path.unlink()
         plugin_id = "invalid_plugin_id" if fixture == "publish-package-validation-fail" else "publish-smoke"
+        existing_marketplace_fixture = fixture.startswith("publish-existing-marketplace-")
+        existing_repo_path = _seed_existing_marketplace_checkout(run_root, fixture, plugin_id) if existing_marketplace_fixture else None
         cmd = [
             sys.executable,
             str(_repo_root() / ".claude" / "scripts" / "workflow-publish-entry.py"),
@@ -1308,17 +1365,34 @@ def _invoke_fixture_host(
             "--repository",
             "https://github.com/example/publish-smoke",
             "--repo-mode",
-            "export_repo",
+            "existing_marketplace" if existing_marketplace_fixture else "export_repo",
             "--runtime-mode",
             "workflowprogram_dependency",
             "--skip-claude-validate",
         ]
+        if existing_repo_path is not None:
+            cmd.extend(
+                [
+                    "--repo-path",
+                    str(existing_repo_path),
+                    "--marketplace-name",
+                    "fixture-marketplace",
+                ]
+            )
+        if fixture in {
+            "publish-existing-marketplace-update-pass",
+            "publish-existing-marketplace-source-mismatch-fail",
+            "publish-existing-marketplace-version-not-bumped-fail",
+        }:
+            cmd.append("--update-existing-entry")
         if develop_run_root is not None:
             cmd.extend(["--develop-run-root", str(develop_run_root)])
-        if fixture != "publish-github-auth-missing-blocked":
-            cmd.append("--dry-run")
-        else:
+        if fixture == "publish-github-auth-missing-blocked":
             cmd.append("--simulate-github-auth-missing")
+        elif fixture == "publish-existing-marketplace-dirty-checkout-blocked":
+            cmd.extend(["--execute-github", "--approve-github", "--simulate-github-auth-ready"])
+        else:
+            cmd.append("--dry-run")
         cmd.append("--json")
         completed = subprocess.run(cmd, capture_output=True, text=True, check=False)
         try:

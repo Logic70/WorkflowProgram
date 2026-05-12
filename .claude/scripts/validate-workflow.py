@@ -403,6 +403,7 @@ def validate_required_paths(root: Path, result: ValidationResult) -> None:
         ".claude/scripts/workflow-publish-entry.py",
         ".claude/scripts/validate-publish-eligibility.py",
         ".claude/scripts/package-target-plugin.py",
+        ".claude/scripts/merge-target-marketplace.py",
         ".claude/scripts/validate-target-plugin-package.py",
         ".claude/scripts/github-publish-target-plugin.py",
         ".claude/scripts/bootstrap-python-runtime.py",

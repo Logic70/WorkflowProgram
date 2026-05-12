@@ -21,13 +21,15 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--package-root", required=True)
     parser.add_argument("--run-root", required=True)
     parser.add_argument("--repository", required=True, help="GitHub repository URL or owner/name")
-    parser.add_argument("--repo-mode", default="export_repo", choices=["current_repo", "export_repo"])
+    parser.add_argument("--repo-mode", default="export_repo", choices=["current_repo", "export_repo", "existing_marketplace"])
     parser.add_argument("--repo-path", default="", help="Local checkout path to update when executing")
+    parser.add_argument("--plugin-id", default="")
     parser.add_argument("--version", default="0.1.0")
     parser.add_argument("--execute", action="store_true", help="Perform git writes and push")
     parser.add_argument("--approved", action="store_true", help="Required for --execute")
     parser.add_argument("--dry-run", action="store_true", help="Simulate successful GitHub publication")
     parser.add_argument("--simulate-auth-missing", action="store_true", help="Force auth-missing blocked result")
+    parser.add_argument("--simulate-auth-ready", action="store_true", help="Force auth-ready state for deterministic local fixtures")
     parser.add_argument("--json", action="store_true")
     return parser.parse_args()
 
@@ -46,9 +48,11 @@ def sanitize_auth_output(output: str) -> str:
     return "\n".join(lines).strip()
 
 
-def gh_auth_status(simulate_missing: bool) -> Dict[str, Any]:
+def gh_auth_status(simulate_missing: bool, simulate_ready: bool) -> Dict[str, Any]:
     if simulate_missing:
         return {"available": bool(shutil.which("gh")), "ready": False, "message": "simulated missing GitHub auth"}
+    if simulate_ready:
+        return {"available": True, "ready": True, "message": "simulated ready GitHub auth"}
     gh = shutil.which("gh")
     if not gh:
         return {"available": False, "ready": False, "message": "gh CLI not found"}
@@ -73,6 +77,35 @@ def copy_package_to_checkout(package_root: Path, repo_path: Path) -> List[str]:
     return copied
 
 
+def copy_package_to_existing_marketplace(package_root: Path, repo_path: Path, plugin_id: str) -> List[str]:
+    plugin_root = repo_path / "plugins" / plugin_id
+    if plugin_root.exists():
+        shutil.rmtree(plugin_root)
+    shutil.copytree(package_root, plugin_root)
+    copied: List[str] = []
+    for path in sorted(plugin_root.rglob("*")):
+        if path.is_file():
+            copied.append(path.relative_to(repo_path).as_posix())
+    return copied
+
+
+def load_preview_manifest(run_root: Path) -> Dict[str, Any]:
+    path = run_root / PUBLISH_DIR / "marketplace-manifest-preview.json"
+    if not path.exists():
+        return {}
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+    marketplace_json = payload.get("marketplace_json") if isinstance(payload, dict) else None
+    return marketplace_json if isinstance(marketplace_json, dict) else {}
+
+
+def checkout_clean(repo_path: Path) -> bool:
+    completed = run_command(["git", "status", "--porcelain"], cwd=repo_path)
+    return completed.returncode == 0 and not completed.stdout.strip()
+
+
 def publish_to_github(
     *,
     package_root: Path,
@@ -80,11 +113,13 @@ def publish_to_github(
     repository: str,
     repo_mode: str,
     repo_path: Path | None,
+    plugin_id: str,
     version: str,
     execute: bool,
     approved: bool,
     dry_run: bool,
     simulate_auth_missing: bool,
+    simulate_auth_ready: bool,
 ) -> Dict[str, Any]:
     plan = {
         "schema_version": 1,
@@ -94,19 +129,32 @@ def publish_to_github(
         "repo_path": str(repo_path) if repo_path else None,
         "version": version,
         "package_root": str(package_root),
-        "steps": [
-            "verify GitHub auth",
-            "copy package to publishing checkout",
-            "commit dist/plugin payload",
-            f"tag v{version}",
-            "push branch and tag",
-        ],
+        "plugin_id": plugin_id or None,
+        "steps": (
+            [
+                "verify GitHub auth",
+                "verify existing marketplace checkout is clean",
+                f"copy package to plugins/{plugin_id}",
+                "write merged marketplace manifest",
+                "commit marketplace manifest and plugin payload",
+                f"tag v{version}",
+                "push branch and tag",
+            ]
+            if repo_mode == "existing_marketplace"
+            else [
+                "verify GitHub auth",
+                "copy package to publishing checkout",
+                "commit dist/plugin payload",
+                f"tag v{version}",
+                "push branch and tag",
+            ]
+        ),
         "execute": execute,
         "dry_run": dry_run,
     }
     write_json(run_root / PUBLISH_DIR / "github-publish-plan.json", plan)
 
-    auth = gh_auth_status(simulate_auth_missing)
+    auth = gh_auth_status(simulate_auth_missing, simulate_auth_ready)
     if dry_run:
         payload = {
             "schema_version": 1,
@@ -166,8 +214,55 @@ def publish_to_github(
         return payload
 
     repo_path.mkdir(parents=True, exist_ok=True)
-    copied = copy_package_to_checkout(package_root, repo_path)
-    run_command(["git", "add", "dist/plugin"], cwd=repo_path)
+    if repo_mode == "existing_marketplace":
+        if not plugin_id.strip():
+            payload = {
+                "schema_version": 1,
+                "generated_at": iso_now(),
+                "status": "BLOCKED",
+                "failure_kind": "conflict",
+                "block_reason": "existing_marketplace_plugin_id_required",
+                "repository": repository,
+                "auth": auth,
+                "message": "Executing existing marketplace publish requires --plugin-id.",
+            }
+            write_json(run_root / PUBLISH_DIR / "github-publish-result.json", payload)
+            return payload
+        if not checkout_clean(repo_path):
+            payload = {
+                "schema_version": 1,
+                "generated_at": iso_now(),
+                "status": "BLOCKED",
+                "failure_kind": "conflict",
+                "block_reason": "existing_marketplace_checkout_dirty",
+                "repository": repository,
+                "repo_path": str(repo_path),
+                "auth": auth,
+                "message": "Existing marketplace checkout must be clean before publish execution.",
+            }
+            write_json(run_root / PUBLISH_DIR / "github-publish-result.json", payload)
+            return payload
+        preview_manifest = load_preview_manifest(run_root)
+        if not preview_manifest:
+            payload = {
+                "schema_version": 1,
+                "generated_at": iso_now(),
+                "status": "BLOCKED",
+                "failure_kind": "conflict",
+                "block_reason": "existing_marketplace_preview_missing",
+                "repository": repository,
+                "repo_path": str(repo_path),
+                "auth": auth,
+                "message": "Existing marketplace merge preview is missing.",
+            }
+            write_json(run_root / PUBLISH_DIR / "github-publish-result.json", payload)
+            return payload
+        copied = copy_package_to_existing_marketplace(package_root, repo_path, plugin_id)
+        write_json(repo_path / ".claude-plugin" / "marketplace.json", preview_manifest)
+        run_command(["git", "add", ".claude-plugin/marketplace.json", f"plugins/{plugin_id}"], cwd=repo_path)
+    else:
+        copied = copy_package_to_checkout(package_root, repo_path)
+        run_command(["git", "add", "dist/plugin"], cwd=repo_path)
     commit = run_command(["git", "commit", "-m", f"Publish target workflow plugin v{version}"], cwd=repo_path)
     if commit.returncode != 0:
         payload = {
@@ -208,11 +303,13 @@ def main() -> int:
         repository=args.repository,
         repo_mode=args.repo_mode,
         repo_path=Path(args.repo_path).resolve() if args.repo_path.strip() else None,
+        plugin_id=args.plugin_id,
         version=args.version,
         execute=args.execute,
         approved=args.approved,
         dry_run=args.dry_run,
         simulate_auth_missing=args.simulate_auth_missing,
+        simulate_auth_ready=args.simulate_auth_ready,
     )
     if args.json:
         print(json.dumps(payload, ensure_ascii=False, indent=2))

@@ -3,7 +3,7 @@
 ## Usage
 
 ```text
-/workflowprogram-publish <target-root> --plugin-id <id> --repo <owner/repo-or-url> [--version 0.1.0] [--dry-run]
+/workflowprogram-publish <target-root> --plugin-id <id> --repo <owner/repo-or-url> [--version 0.1.0] [--repo-mode existing_marketplace --repo-path <checkout>] [--dry-run]
 ```
 
 ## Behavior
@@ -13,7 +13,7 @@
 **Goal**: 明确发布目标、插件 ID、GitHub 仓库、版本、repo mode 和 runtime mode。
 
 1. 解析目标项目路径、插件 ID、GitHub 仓库和版本。
-2. 默认选择 `export_repo` 和 `workflowprogram_dependency`，除非用户显式指定。
+2. 默认选择 `export_repo` 和 `workflowprogram_dependency`，除非用户显式指定；若用户要复用已有 marketplace，则改用 `existing_marketplace`。
 3. 若缺少 GitHub 仓库或插件 ID，先向用户补问，不进入打包。
 
 **Verify**: 发布输入足以生成 `publish-intent.json` 和 `publish-options.json`。
@@ -33,8 +33,9 @@
 **Goal**: 生成 marketplace plugin payload、校验包，并生成 GitHub 发布计划或执行结果。
 
 1. 调用 `${CLAUDE_PLUGIN_ROOT}/scripts/workflow-publish-entry.py run` 完成发布资格检查、打包、包校验和 GitHub 发布计划。
-2. 真实 GitHub 写入必须有显式审批；缺少 `gh` 登录或权限时，只生成阻塞报告和修复指引。
-3. 输出 `install-instructions.md`，用于其他用户通过 Claude Code marketplace 安装。
+2. 若 `repo_mode=existing_marketplace`，还必须生成 marketplace merge 证据，并保证已有 manifest 被追加/更新而不是整份替换。
+3. 真实 GitHub 写入必须有显式审批；缺少 `gh` 登录或权限时，只生成阻塞报告和修复指引。
+4. 输出 `install-instructions.md`，用于其他用户通过 Claude Code marketplace 安装。
 
 **Verify**: `publish-summary.json` 明确记录 `PASS`、`BLOCKED` 或 `FAIL`，并能回溯到 package、validation 和 GitHub 证据。
 

@@ -59,12 +59,21 @@ Claude Code 加载插件后，会在 `SessionStart` 自动执行 Python runtime 
 3. 一个已经存在的 GitHub 发布仓库；当前 publish 流程不会自动创建仓库。
 4. 已安装并登录的 `gh`，且对目标仓库有 push 权限。
 5. 若要真实执行 push，而不是 `--dry-run`，还需要该仓库的本地 checkout 路径，供 `--repo-path` 使用。
+6. 若要复用已有 marketplace，则 checkout 中还必须已有 `.claude-plugin/marketplace.json`，并选择 `--repo-mode existing_marketplace`。
 
 最小入口：
 
 ```text
 /workflowprogram-cn:workflowprogram-publish <target-root> --plugin-id <id> --repo <owner/repo-or-url>
 ```
+
+复用已有 marketplace：
+
+```text
+/workflowprogram-cn:workflowprogram-publish <target-root> --plugin-id <id> --repo <owner/repo-or-url> --repo-mode existing_marketplace --repo-path <marketplace-checkout>
+```
+
+该模式会把插件规划到 `plugins/<plugin-id>/`，再合并已有 marketplace manifest；若更新同名插件，还必须显式允许更新并提升版本号。
 
 真实 GitHub 写入仍要求显式审批；缺少认证、权限、仓库或本地 checkout 时，流程会返回 `BLOCKED` 并给出修复指引。
 
@@ -89,7 +98,7 @@ Claude Code 加载插件后，会在 `SessionStart` 自动执行 Python runtime 
 - 如需最小化排障，执行 `workflowprogram-doctor`。
 - 如需清理插件 Python runtime、测试产物或目标项目旧 run，执行 `workflowprogram-clean`；默认 dry-run，删除必须显式传 `--apply`。
 - 如果出现 `Unknown skill: workflowprogram-orchestrate`，先执行 `/reload-plugins` 或重启 `claude`，并使用 `/workflowprogram-cn:workflowprogram-orchestrate ...` 入口；不要让模型手写 `Skill(workflowprogram-orchestrate)`。
-- 如果出现 `bin/workflowprogram-python: Permission denied`，说明安装缓存中的 launcher 缺少执行权限。更新并重新安装最新 marketplace 载荷；临时修复可执行 `chmod +x ~/.claude/plugins/cache/logic70-plugins/workflowprogram-cn/0.1.6/bin/workflowprogram-*`。
+- 如果出现 `bin/workflowprogram-python: Permission denied`，说明安装缓存中的 launcher 缺少执行权限。更新并重新安装最新 marketplace 载荷；临时修复可执行 `chmod +x ~/.claude/plugins/cache/logic70-plugins/workflowprogram-cn/0.1.7/bin/workflowprogram-*`。
 
 ## 运行时模型
 

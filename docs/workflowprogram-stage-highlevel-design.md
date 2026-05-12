@@ -361,6 +361,8 @@ TARGET_ROOT/
 - 发布入口为 `/workflowprogram-cn:workflowprogram-publish`，对应 skill 为 `workflowprogram-publish`。
 - 发布证据固定写入 `RUN_ROOT/outputs/stages/publish/`，包括 `publish-eligibility.json`、`plugin-package-plan.json`、`plugin-validation-report.json`、`github-publish-result.json`、`install-instructions.md` 与 `publish-summary.json`。
 - 目标插件 runtime 打包模式必须显式选择：`workflowprogram_dependency` 或 `vendored_runtime`。当前稳妥默认是 `workflowprogram_dependency`，安装说明必须提示消费者先安装 WorkflowProgram。
+- 发布仓库模式支持 `export_repo` / `current_repo` / `existing_marketplace`。其中 `existing_marketplace` 复用已有 `.claude-plugin/marketplace.json`，把插件 payload 规划到 `plugins/<plugin-id>/`，并以 merge plan 追加或显式更新同名条目。
+- `existing_marketplace` 不得静默覆盖同名 plugin，不得改写已存在条目的 source；更新必须显式授权且版本提升。
 - GitHub 发布使用用户自己的 `gh` / `git` 认证状态；WorkflowProgram 不保存 token。缺认证、缺权限或缺审批时，发布以 `BLOCKED/environment` 或 `BLOCKED/design` 停止。
 
 基础运行测试的统一场景骨架至少包含：

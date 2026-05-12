@@ -45,7 +45,7 @@ After installation:
 Troubleshooting:
 
 - If you see `Unknown skill: workflowprogram-orchestrate`, the current Claude session usually has not reloaded the plugin. Run `/reload-plugins` or restart `claude`, then use `/workflowprogram-cn:workflowprogram-orchestrate ...`; do not ask the model to hand-write `Skill(workflowprogram-orchestrate)`.
-- If you see `bin/workflowprogram-python: Permission denied`, the installed launcher lost its executable bit. Update/reinstall from the latest marketplace payload. As a temporary local fix, run `chmod +x ~/.claude/plugins/cache/logic70-plugins/workflowprogram-cn/0.1.6/bin/workflowprogram-*`.
+- If you see `bin/workflowprogram-python: Permission denied`, the installed launcher lost its executable bit. Update/reinstall from the latest marketplace payload. As a temporary local fix, run `chmod +x ~/.claude/plugins/cache/logic70-plugins/workflowprogram-cn/0.1.7/bin/workflowprogram-*`.
 
 Source builds of `dist/plugin/` remain useful for repository development and debugging, but they are no longer the primary end-user install model.
 
@@ -150,12 +150,21 @@ Before calling `/workflowprogram-cn:workflowprogram-publish`, the user should ha
 3. An existing GitHub repository dedicated to publishing that target workflow. The current flow does not create a new repository automatically.
 4. `gh` installed and authenticated locally, with push access to the target repository.
 5. For real GitHub writes instead of `--dry-run`, a local checkout of that publishing repository for `--repo-path`.
+6. To reuse an existing marketplace instead of generating a standalone marketplace, that checkout must already contain `.claude-plugin/marketplace.json`, and the publish command must use `--repo-mode existing_marketplace`.
 
 Minimal command:
 
 ```text
 /workflowprogram-cn:workflowprogram-publish <target-root> --plugin-id <id> --repo <owner/repo-or-url>
 ```
+
+Existing marketplace example:
+
+```text
+/workflowprogram-cn:workflowprogram-publish <target-root> --plugin-id <id> --repo <owner/repo-or-url> --repo-mode existing_marketplace --repo-path <marketplace-checkout>
+```
+
+This mode plans the plugin payload under `plugins/<plugin-id>/` and merges the existing marketplace manifest. Updating an existing same-name plugin still requires explicit update intent and a version increase.
 
 Real GitHub writes still require explicit approval. If the repository, auth, permissions, or local checkout are missing, the publish flow returns `BLOCKED` with remediation guidance instead of attempting a partial release.
 

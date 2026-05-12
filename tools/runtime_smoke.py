@@ -239,6 +239,48 @@ FIXTURE_PRESETS: Dict[str, Dict[str, str]] = {
         "request": "为独立 export repo 生成目标工作流插件发布计划",
         "contract_categories": "artifacts,failure",
     },
+    "publish-existing-marketplace-append-pass": {
+        "workspace_fixture": "empty-project",
+        "entry_skill": "workflowprogram-publish",
+        "request": "将目标 workflow 追加到已有 marketplace",
+        "contract_categories": "artifacts,failure",
+    },
+    "publish-existing-marketplace-update-pass": {
+        "workspace_fixture": "empty-project",
+        "entry_skill": "workflowprogram-publish",
+        "request": "显式更新已有 marketplace 中同名 workflow plugin",
+        "contract_categories": "artifacts,failure",
+    },
+    "publish-existing-marketplace-duplicate-plugin-blocked": {
+        "workspace_fixture": "empty-project",
+        "entry_skill": "workflowprogram-publish",
+        "request": "已有 marketplace 存在同名 plugin 且未授权更新",
+        "contract_categories": "artifacts,failure",
+    },
+    "publish-existing-marketplace-source-mismatch-fail": {
+        "workspace_fixture": "empty-project",
+        "entry_skill": "workflowprogram-publish",
+        "request": "已有 marketplace 同名 plugin source 与固定目录不一致",
+        "contract_categories": "artifacts,failure",
+    },
+    "publish-existing-marketplace-version-not-bumped-fail": {
+        "workspace_fixture": "empty-project",
+        "entry_skill": "workflowprogram-publish",
+        "request": "已有 marketplace 同名 plugin 版本未提升",
+        "contract_categories": "artifacts,failure",
+    },
+    "publish-existing-marketplace-invalid-manifest-fail": {
+        "workspace_fixture": "empty-project",
+        "entry_skill": "workflowprogram-publish",
+        "request": "已有 marketplace manifest 非法",
+        "contract_categories": "artifacts,failure",
+    },
+    "publish-existing-marketplace-dirty-checkout-blocked": {
+        "workspace_fixture": "empty-project",
+        "entry_skill": "workflowprogram-publish",
+        "request": "已有 marketplace checkout 有未提交改动时执行发布",
+        "contract_categories": "artifacts,failure",
+    },
 }
 
 
@@ -994,6 +1036,10 @@ def main() -> int:
             "outputs/stages/publish/plugin-package-plan.json",
             "outputs/stages/publish/plugin-manifest-preview.json",
             "outputs/stages/publish/plugin-validation-report.json",
+            "outputs/stages/publish/marketplace-resolution.json",
+            "outputs/stages/publish/marketplace-merge-plan.json",
+            "outputs/stages/publish/marketplace-manifest-preview.json",
+            "outputs/stages/publish/marketplace-validation-report.json",
             "outputs/stages/publish/github-publish-plan.json",
             "outputs/stages/publish/github-publish-result.json",
             "outputs/stages/publish/install-instructions.md",

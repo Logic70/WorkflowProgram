@@ -783,6 +783,7 @@ claude --plugin-dir /path/to/WorkflowProgram-CN/dist/plugin</code></pre>
               <pre style="background:rgba(0,0,0,.04);padding:12px;border-radius:12px;overflow-x:auto;font-family:var(--mono);font-size:.88em"><code>/workflowprogram-cn:workflowprogram-publish . \
   --plugin-id my-workflow \
   --repo owner/my-workflow</code></pre>
+              <p>若要复用已有 marketplace，可再传 <code>--repo-mode existing_marketplace --repo-path &lt;checkout&gt;</code>；publish 会把插件合并到 <code>plugins/&lt;plugin-id&gt;/</code>，不会静默覆盖同名 entry。</p>
             </article>
           </div>
         </section>
