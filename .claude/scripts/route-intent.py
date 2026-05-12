@@ -21,6 +21,7 @@ ENTRY_SKILL_BY_INTENT = {
     "audit": "workflowprogram-audit",
     "iterate": "workflowprogram-iterate",
     "validate": "workflowprogram-validate",
+    "publish": "workflowprogram-publish",
 }
 
 INTENT_KEYWORDS = {
@@ -45,6 +46,16 @@ INTENT_KEYWORDS = {
     "audit": [("审计", 4), ("盘点", 3), ("扫描", 2), ("audit", 4), ("review", 2), ("结构问题", 3), ("偏离", 2)],
     "iterate": [("迭代", 4), ("优化", 2), ("改进", 2), ("evolve", 3), ("iterate", 4), ("lessons", 3)],
     "validate": [("验证", 4), ("校验", 4), ("检查", 2), ("validate", 4), ("test", 2), ("合规", 3)],
+    "publish": [
+        ("发布", 4),
+        ("插件市场", 4),
+        ("marketplace", 4),
+        ("plugin install", 4),
+        ("plugin marketplace", 4),
+        ("publish", 4),
+        ("github", 2),
+        ("安装给别人", 3),
+    ],
 }
 
 
@@ -61,7 +72,7 @@ def parse_args() -> argparse.Namespace:
 
 def slash_intent(request: str) -> str | None:
     """优先识别显式 `/workflowprogram-*` 调用，而不是关键词推断。"""
-    match = re.match(r"^\s*/workflowprogram-(develop|audit|iterate|validate)\b", request)
+    match = re.match(r"^\s*/(?:workflowprogram-cn:)?workflowprogram-(develop|audit|iterate|validate|publish)\b", request)
     if not match:
         return None
     return match.group(1)

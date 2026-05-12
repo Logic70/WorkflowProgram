@@ -46,8 +46,9 @@ Claude Code 加载插件后，会在 `SessionStart` 自动执行 Python runtime 
 安装后，普通用户优先使用唯一主入口：
 
 - `/workflowprogram-cn:workflowprogram-orchestrate <需求>`
+- `/workflowprogram-cn:workflowprogram-publish <target-root> --plugin-id <id> --repo <owner/repo-or-url>`
 
-`workflowprogram-develop`、`workflowprogram-audit`、`workflowprogram-iterate`、`workflowprogram-validate` 是高级显式 intent 或内部路由目标。旧 commands 仅作为兼容入口保留。
+`workflowprogram-develop`、`workflowprogram-audit`、`workflowprogram-iterate`、`workflowprogram-validate` 是高级显式 intent 或内部路由目标。`workflowprogram-publish` 是独立发布环节，只用于把完整通过 develop 的目标 workflow 打包并发布成 marketplace plugin。旧 commands 仅作为兼容入口保留。
 
 ## 新增能力：S1 需求逻辑访谈
 
@@ -70,7 +71,7 @@ Claude Code 加载插件后，会在 `SessionStart` 自动执行 Python runtime 
 - 如需最小化排障，执行 `workflowprogram-doctor`。
 - 如需清理插件 Python runtime、测试产物或目标项目旧 run，执行 `workflowprogram-clean`；默认 dry-run，删除必须显式传 `--apply`。
 - 如果出现 `Unknown skill: workflowprogram-orchestrate`，先执行 `/reload-plugins` 或重启 `claude`，并使用 `/workflowprogram-cn:workflowprogram-orchestrate ...` 入口；不要让模型手写 `Skill(workflowprogram-orchestrate)`。
-- 如果出现 `bin/workflowprogram-python: Permission denied`，说明安装缓存中的 launcher 缺少执行权限。更新并重新安装最新 marketplace 载荷；临时修复可执行 `chmod +x ~/.claude/plugins/cache/logic70-plugins/workflowprogram-cn/0.1.5/bin/workflowprogram-*`。
+- 如果出现 `bin/workflowprogram-python: Permission denied`，说明安装缓存中的 launcher 缺少执行权限。更新并重新安装最新 marketplace 载荷；临时修复可执行 `chmod +x ~/.claude/plugins/cache/logic70-plugins/workflowprogram-cn/0.1.6/bin/workflowprogram-*`。
 
 ## 运行时模型
 

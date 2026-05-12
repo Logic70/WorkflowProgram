@@ -45,7 +45,7 @@ After installation:
 Troubleshooting:
 
 - If you see `Unknown skill: workflowprogram-orchestrate`, the current Claude session usually has not reloaded the plugin. Run `/reload-plugins` or restart `claude`, then use `/workflowprogram-cn:workflowprogram-orchestrate ...`; do not ask the model to hand-write `Skill(workflowprogram-orchestrate)`.
-- If you see `bin/workflowprogram-python: Permission denied`, the installed launcher lost its executable bit. Update/reinstall from the latest marketplace payload. As a temporary local fix, run `chmod +x ~/.claude/plugins/cache/logic70-plugins/workflowprogram-cn/0.1.5/bin/workflowprogram-*`.
+- If you see `bin/workflowprogram-python: Permission denied`, the installed launcher lost its executable bit. Update/reinstall from the latest marketplace payload. As a temporary local fix, run `chmod +x ~/.claude/plugins/cache/logic70-plugins/workflowprogram-cn/0.1.6/bin/workflowprogram-*`.
 
 Source builds of `dist/plugin/` remain useful for repository development and debugging, but they are no longer the primary end-user install model.
 
@@ -70,6 +70,7 @@ Natural-language examples:
 "Design a code review workflow for this project"
 "Audit the workflow structure of this project"
 "Validate the workflow assets in this project"
+"Publish this completed workflow as a Claude Code plugin"
 ```
 
 `workflowprogram-orchestrate` will route the request to the correct entry skill. The leaf entries below are advanced explicit intents or debugging targets; ordinary usage should start from orchestrate:
@@ -80,6 +81,7 @@ Natural-language examples:
 | `workflowprogram-audit` | Audit an existing workflow structure |
 | `workflowprogram-validate` | Produce a validation verdict for workflow assets |
 | `workflowprogram-iterate` | Turn lessons into improvement proposals |
+| `workflowprogram-publish` | Publish a completed target workflow as a marketplace plugin |
 
 ## Core Concepts
 
@@ -137,6 +139,7 @@ Execution order is decided by programs, not by hoping the model remembers the ne
 - If a workflow declares `capability_discovery`, the entry path first generates candidate `skill / MCP / CLI` recommendations plus manual guidance.
 - If a workflow declares `host_capabilities`, both the entry path and S5 consume `host-capability-report.json`, `environment-remediation-report.json`, and `environment-remediation-guide.md`.
 - If a workflow declares `agent_team_contract`, S5 also validates structured Team evidence such as `team-plan.json`, `team-results.json`, and `team-join-summary.json`.
+- A target workflow that fully passed `workflowprogram-develop` can enter the independent publish lifecycle. `/workflowprogram-cn:workflowprogram-publish` checks develop/S5/design-review/managed evidence, stages a Claude Code marketplace plugin package, and uses the user's GitHub account for the publish plan or approved execution.
 
 ### Managed Write Flow
 

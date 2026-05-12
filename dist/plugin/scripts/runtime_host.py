@@ -381,6 +381,8 @@ def _entry_exists(plugin_root: Path, entry_skill: str) -> bool:
 def _stage_history_for_entry(entry_skill: str) -> List[str]:
     """返回 fixture_host 暴露的简化逻辑阶段历史。"""
 
+    if entry_skill == "workflowprogram-publish":
+        return ["publish"]
     if entry_skill == "workflowprogram-audit":
         return ["validate", "lessons"]
     if entry_skill == "workflowprogram-validate":
@@ -957,6 +959,80 @@ def _write_runner_evidence(
     )
 
 
+def _write_publish_route_evidence(run_root: Path, target_root: Path, entry_skill: str, result: str, failure_code: str) -> None:
+    """为 publish fixture 写出最小路由摘要。"""
+
+    outputs = run_root / "outputs"
+    write_json(
+        outputs / "stages" / "s0-route.json",
+        {
+            "intent": "publish",
+            "entry_skill": entry_skill,
+            "target_root": str(target_root),
+            "routed_at": iso_now(),
+        },
+    )
+    write_json(
+        outputs / "stages" / "runner-summary.json",
+        {
+            "run_id": run_root.name,
+            "status": result,
+            "entry_skill": entry_skill,
+            "transition_count": 1,
+            "failure_code": failure_code or None,
+        },
+    )
+
+
+def _seed_publishable_target(plugin_root: Path, target_root: Path, request: str) -> Path:
+    """在 fixture_host 内部构造一条已完成 develop 的目标 workflow。"""
+
+    prior_run_root = target_root / ".workflowprogram" / "runs" / "prior-develop-for-publish"
+    if prior_run_root.exists():
+        shutil.rmtree(prior_run_root)
+    prior = _invoke_fixture_host(
+        RuntimeHostConfig(provider="fixture_host"),
+        plugin_root,
+        target_root,
+        prior_run_root,
+        "workflowprogram-develop",
+        request or "seed publishable workflow",
+        "empty-project",
+    )
+    if prior.result != "PASS":
+        raise RuntimeError(prior.message)
+    write_json(
+        prior_run_root / "state.json",
+        {
+            "schema_version": 1,
+            "schema_name": "fixture-host-prior-develop-state",
+            "run_id": prior_run_root.name,
+            "status": "completed",
+            "stage": "finished",
+            "result": "PASS",
+            "category": None,
+            "values": {"stage_history": prior.stage_history},
+            "updated_at": iso_now(),
+        },
+    )
+    write_json(
+        prior_run_root / "outputs" / "stages" / "s5-validation-summary.json",
+        {
+            "verdict": "PASS",
+            "failure_kind": "none",
+            "failure_code": "",
+            "summary": "fixture_host prior develop run passed and is publishable.",
+            "checked_files": [
+                "state.json",
+                "events.jsonl",
+                "outputs/managed-change-result.json",
+                "outputs/stages/design-review/closure.json",
+            ],
+        },
+    )
+    return prior_run_root
+
+
 def _invoke_fixture_host(
     config: RuntimeHostConfig,
     plugin_root: Path,
@@ -1203,6 +1279,87 @@ def _invoke_fixture_host(
             next_action="complete",
             next_stage_on_failure="",
             metadata={"applied": applied, "conflicts": conflicts},
+        )
+
+    if entry_skill == "workflowprogram-publish":
+        stage_history = ["publish"]
+        develop_run_root: Path | None = None
+        if fixture != "publish-missing-develop-evidence-fail":
+            develop_run_root = _seed_publishable_target(plugin_root, target_root, request)
+        if fixture == "publish-stale-managed-state-fail":
+            stale_path = target_root / ".claude" / "commands" / "generated-smoke.md"
+            if stale_path.exists():
+                stale_path.unlink()
+        plugin_id = "invalid_plugin_id" if fixture == "publish-package-validation-fail" else "publish-smoke"
+        cmd = [
+            sys.executable,
+            str(_repo_root() / ".claude" / "scripts" / "workflow-publish-entry.py"),
+            "run",
+            "--target-root",
+            str(target_root),
+            "--run-root",
+            str(run_root),
+            "--plugin-id",
+            plugin_id,
+            "--plugin-name",
+            "Publish Smoke Workflow",
+            "--version",
+            "0.1.0",
+            "--repository",
+            "https://github.com/example/publish-smoke",
+            "--repo-mode",
+            "export_repo",
+            "--runtime-mode",
+            "workflowprogram_dependency",
+            "--skip-claude-validate",
+        ]
+        if develop_run_root is not None:
+            cmd.extend(["--develop-run-root", str(develop_run_root)])
+        if fixture != "publish-github-auth-missing-blocked":
+            cmd.append("--dry-run")
+        else:
+            cmd.append("--simulate-github-auth-missing")
+        cmd.append("--json")
+        completed = subprocess.run(cmd, capture_output=True, text=True, check=False)
+        try:
+            parsed_payload = json.loads(completed.stdout.strip()) if completed.stdout.strip() else {}
+        except json.JSONDecodeError:
+            parsed_payload = {}
+        payload = parsed_payload if isinstance(parsed_payload, dict) and parsed_payload else read_json_from_output(completed.stdout, completed.stderr)
+        publish_status = str((payload or {}).get("status", "")).strip()
+        if not publish_status:
+            publish_status = "FAIL"
+        result = "PASS" if publish_status == "PASS" else "FAIL"
+        if publish_status == "BLOCKED":
+            failure_code = "PUBLISH_GITHUB_AUTH_MISSING" if fixture == "publish-github-auth-missing-blocked" else "PUBLISH_BLOCKED"
+        elif publish_status == "FAIL":
+            failure_code = "PUBLISH_FAILURE"
+        else:
+            failure_code = ""
+        _write_publish_route_evidence(run_root, target_root, entry_skill, result, failure_code)
+        _write_progress_artifacts(
+            run_root,
+            stage_history,
+            result,
+            "complete" if result == "PASS" else "inspect publish-summary.json",
+            current_stage="publish",
+        )
+        return RuntimeHostInvocation(
+            provider=config.provider,
+            result=result,
+            failure_code=failure_code,
+            message=str((payload or {}).get("message", "fixture_host completed publish flow.")),
+            is_error=result != "PASS",
+            command=cmd,
+            returncode=completed.returncode,
+            stdout=completed.stdout,
+            stderr=completed.stderr,
+            parsed=payload,
+            stage_history=stage_history,
+            current_stage="publish",
+            stage_status="done" if result == "PASS" else "failed",
+            next_action="complete" if result == "PASS" else "inspect publish-summary.json",
+            next_stage_on_failure="publish" if result != "PASS" else "",
         )
 
     # 非 develop 流程会刻意保持更轻，只合成足以让阶段契约可观测的产物。

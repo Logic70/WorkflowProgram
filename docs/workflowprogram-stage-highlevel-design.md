@@ -353,6 +353,16 @@ TARGET_ROOT/
 - 目标工作流自己的 deterministic runtime 入口是 `TARGET_ROOT/.workflowprogram/runtime/workflow-entry.py`，并沿用同样的 shared-control-plane-wrapper 顺序：`probe/apply-bootstrap -> environment-remediation -> workflow-runner -> validate-run-state`。
 - 若声明 `capability_discovery`，则该顺序应扩展为 `discover -> probe/apply-bootstrap -> environment-remediation -> workflow-runner -> validate-run-state`。
 
+## 5D. 目标工作流发布环节
+
+- `workflowprogram-publish` 是独立生命周期，不属于 `develop` 的 S1-S6 阶段。
+- 发布前必须确认目标 workflow 已完整经过 `workflowprogram-develop`，并具备当前有效的 design-review、managed apply、runtime state/events 与 S5 `PASS` 证据。
+- 发布流程不得直接修改目标 workflow 的语义设计；若发现不可发布的设计或实现缺口，必须停止并要求回到 `workflowprogram-develop` 的 change-policy 修改流。
+- 发布入口为 `/workflowprogram-cn:workflowprogram-publish`，对应 skill 为 `workflowprogram-publish`。
+- 发布证据固定写入 `RUN_ROOT/outputs/stages/publish/`，包括 `publish-eligibility.json`、`plugin-package-plan.json`、`plugin-validation-report.json`、`github-publish-result.json`、`install-instructions.md` 与 `publish-summary.json`。
+- 目标插件 runtime 打包模式必须显式选择：`workflowprogram_dependency` 或 `vendored_runtime`。当前稳妥默认是 `workflowprogram_dependency`，安装说明必须提示消费者先安装 WorkflowProgram。
+- GitHub 发布使用用户自己的 `gh` / `git` 认证状态；WorkflowProgram 不保存 token。缺认证、缺权限或缺审批时，发布以 `BLOCKED/environment` 或 `BLOCKED/design` 停止。
+
 基础运行测试的统一场景骨架至少包含：
 
 - 标准成功场景

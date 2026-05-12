@@ -222,6 +222,8 @@ def infer_expected_intent(entry_skill: str) -> str:
         return "iterate"
     if entry_skill.endswith("-orchestrate"):
         return "orchestrate"
+    if entry_skill.endswith("-publish"):
+        return "publish"
     return "develop"
 
 

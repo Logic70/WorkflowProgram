@@ -30,6 +30,7 @@ REQUIRED_PRIMARY_SKILLS = [
     'workflowprogram-audit',
     'workflowprogram-iterate',
     'workflowprogram-validate',
+    'workflowprogram-publish',
 ]
 
 FORBIDDEN_LEGACY_PATHS = [
@@ -399,6 +400,11 @@ def validate_required_paths(root: Path, result: ValidationResult) -> None:
         ".claude/scripts/generate-environment-remediation.py",
         ".claude/scripts/generate-clarification-package.py",
         ".claude/scripts/generate-clarification-review.py",
+        ".claude/scripts/workflow-publish-entry.py",
+        ".claude/scripts/validate-publish-eligibility.py",
+        ".claude/scripts/package-target-plugin.py",
+        ".claude/scripts/validate-target-plugin-package.py",
+        ".claude/scripts/github-publish-target-plugin.py",
         ".claude/scripts/bootstrap-python-runtime.py",
         ".claude/scripts/doctor.py",
         ".claude/scripts/clean-workflowprogram.py",

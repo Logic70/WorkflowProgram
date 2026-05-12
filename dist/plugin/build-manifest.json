@@ -1,25 +1,25 @@
 {
   "manifest_version": 1,
-  "generated_at": "2026-05-09T14:15:10Z",
+  "generated_at": "2026-05-12T01:54:04Z",
   "builder": "tools/build_plugin.py",
   "plugin_name": "workflowprogram-cn",
-  "plugin_version": "0.1.5",
-  "source_commit": "cd0cfa6a47c32791b591e552932939e324a9fef6",
+  "plugin_version": "0.1.6",
+  "source_commit": "207867646ff005e66cb582d529683579cf35dbfb",
   "source_dirty": true,
   "files": [
     {
       "path": ".claude-plugin/README.md",
-      "sha256": "ae28cf00143a9d43f2e19b9a597022b050fc5d92081716880f342581ee11a630",
-      "size": 4592
+      "sha256": "5945c2bb10690013fb35cbed783bee6dd184fecbf819db93b0af135050012df5",
+      "size": 4840
     },
     {
       "path": ".claude-plugin/marketplace.json",
-      "sha256": "6f70211ffbbbe71c4cdff45d608df33a2895e11779be71f099f7142f4dc77e7b",
+      "sha256": "2c9c8f704356e3a970f5a04624f104d9afa5625f72bf4e747c20c8c214abcff5",
       "size": 1282
     },
     {
       "path": ".claude-plugin/plugin.json",
-      "sha256": "763553e8249791dbddd8cc549e81226fce4f5e455f8ba441c910a01f2a75fe9c",
+      "sha256": "1ac40b4b83999ae14d66c222be204695078d06704cf795913182282ebbddf2a2",
       "size": 606
     },
     {
@@ -113,6 +113,11 @@
       "size": 3748
     },
     {
+      "path": "commands/workflowprogram-publish.md",
+      "sha256": "66ae037e62fc7be41a85ac6bb4fec47dbb286a8f5b81514394e1b7f56bcb3bbc",
+      "size": 2427
+    },
+    {
       "path": "hooks/hooks.json",
       "sha256": "4b59b81378554537c1ca1a4f037f9824661c974951e14c3a2f8af4b39a04e317",
       "size": 310
@@ -193,6 +198,11 @@
       "size": 15223
     },
     {
+      "path": "scripts/github-publish-target-plugin.py",
+      "sha256": "eaec3d259a6f0ae228bd92e11e9c27c321d1819eaa078a99eae8c811b02ed6de",
+      "size": 8458
+    },
+    {
       "path": "scripts/lib/__init__.py",
       "sha256": "2d9c7fed5c9b8e9aadb3e245b8378d14b7fc147d329d3118f2ba4ef09b454c55",
       "size": 99
@@ -258,6 +268,11 @@
       "size": 26092
     },
     {
+      "path": "scripts/package-target-plugin.py",
+      "sha256": "93fbd4b592ae226d80fad940a19269d45d26e383ea820d22bb515b5122414153",
+      "size": 10435
+    },
+    {
       "path": "scripts/probe-host-capabilities.py",
       "sha256": "3262aae65197d438f44aab84e1990aa4f9d5ffc9e8de1d184444e240512480c8",
       "size": 5485
@@ -269,13 +284,13 @@
     },
     {
       "path": "scripts/route-intent.py",
-      "sha256": "74a11c86ee841c5dd36388fc6d80454edacf8c0ff70e2243c8ab01018d7a54f2",
-      "size": 6604
+      "sha256": "b3038df391bf7e8707d1e1ee4559abbc72b96c2925d47d060992e546ff19af1a",
+      "size": 6927
     },
     {
       "path": "scripts/runtime_host.py",
-      "sha256": "6a7508a2ec8743ed16d1abf1ba4dabde182a495a8c8e06429d6cbec67857dffa",
-      "size": 59046
+      "sha256": "dceb33382029d8fc42609545d30097974cf67f24e7c324201a8588a1b13af8b3",
+      "size": 65175
     },
     {
       "path": "scripts/stage-progress.py",
@@ -308,9 +323,19 @@
       "size": 7329
     },
     {
+      "path": "scripts/validate-publish-eligibility.py",
+      "sha256": "bd05de89059b2e5c7747978584eb545fa6b5770174340b61d986c1a58310f6b3",
+      "size": 9205
+    },
+    {
       "path": "scripts/validate-run-state.py",
       "sha256": "bc8a7ffe10ba808fb472e4c47586cb13c23c8d4a25802b1896e60ae6a0dbec6b",
       "size": 8279
+    },
+    {
+      "path": "scripts/validate-target-plugin-package.py",
+      "sha256": "f9cd0c3659c53ef54e0800c97b8318959ef3d6d903808b1f32c6072a46a9ffa3",
+      "size": 7008
     },
     {
       "path": "scripts/validate-workflow-draft.py",
@@ -334,8 +359,8 @@
     },
     {
       "path": "scripts/validate-workflow.py",
-      "sha256": "5599e600461c3ac95ed4bd2c480bb1f2eea9caf5ab35abc3f1102d4999b2fae1",
-      "size": 59930
+      "sha256": "b83ca3a5fccb63f61bdb35809bbd7863986c2bb8d8b5edee5a3696f1d26fa70e",
+      "size": 60245
     },
     {
       "path": "scripts/verify-plugin-load.sh",
@@ -348,14 +373,19 @@
       "size": 36392
     },
     {
+      "path": "scripts/workflow-publish-entry.py",
+      "sha256": "b729c52fa2b47e3bfe77f883575c284f179a9bfad876edcf49739dbae9f4a0c2",
+      "size": 13193
+    },
+    {
       "path": "scripts/workflow-runner.py",
       "sha256": "c8ebdc510965e54625ea88763e6d58d1a84a0bbf0d16215b155615ee5a187ba1",
       "size": 45304
     },
     {
       "path": "scripts/workflow-s5-judge.py",
-      "sha256": "9b5127ca30191b0053e6ba52ab6b6b0c45749f68b3796bb499ed7816fdf9ec9d",
-      "size": 117285
+      "sha256": "9637af034f7e46efa0eec823f1fe2ca1f66fe00d4194fcbe95fede064a702a11",
+      "size": 117351
     },
     {
       "path": "skills/commit/SKILL.md",
@@ -424,8 +454,13 @@
     },
     {
       "path": "skills/workflowprogram-orchestrate/SKILL.md",
-      "sha256": "27793517e9e881f9279ff9f6e4ded534e52c832eeb8d3831720f9a3ffdef1a6f",
-      "size": 3604
+      "sha256": "971a8a2b42a50cbee04c3ead6cd66db83ae5bd3196484c6513c1e0d9b7793e52",
+      "size": 3775
+    },
+    {
+      "path": "skills/workflowprogram-publish/SKILL.md",
+      "sha256": "4e69f9e5181ffc3d5e178efcb0ae72bb2c8984b4e280dde43393124f1a22d9a7",
+      "size": 4246
     },
     {
       "path": "skills/workflowprogram-validate/SKILL.md",

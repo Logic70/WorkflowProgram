@@ -38,6 +38,7 @@ COMMAND_DESCRIPTIONS = {
     "hotfix": ("Repository hotfix compatibility command", "[description]"),
     "evolve-workflow": ("Compatibility workflow audit entry; prefer workflowprogram-orchestrate", "[options] <workflow-path>"),
     "iterate-workflow": ("Compatibility lessons iteration entry; prefer workflowprogram-orchestrate", "[--dry-run] [--apply] [workflow-path]"),
+    "workflowprogram-publish": ("Publish a completed target workflow as a Claude Code marketplace plugin", "<target-root> --plugin-id <id> --repo <owner/repo-or-url> [--dry-run]"),
 }
 
 REPLACEMENTS = {

@@ -23,6 +23,10 @@
     "iterate-workflow": {
       "description": "Iterate a workflow from lessons with approval",
       "file": ".claude/commands/iterate-workflow.md"
+    },
+    "workflowprogram-publish": {
+      "description": "Publish a completed target workflow as a Claude Code marketplace plugin",
+      "file": ".claude/commands/workflowprogram-publish.md"
     }
   },
   "skills": {
@@ -70,6 +74,10 @@
     "workflowprogram-validate": {
       "description": "Validate workflow assets in the current target project at workflow scope",
       "file": ".claude/skills/workflowprogram-validate/SKILL.md"
+    },
+    "workflowprogram-publish": {
+      "description": "Publish a completed WorkflowProgram-generated target workflow as a Claude Code marketplace plugin",
+      "file": ".claude/skills/workflowprogram-publish/SKILL.md"
     }
   }
 }

@@ -235,6 +235,42 @@ def base_cases(provider_command: str) -> List[Dict[str, Any]]:
             "expected_result": "PASS",
         },
         {
+            "name": "fixture-publish-eligible-pass",
+            "fixture": "publish-eligible-pass",
+            "provider": "fixture_host",
+            "expected_result": "PASS",
+        },
+        {
+            "name": "fixture-publish-missing-develop-evidence-fail",
+            "fixture": "publish-missing-develop-evidence-fail",
+            "provider": "fixture_host",
+            "expected_result": "FAIL",
+        },
+        {
+            "name": "fixture-publish-stale-managed-state-fail",
+            "fixture": "publish-stale-managed-state-fail",
+            "provider": "fixture_host",
+            "expected_result": "FAIL",
+        },
+        {
+            "name": "fixture-publish-github-auth-missing-blocked",
+            "fixture": "publish-github-auth-missing-blocked",
+            "provider": "fixture_host",
+            "expected_result": "FAIL",
+        },
+        {
+            "name": "fixture-publish-package-validation-fail",
+            "fixture": "publish-package-validation-fail",
+            "provider": "fixture_host",
+            "expected_result": "FAIL",
+        },
+        {
+            "name": "fixture-publish-export-repo-plan",
+            "fixture": "publish-export-repo-plan",
+            "provider": "fixture_host",
+            "expected_result": "PASS",
+        },
+        {
             "name": "fixture-develop-pass",
             "fixture": "empty-project",
             "provider": "fixture_host",

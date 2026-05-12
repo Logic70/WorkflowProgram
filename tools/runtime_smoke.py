@@ -203,6 +203,42 @@ FIXTURE_PRESETS: Dict[str, Dict[str, str]] = {
         "request": "触发 S3 设计审视仅有 accepted risk 时允许进入实现的 PASS 路径",
         "contract_categories": "flow,artifacts,failure",
     },
+    "publish-eligible-pass": {
+        "workspace_fixture": "empty-project",
+        "entry_skill": "workflowprogram-publish",
+        "request": "将已完成的目标工作流发布为 Claude Code marketplace 插件",
+        "contract_categories": "artifacts,failure",
+    },
+    "publish-missing-develop-evidence-fail": {
+        "workspace_fixture": "empty-project",
+        "entry_skill": "workflowprogram-publish",
+        "request": "缺少完整 develop 证据时尝试发布目标工作流",
+        "contract_categories": "artifacts,failure",
+    },
+    "publish-stale-managed-state-fail": {
+        "workspace_fixture": "empty-project",
+        "entry_skill": "workflowprogram-publish",
+        "request": "目标工作流托管资产发生漂移后尝试发布",
+        "contract_categories": "artifacts,failure",
+    },
+    "publish-github-auth-missing-blocked": {
+        "workspace_fixture": "empty-project",
+        "entry_skill": "workflowprogram-publish",
+        "request": "GitHub 未登录时尝试执行发布",
+        "contract_categories": "artifacts,failure",
+    },
+    "publish-package-validation-fail": {
+        "workspace_fixture": "empty-project",
+        "entry_skill": "workflowprogram-publish",
+        "request": "目标插件包元数据非法时尝试发布",
+        "contract_categories": "artifacts,failure",
+    },
+    "publish-export-repo-plan": {
+        "workspace_fixture": "empty-project",
+        "entry_skill": "workflowprogram-publish",
+        "request": "为独立 export repo 生成目标工作流插件发布计划",
+        "contract_categories": "artifacts,failure",
+    },
 }
 
 
@@ -952,6 +988,16 @@ def main() -> int:
             "outputs/stages/team-join-summary.json",
             "workflow-spec.md",
             "outputs/stages/s6-lessons-delta.md",
+            "outputs/stages/publish/publish-intent.json",
+            "outputs/stages/publish/publish-options.json",
+            "outputs/stages/publish/publish-eligibility.json",
+            "outputs/stages/publish/plugin-package-plan.json",
+            "outputs/stages/publish/plugin-manifest-preview.json",
+            "outputs/stages/publish/plugin-validation-report.json",
+            "outputs/stages/publish/github-publish-plan.json",
+            "outputs/stages/publish/github-publish-result.json",
+            "outputs/stages/publish/install-instructions.md",
+            "outputs/stages/publish/publish-summary.json",
         ):
             if (run_root / rel_path).exists():
                 checked_files.append(rel_path)

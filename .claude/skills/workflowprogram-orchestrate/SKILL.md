@@ -12,6 +12,7 @@ version: 1.0.0
 - 用户希望审计当前项目中的 workflow 资产
 - 用户希望根据 lessons 迭代当前 workflow
 - 用户希望验证当前 workflow 是否符合结构约束
+- 用户希望把已完成的目标 workflow 发布成 Claude Code marketplace plugin
 
 ## Core Rules
 
@@ -45,6 +46,7 @@ version: 1.0.0
 - 审计现有 workflow 结构与模式 -> `workflowprogram-audit`
 - 基于 `lessons.md` 生成改进草案 -> `workflowprogram-iterate`
 - 对 workflow 资产执行结构化校验 -> `workflowprogram-validate`
+- 发布已完成目标 workflow 为 marketplace plugin -> `workflowprogram-publish`
 
 ## Step 3: Hand-off Requirements
 

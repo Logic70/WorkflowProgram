@@ -306,6 +306,24 @@
           </div>
         </section>
 
+        <section class="panel" id="publish">
+          <div class="section-heading">
+            <p class="eyebrow">Step 6b: Publish completed workflows</p>
+            <h2>Publishing is independent from develop</h2>
+          </div>
+
+          <div class="compare-grid">
+            <article class="compare-card">
+              <h3>Publish boundary</h3>
+              <p>A target workflow must fully pass develop before it can be packaged as a Claude Code marketplace plugin.</p>
+            </article>
+            <article class="compare-card">
+              <h3>Current mapping</h3>
+              <p><code>/workflowprogram-cn:workflowprogram-publish</code> checks develop evidence, stages a plugin package, validates it, and uses the user's GitHub account for the publish plan or approved execution.</p>
+            </article>
+          </div>
+        </section>
+
         <section class="panel" id="managed-apply">
           <div class="section-heading">
             <p class="eyebrow">Step 7: Control target writes</p>

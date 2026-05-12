@@ -764,7 +764,8 @@ claude --plugin-dir /path/to/WorkflowProgram-CN/dist/plugin</code></pre>
               <p><code>workflowprogram-orchestrate</code> 会自动路由到正确的入口：</p>
               <pre style="background:rgba(0,0,0,.04);padding:12px;border-radius:12px;overflow-x:auto;font-family:var(--mono);font-size:.88em"><code>"为当前项目设计一个 code review workflow"
 "审计当前项目的 workflow 结构"
-"验证当前项目的 workflow 资产"</code></pre>
+"验证当前项目的 workflow 资产"
+"把这个已经完成的 workflow 发布成 Claude Code 插件"</code></pre>
             </article>
             <article class="stack-card">
               <span class="stack-index">4</span>
@@ -774,6 +775,14 @@ claude --plugin-dir /path/to/WorkflowProgram-CN/dist/plugin</code></pre>
   state.json          # 控制面状态
   events.jsonl        # 事件流
   validation-runtime-report.md</code></pre>
+            </article>
+            <article class="stack-card">
+              <span class="stack-index">5</span>
+              <h3>发布目标 Workflow</h3>
+              <p>完整通过 develop 后，可用独立 publish 环节打包并生成 GitHub marketplace 发布计划。</p>
+              <pre style="background:rgba(0,0,0,.04);padding:12px;border-radius:12px;overflow-x:auto;font-family:var(--mono);font-size:.88em"><code>/workflowprogram-cn:workflowprogram-publish . \
+  --plugin-id my-workflow \
+  --repo owner/my-workflow</code></pre>
             </article>
           </div>
         </section>
