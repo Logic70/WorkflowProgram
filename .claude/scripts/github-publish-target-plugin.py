@@ -70,10 +70,15 @@ def copy_package_to_checkout(package_root: Path, repo_path: Path) -> List[str]:
     if dist_root.exists():
         shutil.rmtree(dist_root)
     shutil.copytree(package_root, dist_root)
+    source_readme = package_root / ".claude-plugin" / "README.md"
+    if source_readme.exists():
+        shutil.copy2(source_readme, repo_path / "README.md")
     copied: List[str] = []
     for path in sorted(dist_root.rglob("*")):
         if path.is_file():
             copied.append(path.relative_to(repo_path).as_posix())
+    if (repo_path / "README.md").exists():
+        copied.append("README.md")
     return copied
 
 
@@ -262,7 +267,7 @@ def publish_to_github(
         run_command(["git", "add", ".claude-plugin/marketplace.json", f"plugins/{plugin_id}"], cwd=repo_path)
     else:
         copied = copy_package_to_checkout(package_root, repo_path)
-        run_command(["git", "add", "dist/plugin"], cwd=repo_path)
+        run_command(["git", "add", "README.md", "dist/plugin"], cwd=repo_path)
     commit = run_command(["git", "commit", "-m", f"Publish target workflow plugin v{version}"], cwd=repo_path)
     if commit.returncode != 0:
         payload = {
@@ -277,12 +282,27 @@ def publish_to_github(
         write_json(run_root / PUBLISH_DIR / "github-publish-result.json", payload)
         return payload
     tag = run_command(["git", "tag", f"v{version}"], cwd=repo_path)
-    push = run_command(["git", "push", "--follow-tags"], cwd=repo_path)
+    if tag.returncode != 0:
+        payload = {
+            "schema_version": 1,
+            "generated_at": iso_now(),
+            "status": "FAIL",
+            "failure_kind": "conflict",
+            "repository": repository,
+            "copied_files": copied,
+            "commit_stdout": commit.stdout.strip(),
+            "message": tag.stderr.strip() or tag.stdout.strip() or f"git tag v{version} failed",
+        }
+        write_json(run_root / PUBLISH_DIR / "github-publish-result.json", payload)
+        return payload
+    push = run_command(["git", "push"], cwd=repo_path)
+    push_tag = run_command(["git", "push", "origin", f"v{version}"], cwd=repo_path)
+    push_succeeded = push.returncode == 0 and push_tag.returncode == 0
     payload = {
         "schema_version": 1,
         "generated_at": iso_now(),
-        "status": "PASS" if push.returncode == 0 else "FAIL",
-        "failure_kind": "none" if push.returncode == 0 else "environment",
+        "status": "PASS" if push_succeeded else "FAIL",
+        "failure_kind": "none" if push_succeeded else "environment",
         "repository": repository,
         "repo_path": str(repo_path),
         "copied_files": copied,
@@ -290,6 +310,8 @@ def publish_to_github(
         "tag_stdout": tag.stdout.strip(),
         "push_stdout": push.stdout.strip(),
         "push_stderr": push.stderr.strip(),
+        "push_tag_stdout": push_tag.stdout.strip(),
+        "push_tag_stderr": push_tag.stderr.strip(),
     }
     write_json(run_root / PUBLISH_DIR / "github-publish-result.json", payload)
     return payload

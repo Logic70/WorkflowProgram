@@ -131,6 +131,7 @@ def write_install_instructions(
     runtime_mode: str,
     github_status: str,
     repo_mode: str,
+    package_root: str = "",
 ) -> Path:
     lines = [
         "# Target Workflow Plugin Install Instructions",
@@ -157,6 +158,21 @@ def write_install_instructions(
                 "",
             ]
         )
+    requirements_path = Path(package_root) / "requirements.txt" if package_root else Path()
+    if requirements_path.exists():
+        packages = [line.strip() for line in requirements_path.read_text(encoding="utf-8").splitlines() if line.strip() and not line.strip().startswith("#")]
+        lines.extend(
+            [
+                "Install target workflow Python dependencies when report rendering or deterministic scripts require them:",
+                "",
+                "```text",
+                "python3 -m pip install -r <installed-plugin-root>/requirements.txt",
+                "```",
+                "",
+            ]
+        )
+        if packages:
+            lines.extend(["Declared packages:", "", *[f"- `{package}`" for package in packages], ""])
     lines.extend(
         [
             "Install the target workflow plugin:",
@@ -381,6 +397,7 @@ def main() -> int:
         runtime_mode=args.runtime_mode,
         github_status=str(github.get("status", "UNKNOWN")),
         repo_mode=args.repo_mode,
+        package_root=package_root,
     )
     if github.get("status") == "PASS":
         append_event(run_root, "PublishCompleted", "ok", "Target workflow plugin publish completed.")
