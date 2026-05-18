@@ -134,6 +134,10 @@ def main() -> int:
         package = package_target_direct(target, run_root)
         assert package["status"] == "PASS"
         package_root = Path(package["package_root"])
+        marketplace = json.loads((package_root / ".claude-plugin" / "marketplace.json").read_text(encoding="utf-8"))
+        assert "$schema" not in marketplace
+        assert "description" not in marketplace
+        assert marketplace["name"] == "target-workflow-plugins"
         for rel in [
             "commands/demo.md",
             "skills/demo-skill/SKILL.md",

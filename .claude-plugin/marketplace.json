@@ -1,7 +1,5 @@
 {
-  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
   "name": "logic70-plugins",
-  "description": "Workflow development toolkit plugin for Claude Code with commands, skills, agents, and validation assets",
   "owner": {
     "name": "Logic_70",
     "email": "zjmp8870@outlook.com"
@@ -19,7 +17,7 @@
         "ref": "main"
       },
       "description": "A Claude Code plugin that packages WorkflowProgram-CN as reusable workflow development commands, skills, agents, and validation assets",
-      "version": "0.1.8",
+      "version": "0.1.9",
       "author": {
         "name": "Logic_70",
         "email": "zjmp8870@outlook.com"
@@ -27,9 +25,21 @@
       "homepage": "https://github.com/Logic70/WorkflowProgram",
       "repository": "https://github.com/Logic70/WorkflowProgram",
       "license": "MIT",
-      "keywords": ["workflow", "commands", "skills", "agents", "audit"],
+      "keywords": [
+        "workflow",
+        "commands",
+        "skills",
+        "agents",
+        "audit"
+      ],
       "category": "workflow",
-      "tags": ["workflow", "claude-code", "commands", "skills", "agents"],
+      "tags": [
+        "workflow",
+        "claude-code",
+        "commands",
+        "skills",
+        "agents"
+      ],
       "strict": false
     }
   ]

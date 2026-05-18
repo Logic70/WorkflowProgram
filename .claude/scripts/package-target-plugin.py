@@ -360,9 +360,7 @@ def package_target_plugin(
     marketplace_json = None
     if repo_mode != "existing_marketplace":
         marketplace_json = {
-            "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
             "name": marketplace_name,
-            "description": f"Marketplace for {display_name}",
             "owner": {"name": owner_name},
             "plugins": [
                 {
