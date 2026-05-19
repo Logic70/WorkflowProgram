@@ -26,7 +26,7 @@
 - 若工作流依赖宿主专业能力或显式 agent team，则必须分别通过 `host_capabilities` 与 `agent_team_contract` 在 `workflow-spec.yaml` 中声明。
 - 生成后的目标工作流若需要自己的业务节点图，必须在 `workflow-spec.yaml.workflow_graph` 中声明；目标工作流不强制套用 WorkflowProgram 自身的 `S1..S6` 模板。
 - 若目标工作流的某个业务节点需要 Ralph-style 持续执行直到验证通过，必须在该 `workflow_graph.nodes[*].loop_policy` 中声明；它是目标节点策略，不替换 WorkflowProgram 自身 `S1..S6` 主链。
-- 目标工作流设计采用“设计源 -> 机器投影 -> 派生视图 -> 运行证据”分层：`s3-design-highlevel.md` / `s3-design-lowlevel.md` 解释为什么这样设计，`workflow-spec.yaml` 只承载脚本、validator、runner、judge 需要执行和验证的最小机器契约。
+- 目标工作流设计采用“target design source -> target runtime map -> target derived views -> runtime evidence”分层：`target-design-overview.md` / `target-design-detail.md` 解释为什么这样设计，`workflow-spec.yaml` 只承载脚本、validator、runner、judge 需要执行和验证的最小机器契约；legacy `s3-design-highlevel.md` / `s3-design-lowlevel.md` 仅作为迁移兼容别名。
 
 ### 2.2 冲突收敛决策
 
@@ -43,10 +43,11 @@
 - 决策 D11：`workflow-spec.yaml.workflow_graph` 作为目标工作流业务图的机器可读真源；`workflow-view.md` 与 `workflow-lowlevel.md` 只能从 YAML 派生展示，不得反向定义新的执行语义。
 - 决策 D12：managed apply 必须同时产出 `managed-rollback-manifest.json` 与 `managed-recover-instructions.md`，用于覆盖 created / updated / conflicted / user-modified 文件的恢复边界。
 - 决策 D13：面向用户或跨阶段消费的 JSON 报告必须带 `schema_version`、`error_code`、`failure_kind` 与 `remediation` 字段，并对 token/password/key-like 内容做脱敏。
-- 决策 D14：原始需求必须沿 `S1 requirements -> S2 findings -> S3 design source -> workflow-spec.yaml projection -> S4 assets -> S5 evidence -> S6 lessons` 保留需求血缘，禁止在阶段切换中丢失来源。
+- 决策 D14：原始需求必须沿 `target-requirements.yaml -> target-context-findings.yaml -> target design source -> workflow-spec.yaml projection -> S4 assets -> S5 evidence -> S6 lessons` 保留需求血缘，禁止在阶段切换中丢失来源。
 - 决策 D15：复杂目标业务节点不拆成新的 WorkflowProgram `S1..S6`，而是升级为 `node-design`，并由 `workflow_graph.nodes[*]`、可选 `loop_policy`、可选 agent/team 契约承接。
 - 决策 D16：node 是流程单位，agent 是执行角色；二者不强制一一对应，只有复杂认知边界、专业能力边界或独立上下文边界才需要独立 agent。
-- 决策 D17：简单工作流不得被强行重型化；`node-designs/**`、agent team、loop policy、host bootstrap 都是按复杂度和需求触发的条件性设计，不是所有工作流的默认负担。
+- 决策 D17：简单工作流不得被强行重型化；`target-node-designs/**`、agent team、loop policy、host bootstrap 都是按复杂度和需求触发的条件性设计，不是所有工作流的默认负担。
+- 决策 D21：completed develop 必须把 target design source 归档到 `TARGET_ROOT/.workflowprogram/design/source/**`，使后续修改、审计、validate 与 publish 不依赖旧 `RUN_ROOT`。
 - 决策 D18：修改已有目标工作流不新增 `workflowprogram-change` 入口，而是在 `workflowprogram-develop` 内启用 controlled evolution；`change-policy.json`、`impact-analysis.json`、`existing-workflow-readback.json` 是单次运行证据，不是 `workflow-spec.yaml` 顶层字段。
 - 决策 D19：change policy 的提示词规则是“候选资产生成前先分析”，确定性硬门禁是 `workflow-entry.py` 在 managed apply 前复核 `route-intent.json`、`change-context.json`、policy、impact、审批与 stale context。
 - 决策 D20：S3 完成后必须经过内部 `workflow-design-reviewer` 的隔离上下文审视，并由 `validate-design-review-gate.py` 形成确定性写入门禁；设计审视产物属于本轮 run evidence，不写入 `workflow-spec.yaml` 顶层。
@@ -185,12 +186,12 @@ TARGET_ROOT/
 
 - 目标：把 S1 需求与 S2 上下文转化为可执行工作流设计、机器契约和验收映射。
 - 输出：
-  - `outputs/stages/s3-design-highlevel.md`（目标工作流整体设计源）
-  - `outputs/stages/s3-design-lowlevel.md`（节点、字段、证据、失败路径、能力依赖的设计源）
-  - 条件性 `outputs/stages/node-designs/<node-id>.md`（复杂节点子设计）
-  - `outputs/stages/s3-implementation-plan.md`
-  - `outputs/stages/acceptance-tests.yaml`
-  - `outputs/stages/traceability-matrix.json`
+  - `outputs/stages/target-design-overview.md`（目标工作流整体设计源）
+  - `outputs/stages/target-design-detail.md`（节点、字段、证据、失败路径、能力依赖的设计源）
+  - 条件性 `outputs/stages/target-node-designs/<node-id>.md`（复杂节点子设计）
+  - `outputs/stages/target-implementation-plan.md`
+  - `outputs/stages/target-acceptance-tests.yaml`
+  - `outputs/stages/target-traceability-matrix.json`
   - `outputs/stages/design-review/design-review-packet.json`
   - `outputs/stages/design-review/issues.json`
   - `outputs/stages/design-review/closure.json`
@@ -209,9 +210,9 @@ TARGET_ROOT/
   - `workflow-lowlevel.md`（维护与迭代指导；不得覆盖 YAML 语义）
 - 规范要求：
   - S3 必须先产出设计源，再投影 `workflow-spec.yaml`；不得跳过设计源直接写 YAML。
-  - `s3-design-highlevel.md` 回答目标工作流为什么存在、整体怎么组织、用户怎么使用、如何验证。
-  - `s3-design-lowlevel.md` 回答每个目标节点的输入输出、owner、gate、能力依赖、证据、失败路径和对应 YAML 字段。
-  - 复杂节点满足任一条件时必须产出 `node-design`：跨模块阅读、多步推理、生成中间模型、需要专业工具/agent、需要 verifier/test 循环、输出影响多个后续节点。
+  - `target-design-overview.md` 回答目标工作流为什么存在、整体怎么组织、用户怎么使用、如何验证。
+  - `target-design-detail.md` 回答每个目标节点的输入输出、owner、gate、能力依赖、证据、失败路径和对应 YAML 字段。
+  - 复杂节点满足任一条件时必须产出 target node design：跨模块阅读、多步推理、生成中间模型、需要专业工具/agent、需要 verifier/test 循环、输出影响多个后续节点。
   - agent 设计必须基于复杂认知边界，而不是按 node 机械一一拆分；简单格式化、归档、命名、状态更新应优先由 skill 或 script 承接。
   - `traceability-matrix.json` 必须记录 `REQ -> design node -> asset -> acceptance test -> evidence` 的最小覆盖链。
   - `develop` 主链必须在 S3 完成后先生成 `design-review-packet.json`，再由内部 `workflow-design-reviewer` 审视目标一致性、复杂度、上下文传递、YAML 投影、change policy 影响与运行时兼容性。
@@ -289,9 +290,9 @@ TARGET_ROOT/
 | Stage | 可验证准出条件 | 最小证据 |
 |---|---|---|
 | S0 | `intent` 属于 4 个枚举，`target_root` 为绝对路径且目录已存在（不存在时已创建） | `RUN_ROOT/outputs/stages/s0-route.json` |
-| S1 | `workflow-spec.md` 存在、不含 `TBD/待补`，包含 `User Intent`、`Clarification Summary`、`Requirement Logic Interview`、`Open Questions`、`Assumptions and Boundaries`、`Readback Confirmation`；`澄清轮次 >= 2`；`s1-requirements.yaml` 至少包含一条 `REQ-*`；M+ 草案必须有完整七个 logic lenses、`question-backlog.json`、`requirement-logic-map.json` 且 `REQ-*` 链接到 process/evidence/acceptance；`design-readiness-report.json=READY`；`clarification-handoff.json.ready=true`；challenge roles 未直接面向用户 | `RUN_ROOT/workflow-spec.md`、`RUN_ROOT/outputs/stages/s1-requirements.yaml`、`RUN_ROOT/outputs/stages/question-backlog.json`、`RUN_ROOT/outputs/stages/requirement-logic-map.json`、`RUN_ROOT/outputs/stages/clarification-record.json`、`RUN_ROOT/outputs/stages/open-questions.json`、`RUN_ROOT/outputs/stages/assumption-log.md`、`RUN_ROOT/outputs/stages/design-readiness-report.json`、`RUN_ROOT/outputs/stages/clarification-challenge-report.json`、`RUN_ROOT/outputs/stages/clarification-handoff.json`、`RUN_ROOT/outputs/stages/clarification-evidence.json` |
-| S2 | 上下文报告包含“可复用资产/缺口/命名建议”三段，结构化 findings 能回溯到 `REQ-*` | `RUN_ROOT/outputs/stages/s2-context-report.md`、`RUN_ROOT/outputs/stages/s2-context-findings.yaml` |
-| S3 | `s3-design-highlevel.md`、`s3-design-lowlevel.md`、`acceptance-tests.yaml`、`traceability-matrix.json` 存在且覆盖 `REQ-*`；复杂节点已有 `node-design` 或明确豁免；`workflow-spec.yaml` 可解析且关键键存在；`workflow-view.md` 与 `workflow-lowlevel.md` 已生成，且 `workflow-lowlevel.md` 可由 `workflow-spec.yaml` 确定性重算；审批状态已记录且未绕过 gate；design-review gate 已闭合且 fingerprints 未过期 | `RUN_ROOT/outputs/stages/s3-design-highlevel.md`、`RUN_ROOT/outputs/stages/s3-design-lowlevel.md`、条件性 `RUN_ROOT/outputs/stages/node-designs/`、`RUN_ROOT/outputs/stages/s3-implementation-plan.md`、`RUN_ROOT/outputs/stages/acceptance-tests.yaml`、`RUN_ROOT/outputs/stages/traceability-matrix.json`、`RUN_ROOT/outputs/stages/design-review/design-review-packet.json`、`RUN_ROOT/outputs/stages/design-review/issues.json`、`RUN_ROOT/outputs/stages/design-review/closure.json`、`RUN_ROOT/outputs/stages/design-review/gate-validation.json`、`RUN_ROOT/workflow-spec.yaml`、`RUN_ROOT/workflow-view.md`、`RUN_ROOT/workflow-lowlevel.md`、`outputs/stages/s3-design-summary.json` |
+| S1 | `workflow-spec.md` 存在、不含 `TBD/待补`，包含 `User Intent`、`Clarification Summary`、`Requirement Logic Interview`、`Open Questions`、`Assumptions and Boundaries`、`Readback Confirmation`；`澄清轮次 >= 2`；`target-requirements.yaml` 至少包含一条 `REQ-*`；M+ 草案必须有完整七个 logic lenses、`target-question-backlog.json`、`target-requirement-logic-map.json` 且 `REQ-*` 链接到 process/evidence/acceptance；`design-readiness-report.json=READY`；`clarification-handoff.json.ready=true`；challenge roles 未直接面向用户 | `RUN_ROOT/workflow-spec.md`、`RUN_ROOT/outputs/stages/target-requirements.yaml`、`RUN_ROOT/outputs/stages/target-question-backlog.json`、`RUN_ROOT/outputs/stages/target-requirement-logic-map.json`、`RUN_ROOT/outputs/stages/clarification-record.json`、`RUN_ROOT/outputs/stages/open-questions.json`、`RUN_ROOT/outputs/stages/assumption-log.md`、`RUN_ROOT/outputs/stages/design-readiness-report.json`、`RUN_ROOT/outputs/stages/clarification-challenge-report.json`、`RUN_ROOT/outputs/stages/clarification-handoff.json`、`RUN_ROOT/outputs/stages/clarification-evidence.json` |
+| S2 | 上下文报告包含“可复用资产/缺口/命名建议”三段，结构化 findings 能回溯到 `REQ-*` | `RUN_ROOT/outputs/stages/s2-context-report.md`、`RUN_ROOT/outputs/stages/target-context-findings.yaml` |
+| S3 | `target-design-overview.md`、`target-design-detail.md`、`target-acceptance-tests.yaml`、`target-traceability-matrix.json` 存在且覆盖 `REQ-*`；复杂节点已有 target node design 或明确豁免；`workflow-spec.yaml` 可解析且关键键存在；`workflow-view.md` 与 `workflow-lowlevel.md` 已生成，且 `workflow-lowlevel.md` 可由 `workflow-spec.yaml` 确定性重算；审批状态已记录且未绕过 gate；design-review gate 已闭合且 fingerprints 未过期 | `RUN_ROOT/outputs/stages/target-design-overview.md`、`RUN_ROOT/outputs/stages/target-design-detail.md`、条件性 `RUN_ROOT/outputs/stages/target-node-designs/`、`RUN_ROOT/outputs/stages/target-implementation-plan.md`、`RUN_ROOT/outputs/stages/target-acceptance-tests.yaml`、`RUN_ROOT/outputs/stages/target-traceability-matrix.json`、`RUN_ROOT/outputs/stages/design-review/design-review-packet.json`、`RUN_ROOT/outputs/stages/design-review/issues.json`、`RUN_ROOT/outputs/stages/design-review/closure.json`、`RUN_ROOT/outputs/stages/design-review/gate-validation.json`、`RUN_ROOT/workflow-spec.yaml`、`RUN_ROOT/workflow-view.md`、`RUN_ROOT/workflow-lowlevel.md`、`outputs/stages/s3-design-summary.json` |
 | S4 | candidate 目录存在；managed plan/result 存在；`TARGET_ROOT/.workflowprogram/managed-files.json` 已写入且带 `updated_at`；目标侧设计包与 `.workflowprogram/runtime/` 已持久化；冲突不覆盖目标文件 | `RUN_ROOT/outputs/candidate/.claude/`、`RUN_ROOT/outputs/candidate/.workflowprogram/design/`、`RUN_ROOT/outputs/candidate/.workflowprogram/runtime/`、`managed-change-plan/result`、`TARGET_ROOT/.workflowprogram/managed-files.json` |
 | S5 | 产生 workflow 级结论，且证据链文件齐全；若声明能力发现、宿主能力或 team 契约，则对应 discovery / probe / team evidence 已纳入判定 | `validation-runtime-report.md`、`outputs/stages/s5-validation-summary.json`、条件性 `outputs/stages/host-capability-candidates.json`、`outputs/stages/host-bootstrap-instructions.md`、`outputs/stages/host-capability-report.json`、`outputs/stages/team-plan.json`、`outputs/stages/team-results.json`、`outputs/stages/team-join-summary.json` |
 | S6 | 输出 lessons 增量与约束候选，关联本次 `run-id` 与 `failure_kind`，且 `user-progress.md` 含“历史关键节点结果” | `RUN_ROOT/outputs/stages/s6-lessons-delta.md` |

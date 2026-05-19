@@ -81,6 +81,7 @@ So WorkflowProgram is not about adding more skills. It is about systematically t
 | `workflow-runner.py` | Who owns transitions and runtime constraints | control-plane runner |
 | `workflowprogram-validate` | Who produces the workflow-level verdict | S5 judge entry |
 | `workflow-lowlevel.md` | Where maintenance and iteration guidance comes from | a one-way render from YAML |
+| `target design source` | Where the target workflow's rationale, node details, acceptance tests, and traceability live | `TARGET_ROOT/.workflowprogram/design/source/**` |
 | `runtime-manifest.json` | Whether the target-side runtime was really delivered | the machine contract inside `.workflowprogram/runtime/` |
 | `capability_discovery` / `host_capabilities` | How external capabilities are discovered, probed, and repaired | candidate reports, host reports, remediation guidance |
 | `agent_team_contract` | When Team orchestration is explicitly enabled | fan-out / join / evidence contract |
@@ -102,6 +103,8 @@ flowchart TD
     J --> L["S6 lessons + constraint candidates"]
     M --> T["TARGET_ROOT/.claude/"]
 ```
+
+Target workflow design is split into two layers: `workflow-spec.yaml` is the machine control plane and runtime map, while `target-design-overview.md`, `target-design-detail.md`, `target-acceptance-tests.yaml`, and `target-traceability-matrix.json` are the target design source. After a successful develop run, these source files are archived under `TARGET_ROOT/.workflowprogram/design/source/**`; future change, audit, validate, and publish flows should read that archive instead of depending on one-off chat context.
 
 In one sentence:
 

@@ -100,7 +100,7 @@
 
 | 层级 | 责任 | 典型产物 |
 |---|---|---|
-| 设计源 | 解释用户需求为何被这样拆解、节点为何这样组织、复杂节点如何分析与验证 | `outputs/stages/s3-design-highlevel.md`、`outputs/stages/s3-design-lowlevel.md`、`outputs/stages/node-designs/<node-id>.md` |
+| target design source | 解释用户需求为何被这样拆解、节点为何这样组织、复杂节点如何分析与验证 | `outputs/stages/target-design-overview.md`、`outputs/stages/target-design-detail.md`、`outputs/stages/target-node-designs/<node-id>.md` |
 | 设计审视门禁 | 由隔离上下文复核 S3 设计是否可进入 S4，并冻结参与审视的 artifact fingerprints | `outputs/stages/design-review/design-review-packet.json`、`issues.json`、`closure.json`、`gate-validation.json` |
 | 机器投影 | 提供脚本、validator、runner、judge 可执行和可验证的最小契约 | `workflow-spec.yaml`、可选 `workflow-spec.yaml.design_refs` |
 | 派生视图 | 从机器投影生成维护说明，不新增执行语义 | `workflow-view.md`、`workflow-lowlevel.md` |
@@ -109,10 +109,11 @@
 固定约束：
 
 1. S1/S2/S3 的设计源可以包含推理、取舍和未决风险；`workflow-spec.yaml` 只引用这些文件并承载机器字段。
-2. `workflow-lowlevel.md` 是从 `workflow-spec.yaml` 派生的维护指南，不等同于 `s3-design-lowlevel.md`。
+2. `workflow-lowlevel.md` 是从 `workflow-spec.yaml` 派生的维护指南，不等同于 `target-design-detail.md`。
 3. S5 必须按 `REQ -> design node -> asset -> acceptance test -> evidence` 检查需求血缘；缺少映射时不得给出 clean PASS。
-4. 简单工作流可以没有 `node-designs/**`；复杂节点必须有节点级设计或明确豁免理由。
-5. 任何修改执行语义的变更必须先更新 `workflow-spec.yaml`，再重生成 `workflow-view.md` 与 `workflow-lowlevel.md`；任何修改设计理由的变更必须先更新 S3 设计源，再检查是否需要同步投影。
+4. 简单工作流可以没有 `target-node-designs/**`；复杂节点必须有节点级设计或明确豁免理由。
+5. 任何修改执行语义的变更必须先更新 `workflow-spec.yaml`，再重生成 `workflow-view.md` 与 `workflow-lowlevel.md`；任何修改设计理由的变更必须先更新 target design source，再检查是否需要同步投影。
+7. completed develop 必须将 target design source 复制到 `TARGET_ROOT/.workflowprogram/design/source/**`，供后续修改、审计、validate 与 publish 使用。
 6. S3 设计审视产物属于 run evidence，只证明“本轮设计进入实现前已被复核并闭合”，不得作为 `workflow-spec.yaml` 顶层字段长期持久化。
 
 ### 2.2 State.artifacts 字段
@@ -202,13 +203,13 @@ Artifact 使用固定结构：
 | `transcript` | 运行转录 | `md` | `RUN_ROOT/transcript.md` |
 | `event_log` | 事件日志流 | `jsonl` | `RUN_ROOT/events.jsonl` |
 | `state_snapshot` | 状态快照 | `json` | `RUN_ROOT/state.json` |
-| `requirement_index` | 需求血缘索引 | `yaml` | `RUN_ROOT/outputs/stages/s1-requirements.yaml` |
-| `context_findings` | 上下文研究结构化结论 | `yaml` | `RUN_ROOT/outputs/stages/s2-context-findings.yaml` |
-| `design_source` | S3 设计源文档 | `md` | `RUN_ROOT/outputs/stages/s3-design-highlevel.md` |
-| `node_design` | 复杂节点子设计 | `md` | `RUN_ROOT/outputs/stages/node-designs/build-dfd.md` |
-| `implementation_plan` | 设计后实施计划 | `md` | `RUN_ROOT/outputs/stages/s3-implementation-plan.md` |
-| `acceptance_tests` | 验收测试契约 | `yaml` | `RUN_ROOT/outputs/stages/acceptance-tests.yaml` |
-| `traceability_matrix` | 需求到设计/实现/证据映射 | `json` | `RUN_ROOT/outputs/stages/traceability-matrix.json` |
+| `requirement_index` | 需求血缘索引 | `yaml` | `RUN_ROOT/outputs/stages/target-requirements.yaml` |
+| `context_findings` | 上下文研究结构化结论 | `yaml` | `RUN_ROOT/outputs/stages/target-context-findings.yaml` |
+| `design_source` | target design source 文档 | `md` | `RUN_ROOT/outputs/stages/target-design-overview.md` |
+| `node_design` | 复杂节点子设计 | `md` | `RUN_ROOT/outputs/stages/target-node-designs/build-dfd.md` |
+| `implementation_plan` | 设计后实施计划 | `md` | `RUN_ROOT/outputs/stages/target-implementation-plan.md` |
+| `acceptance_tests` | 验收测试契约 | `yaml` | `RUN_ROOT/outputs/stages/target-acceptance-tests.yaml` |
+| `traceability_matrix` | 需求到设计/实现/证据映射 | `json` | `RUN_ROOT/outputs/stages/target-traceability-matrix.json` |
 | `design_review_packet` | S3 设计审视输入包 | `json` | `RUN_ROOT/outputs/stages/design-review/design-review-packet.json` |
 | `design_review_issue` | S3 设计审视问题台账或轮次结果 | `json` | `RUN_ROOT/outputs/stages/design-review/issues.json` |
 | `design_review_closure` | S3 设计审视闭合证明 | `json` | `RUN_ROOT/outputs/stages/design-review/closure.json` |

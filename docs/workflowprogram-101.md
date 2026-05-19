@@ -80,6 +80,7 @@
 | `workflow-runner.py` | 谁负责状态转移和硬约束 | 控制面 runner |
 | `workflowprogram-validate` | 谁给最终 workflow 级 verdict | S5 主 judge |
 | `workflow-lowlevel.md` | 维护与迭代说明从哪来 | 由 YAML 单向渲染的维护指导 |
+| `target design source` | 目标 workflow 的设计理由、节点细节、验收与 traceability 放哪 | `TARGET_ROOT/.workflowprogram/design/source/**` |
 | `runtime-manifest.json` | 目标侧 runtime 是否真的交付了 | `.workflowprogram/runtime/` 的机器契约 |
 | `capability_discovery` / `host_capabilities` | 外部能力怎么发现、探测和修复 | 能力候选、宿主报告、修复指引 |
 | `agent_team_contract` | Team 编排何时算显式开启 | fan-out / join / evidence 契约 |
@@ -101,6 +102,8 @@ flowchart TD
     J --> L["S6 lessons + constraints candidates"]
     M --> T["TARGET_ROOT/.claude/"]
 ```
+
+目标 workflow 的设计要分两层看：`workflow-spec.yaml` 是机器控制面和运行态地图；`target-design-overview.md`、`target-design-detail.md`、`target-acceptance-tests.yaml`、`target-traceability-matrix.json` 是目标设计源。develop 成功后，这些设计源会归档到 `TARGET_ROOT/.workflowprogram/design/source/**`，后续修改、审计、validate 和 publish 都应读取这份归档，而不是只依赖一次性聊天上下文。
 
 一句话总结：
 

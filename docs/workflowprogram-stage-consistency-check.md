@@ -22,9 +22,9 @@
 | artifact 字段约束完整性 | PASS | `kind/root/producer/status` 已由 `validate-run-state.py` 强制校验 |
 | spec 运行契约完整性 | PASS | `runtime_contract` 已覆盖写入边界、最小证据集、失败枚举、环境 skip 条件 |
 | spec 测试契约完整性 | PASS | `test_contract` 已覆盖入口、边界、流程、产物、失败五类判定，并与 `runtime_contract` 通过固定引用语法对接 |
-| 设计源与机器投影分层 | PASS | `s3-design-highlevel.md` / `s3-design-lowlevel.md` 承载设计推理，`workflow-spec.yaml` 只承载机器语义和 `design_refs` |
-| 需求血缘传递 | PASS | 原始请求通过 `s1-requirements.yaml -> requirement-logic-map.json -> s2-context-findings.yaml -> traceability-matrix.json` 映射到设计节点、资产、验收和证据 |
-| 复杂节点分层 | PASS | 复杂业务环节通过 `node-designs/<node-id>.md` 与 `workflow_graph.nodes[*]` 对接，不拆成新的 WorkflowProgram `S1..S6` |
+| 设计源与机器投影分层 | PASS | `target-design-overview.md` / `target-design-detail.md` 承载 target design source，`workflow-spec.yaml` 只承载机器语义和 `design_refs` |
+| 需求血缘传递 | PASS | 原始请求通过 `target-requirements.yaml -> target-requirement-logic-map.json -> target-context-findings.yaml -> target-traceability-matrix.json` 映射到设计节点、资产、验收和证据 |
+| 复杂节点分层 | PASS | 复杂业务环节通过 `target-node-designs/<node-id>.md` 与 `workflow_graph.nodes[*]` 对接，不拆成新的 WorkflowProgram `S1..S6` |
 | 视图渲染链路一致性 | PASS | 设计与实现均明确 `tools/generate-view.py` 负责 `workflow-view.md` 渲染 |
 | Stage 间 I/O 依赖闭合 | PASS | `S1->S2->S3->S4->S5->S6` 无未定义依赖 |
 | Stage 准出可验证性 | PASS | 每个 Stage 已补充证据路径和可验证检查条目 |

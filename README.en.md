@@ -134,12 +134,13 @@ Execution order is decided by programs, not by hoping the model remembers the ne
 
 ### Target Runtime And Optional Capability Layers
 
-- A successful develop flow persists not only `.claude/` assets, but also `TARGET_ROOT/.workflowprogram/design/{workflow-spec.yaml,workflow-view.md,workflow-lowlevel.md}`.
+- A successful develop flow persists not only `.claude/` assets, but also `TARGET_ROOT/.workflowprogram/design/{workflow-spec.yaml,workflow-view.md,workflow-lowlevel.md}`, plus the target design-source archive under `TARGET_ROOT/.workflowprogram/design/source/**`.
+- Target design source uses `target-design-overview.md`, `target-design-detail.md`, `target-acceptance-tests.yaml`, and `target-traceability-matrix.json`; `workflow-view.md` / `workflow-lowlevel.md` are YAML-derived views, not new design truth.
 - The target project also receives its own deterministic runtime wrapper at `TARGET_ROOT/.workflowprogram/runtime/{workflow-entry.py,workflow-runner.py,validate-run-state.py,runtime-manifest.json}`.
 - If a workflow declares `capability_discovery`, the entry path first generates candidate `skill / MCP / CLI` recommendations plus manual guidance.
 - If a workflow declares `host_capabilities`, both the entry path and S5 consume `host-capability-report.json`, `environment-remediation-report.json`, and `environment-remediation-guide.md`.
 - If a workflow declares `agent_team_contract`, S5 also validates structured Team evidence such as `team-plan.json`, `team-results.json`, and `team-join-summary.json`.
-- A target workflow that fully passed `workflowprogram-develop` can enter the independent publish lifecycle. `/workflowprogram-cn:workflowprogram-publish` checks develop/S5/design-review/managed evidence, stages a Claude Code marketplace plugin package, and uses the user's GitHub account for the publish plan or approved execution.
+- A target workflow that fully passed `workflowprogram-develop` can enter the independent publish lifecycle. `/workflowprogram-cn:workflowprogram-publish` checks develop/S5/design-review/managed/target-design-source evidence, stages a Claude Code marketplace plugin package, and uses the user's GitHub account for the publish plan or approved execution.
 
 ### Before Publishing
 

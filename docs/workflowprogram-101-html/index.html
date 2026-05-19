@@ -633,6 +633,7 @@ python3 .claude/scripts/validate-workflow-spec.py --spec &lt;workflow-spec.yaml&
 python3 .claude/scripts/validate-workflow-lowlevel.py \
   --spec &lt;workflow-spec.yaml&gt; \
   --lowlevel &lt;workflow-lowlevel.md&gt;
+python3 .claude/scripts/validate-target-design-governance.py --run-root &lt;RUN_ROOT&gt;
 python3 .claude/scripts/validate-run-state.py --state &lt;RUN_ROOT&gt;/state.json</code></pre>
             </div>
             <div class="compare-card safe">
@@ -693,10 +694,16 @@ python3 tools/runtime_smoke_matrix.py --json</code></pre>
             <div class="file-item"><code>.claude/skills/</code><span>源码层 skills 与模板</span></div>
             <div class="file-item"><code>.claude/scripts/</code><span>确定性脚本链与校验器</span></div>
             <div class="file-item"><code>TARGET_ROOT/.workflowprogram/design/</code><span>spec / view / lowlevel 的目标侧持久化包</span></div>
+            <div class="file-item"><code>TARGET_ROOT/.workflowprogram/design/source/</code><span>目标 workflow 的设计源归档、验收与 traceability</span></div>
             <div class="file-item"><code>TARGET_ROOT/.workflowprogram/runtime/</code><span>目标侧 deterministic runtime 包装层</span></div>
             <div class="file-item"><code>dist/plugin/</code><span>构建后的运行时载荷</span></div>
             <div class="file-item"><code>tests/</code><span>fixtures、expectations、transcripts</span></div>
             <div class="file-item"><code>docs/</code><span>HighLevel、LowLevel、教程和状态索引</span></div>
+          </div>
+
+          <div class="note-strip">
+            <strong>目标设计源不要和派生视图混淆：</strong>
+            <span><code>workflow-spec.yaml</code> 是机器控制面；<code>workflow-view.md</code> / <code>workflow-lowlevel.md</code> 是派生视图；<code>design/source/**</code> 下的 <code>target-design-overview.md</code>、<code>target-design-detail.md</code>、<code>target-acceptance-tests.yaml</code>、<code>target-traceability-matrix.json</code> 才记录目标 workflow 的设计理由、验收和 traceability。</span>
           </div>
 
           <div class="note-strip">
@@ -720,12 +727,13 @@ python3 tools/runtime_smoke_matrix.py --json</code></pre>
           <div class="checklist-grid">
             <div class="check-card">1. 最终要交付哪些 <code>.claude/</code> 文件？</div>
             <div class="check-card">2. 机器可读真源是什么？（相当于你的 <code>workflow-spec.yaml</code>）</div>
-            <div class="check-card">3. 哪些步骤必须沉到确定性脚本？（不能只靠 prompt）</div>
-            <div class="check-card">4. 写入边界和冲突处理怎么定义？（怎么做 managed apply）</div>
-            <div class="check-card">5. 最终 verdict 由谁给出？（runner 还是独立 judge）</div>
-            <div class="check-card">6. 失败经验如何进入下一轮约束？（lessons &rarr; constraints）</div>
-            <div class="check-card">7. 如果依赖外部能力，谁负责发现、探测、bootstrap 和修复指引？</div>
-            <div class="check-card">8. 是否真的需要显式 Team，而不是普通 subagent？</div>
+            <div class="check-card">3. 目标设计源放在哪里，如何覆盖需求、节点、验收和 traceability？</div>
+            <div class="check-card">4. 哪些步骤必须沉到确定性脚本？（不能只靠 prompt）</div>
+            <div class="check-card">5. 写入边界和冲突处理怎么定义？（怎么做 managed apply）</div>
+            <div class="check-card">6. 最终 verdict 由谁给出？（runner 还是独立 judge）</div>
+            <div class="check-card">7. 失败经验如何进入下一轮约束？（lessons &rarr; constraints）</div>
+            <div class="check-card">8. 如果依赖外部能力，谁负责发现、探测、bootstrap 和修复指引？</div>
+            <div class="check-card">9. 是否真的需要显式 Team，而不是普通 subagent？</div>
           </div>
 
           <div class="note-strip">

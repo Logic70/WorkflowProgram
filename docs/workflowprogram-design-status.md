@@ -39,9 +39,10 @@
 - `stage_slot: S1..S6` 只约束 WorkflowProgram 自身控制面；生成后的目标工作流可通过 `workflow_graph` 声明自己的业务节点图。
 - 产品主入口的确定性脚本链为 `workflow-entry.py -> managed-assets.py -> workflow-runner.py -> validate-run-state.py`。
 - 目标工作流 runtime 的交付模式固定为 `generated_runtime_contract.mode = shared-control-plane-wrapper`。
-- S1/S2/S3 的需求转化链为 `s1-requirements.yaml -> s2-context-findings.yaml -> s3-design-highlevel.md / s3-design-lowlevel.md -> workflow-spec.yaml -> traceability-matrix.json`。
-- `workflow-spec.md` 是用户回读，`workflow-view.md` 与 `workflow-lowlevel.md` 是从 YAML 派生的报告，`s3-design-lowlevel.md` 才是设计源中的低层设计。
-- 复杂目标业务节点应升级为 `outputs/stages/node-designs/<node-id>.md`，而不是拆成新的 WorkflowProgram `S1..S6`；node 与 agent 不要求一一对应。
+- S1/S2/S3 的需求转化链为 `target-requirements.yaml -> target-context-findings.yaml -> target-design-overview.md / target-design-detail.md -> workflow-spec.yaml -> target-traceability-matrix.json`。
+- `workflow-spec.md` 是用户回读，`workflow-view.md` 与 `workflow-lowlevel.md` 是从 YAML 派生的报告，`target-design-detail.md` 才是目标工作流低层设计源。
+- 复杂目标业务节点应升级为 `outputs/stages/target-node-designs/<node-id>.md`，而不是拆成新的 WorkflowProgram `S1..S6`；node 与 agent 不要求一一对应。
+- completed develop 需要把 target design source 归档到 `TARGET_ROOT/.workflowprogram/design/source/**`，供后续修改、审计、validate 与 publish 使用。
 - managed apply 必须保留 `managed-rollback-manifest.json` 与 `managed-recover-instructions.md`，并在共享报告中包含 schema/remediation 字段。
 - 宿主专业能力必须通过 `host_capabilities` 声明，readiness / bootstrap 证据只写入 `RUN_ROOT`。
 - `project_local` bootstrap 只允许写入 `TARGET_ROOT/.workflowprogram/bootstrap/**`，且应优先通过声明式 `bootstrap.assets` 生成可复用配置 / wrapper / marker 资产，并同步落 target bootstrap manifest。
