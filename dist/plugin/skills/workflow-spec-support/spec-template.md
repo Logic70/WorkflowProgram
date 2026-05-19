@@ -4,8 +4,8 @@
 
 > **Note**: 本模板用于自然语言设计文档。
 > 对于机器可读的编排配置，请使用 `yaml-spec-template.md`。
-> 两者关系：`spec-template.md` → S1/S2/S3 设计源 → `workflow-spec.yaml` 机器投影 → 生成 `workflow-view.md` / `workflow-lowlevel.md`。
-> `workflow-spec.yaml` 是机器语义真源与运行态地图；完整设计推理应保留在 `s3-design-highlevel.md` / `s3-design-lowlevel.md` / 条件性 `node-designs/**` 中。
+> 两者关系：`spec-template.md` → target design source → `workflow-spec.yaml` target runtime map → 生成 `workflow-view.md` / `workflow-lowlevel.md` derived target views。
+> `workflow-spec.yaml` 是机器语义真源与运行态地图；完整目标工作流设计推理应保留在 `target-design-overview.md` / `target-design-detail.md` / 条件性 `target-node-designs/**` 中。
 
 ## Workflow Identity
 
@@ -113,11 +113,12 @@
 
 ## Design Source Plan
 
-- 是否需要 `s3-design-highlevel.md`：
-- 是否需要 `s3-design-lowlevel.md`：
-- 是否存在复杂节点需要 `node-designs/<node-id>.md`：
+- 是否需要 `target-design-overview.md`：
+- 是否需要 `target-design-detail.md`：
+- 是否存在复杂节点需要 `target-node-designs/<node-id>.md`：
 - 复杂节点升级理由：
-- `workflow-spec.yaml.design_refs` 应引用哪些设计源：
+- `workflow-spec.yaml.design_refs` 应引用哪些 target design source：
+- 是否需要持久化 `.workflowprogram/design/source/**`：
 
 ## Pattern Selection Notes
 
@@ -173,6 +174,6 @@
 
 - `REQ-* -> workflow_graph.nodes[*]` 映射：
 - `REQ-* -> generated assets` 映射：
-- `REQ-* -> acceptance-tests.yaml` 映射：
+- `REQ-* -> target-acceptance-tests.yaml` 映射：
 - `REQ-* -> expected S5 evidence` 映射：
 - 无法自动验证的需求及豁免理由：

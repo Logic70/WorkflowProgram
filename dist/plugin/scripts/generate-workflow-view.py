@@ -199,7 +199,18 @@ def render_stages(stages: List[Dict[str, Any]]) -> List[str]:
 
 def render_refs_and_constraints(spec: Dict[str, Any]) -> List[str]:
     """渲染辅助 registry 和全局约束。"""
-    lines: List[str] = ["## Agent Refs", ""]
+    lines: List[str] = ["## Target Design Source", ""]
+    design_refs = spec.get("design_refs", {})
+    if isinstance(design_refs, dict) and design_refs:
+        lines.append(f"- schema_version: `{format_value(design_refs.get('schema_version'))}`")
+        lines.append(f"- naming: `{format_value(design_refs.get('naming'))}`")
+        lines.append(f"- design_overview: `{format_value(design_refs.get('design_overview', design_refs.get('design_highlevel')))}`")
+        lines.append(f"- design_detail: `{format_value(design_refs.get('design_detail', design_refs.get('design_lowlevel')))}`")
+        persistent = design_refs.get("persistent", {})
+        lines.append(f"- persistent_source_archive: `{'yes' if isinstance(persistent, dict) and persistent else 'no'}`")
+    else:
+        lines.append("- None")
+    lines.extend(["", "## Agent Refs", ""])
     agent_refs = spec.get("agent_refs", [])
     if isinstance(agent_refs, list) and agent_refs:
         lines.extend(f"- `{item}`" for item in agent_refs)

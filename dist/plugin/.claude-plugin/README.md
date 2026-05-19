@@ -91,6 +91,19 @@ Claude Code 加载插件后，会在 `SessionStart` 自动执行 Python runtime 
 
 运行时会生成 `RUN_ROOT/outputs/stages/question-backlog.json` 与 `RUN_ROOT/outputs/stages/requirement-logic-map.json`。`validate-workflow-draft.py` 会阻止缺少关键 lens、缺少 `REQ-* -> process/evidence/acceptance` 链接，或 L/XL 复杂度下只有泛问题的草案进入设计阶段。
 
+## 目标工作流设计治理
+
+完整通过 `workflowprogram-develop` 的目标 workflow 不只会写入 `.claude/` 资产，还会写入：
+
+- `TARGET_ROOT/.workflowprogram/design/workflow-spec.yaml`：目标 workflow 的机器控制面和运行态地图。
+- `TARGET_ROOT/.workflowprogram/design/workflow-view.md`：从 YAML 派生的只读概览。
+- `TARGET_ROOT/.workflowprogram/design/workflow-lowlevel.md`：从 YAML 派生的维护指导。
+- `TARGET_ROOT/.workflowprogram/design/source/**`：目标 workflow 的设计源归档。
+
+设计源归档使用 target-prefixed 命名，例如 `target-design-overview.md`、`target-design-detail.md`、`target-acceptance-tests.yaml`、`target-traceability-matrix.json`。这些文件解释“为什么这样设计”和“如何验证”，`workflow-spec.yaml` 只保存可执行、可校验的机器投影。
+
+发布目标 workflow 时，`workflowprogram-publish` 会检查 develop/S5/design-review/managed/target-design-source 证据；publish 不负责临时补设计源，也不修复缺失的 traceability 或 acceptance tests。
+
 ## Python Runtime
 
 - 插件在 `SessionStart` 通过 `${CLAUDE_PLUGIN_ROOT}/scripts/bootstrap-python-runtime.py` 准备私有 Python 依赖。

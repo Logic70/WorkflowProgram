@@ -28,15 +28,15 @@ disable-model-invocation: true
 - 若出现目标文件冲突，应把候选版本保留在 `RUN_ROOT/outputs/`，而不是覆盖用户资产。
 - 对已应用文件，应维护 `TARGET_ROOT/.workflowprogram/managed-files.json`。
 - 执行过程中必须由 runner / control-plane helper 在内部调用 `${CLAUDE_PLUGIN_ROOT}/scripts/stage-progress.py` 写入进展与关键节点结果；不要把严格 CLI 参数组装交给模型。
-- `workflow-spec.md` 草案在进入 YAML 设计前必须通过 `${CLAUDE_PLUGIN_ROOT}/scripts/validate-workflow-draft.py` 的确定性质量门槛，并产出 `clarification-record.json`、`open-questions.json`、`question-backlog.json`、`requirement-logic-map.json`、`assumption-log.md`、`design-readiness-report.json`、`clarification-challenge-report.json`、`clarification-handoff.json`、`clarification-evidence.json`。
+- `workflow-spec.md` 草案在进入 YAML 设计前必须通过 `${CLAUDE_PLUGIN_ROOT}/scripts/validate-workflow-draft.py` 的确定性质量门槛，并产出 `clarification-record.json`、`open-questions.json`、`target-question-backlog.json`、`target-requirement-logic-map.json`、`assumption-log.md`、`design-readiness-report.json`、`clarification-challenge-report.json`、`clarification-handoff.json`、`clarification-evidence.json`。
 - S1 必须通过多轮用户对话澄清“用户诉求、最终目的、成功标准”，并用七个 logic lenses（purpose、object_model、process_model、decision_model、evidence_model、acceptance_model、boundary_model）持续追问；若目的、对象、过程、决策、证据、验收或边界仍不足以影响 S2/S3 设计，不得提前结束需求阶段。
 - S1 的问题必须是 design-consequential：不同答案应能改变目标节点、分支决策、证据要求、验收场景或停止边界；“还有什么边界场景/输入输出/约束”这类泛问题不能单独支撑 L/XL 复杂度进入设计。
-- S1 必须把原始用户请求拆成 `REQ-*` 需求索引，并写入 `RUN_ROOT/outputs/stages/s1-requirements.yaml`；每条需求必须保留来源、优先级、验收口径和边界。
-- S1 必须把 `REQ-*` 映射到 `requirement-logic-map.json` 中的 process/evidence/acceptance refs；M+ 请求不得缺少这些链接。
-- S2 必须把上下文研究结构化为 `RUN_ROOT/outputs/stages/s2-context-findings.yaml`，并把可复用资产、能力候选、风险、约束候选回溯到 `REQ-*`。
-- S3 必须先产出 `s3-design-highlevel.md`、`s3-design-lowlevel.md`、`acceptance-tests.yaml`、`traceability-matrix.json` 和 `s3-implementation-plan.md`，再把可执行语义投影成 `workflow-spec.yaml`。
+- S1 必须把原始用户请求拆成 `REQ-*` 需求索引，并写入 `RUN_ROOT/outputs/stages/target-requirements.yaml`；每条需求必须保留来源、优先级、验收口径和边界。
+- S1 必须把 `REQ-*` 映射到 `target-requirement-logic-map.json` 中的 process/evidence/acceptance refs；M+ 请求不得缺少这些链接。
+- S2 必须把上下文研究结构化为 `RUN_ROOT/outputs/stages/target-context-findings.yaml`，并把可复用资产、能力候选、风险、约束候选回溯到 `REQ-*`。
+- S3 必须先产出 `target-design-overview.md`、`target-design-detail.md`、`target-acceptance-tests.yaml`、`target-traceability-matrix.json` 和 `target-implementation-plan.md`，再把可执行语义投影成 `workflow-spec.yaml`。
 - S3 完成后、S4 候选资产或 managed 写入前，必须生成 `outputs/stages/design-review/design-review-packet.json`，调用内部 `workflow-design-reviewer` 做隔离上下文审视，并产出 `issues.json`、`closure.json`、`gate-validation.json`；只有 `gate-validation.json.status=PASS` 才能进入实现。
-- 若某个目标业务节点需要跨模块推理、专业工具、独立 agent/team、loop 或会影响多个下游节点，必须为它生成 `RUN_ROOT/outputs/stages/node-designs/<node-id>.md`；简单整理节点不得强制拆独立 agent。
+- 若某个目标业务节点需要跨模块推理、专业工具、独立 agent/team、loop 或会影响多个下游节点，必须为它生成 `RUN_ROOT/outputs/stages/target-node-designs/<node-id>.md`；简单整理节点不得强制拆独立 agent。
 - `workflow-spec.yaml` 是机器控制面投影，不是完整设计文档；完整设计推理留在 S3 设计源，YAML 只通过可选 `design_refs` 引用这些文件路径。
 - `workflow-spec.yaml` 产出后必须调用 `${CLAUDE_PLUGIN_ROOT}/scripts/validate-workflow-spec.py` 进行结构校验。
 - `workflow-spec.yaml` 必须包含 `intent_flows`，明确 `develop / audit / iterate / validate` 的逻辑阶段流。
@@ -82,23 +82,23 @@ disable-model-invocation: true
 4. 提问顺序默认为 purpose -> object_model -> process_model -> decision_model -> evidence_model -> acceptance_model -> boundary_model；简单请求可压缩，但 M+ 请求必须留下完整 lens 状态。
 5. 优先问会改变设计的问题，例如：“DFD 不完整时是标记 unknown、阻塞，还是要求用户补充？”、“每个威胁需要哪些代码证据和测试方法才能 PASS？”、“哪些目标节点需要独立 agent 或 loop？”。
 6. 在 `workflow-spec.md` 中显式整理 `User Intent`、`Clarification Summary`、`Requirement Logic Interview`、`Open Questions`、`Assumptions and Boundaries`、`Target Workflow Graph Readback`、`File Plan`、`Readback Confirmation`。
-7. 派生 `RUN_ROOT/outputs/stages/s1-requirements.yaml`，把原始请求拆为 `REQ-*`，并记录 `source_ref`、`priority`、`acceptance_hint`、`boundaries`。
-8. 调用 `${CLAUDE_PLUGIN_ROOT}/scripts/generate-clarification-package.py`，生成 S1 结构化澄清包、`question-backlog.json` 和 `requirement-logic-map.json`。
+7. 派生 `RUN_ROOT/outputs/stages/target-requirements.yaml`，把原始请求拆为 `REQ-*`，并记录 `source_ref`、`priority`、`acceptance_hint`、`boundaries`。
+8. 调用 `${CLAUDE_PLUGIN_ROOT}/scripts/generate-clarification-package.py`，生成 S1 结构化澄清包、`target-question-backlog.json` 和 `target-requirement-logic-map.json`。
 9. 调用 `${CLAUDE_PLUGIN_ROOT}/scripts/generate-clarification-review.py`，生成 challenge/handoff/evidence 三份审阅产物；handoff 必须携带 `logic_map_path`、`question_backlog_path`、S2 logic lens inputs、S3 node candidates 与 acceptance scenarios。
 10. 约束：`requirement-clarification-lead` 是唯一与用户直接对话的角色；`scenario-extractor`、`assumption-auditor`、`constraint-reviewer` 只能在内部 challenge 中提出补问与 handoff 建议，不得直接触达用户。
-11. 形成工作流规格、模式选择和文件清单，并让 `S2/S3` 显式消费 `clarification-handoff.json`、`s1-requirements.yaml`、`question-backlog.json` 与 `requirement-logic-map.json`。
+11. 形成工作流规格、模式选择和文件清单，并让 `S2/S3` 显式消费 `clarification-handoff.json`、`target-requirements.yaml`、`target-question-backlog.json` 与 `target-requirement-logic-map.json`。
 12. 写入进展事件：`S1 StageCheckpoint` 与 `S1 StageCompleted`。
 
 ## Step 3: Design Assets
 
 先形成设计源和机器投影，再在 `RUN_ROOT/outputs/candidate/` 规划或生成候选资产：
 
-- `outputs/stages/s3-design-highlevel.md`
-- `outputs/stages/s3-design-lowlevel.md`
-- 条件性 `outputs/stages/node-designs/<node-id>.md`
-- `outputs/stages/acceptance-tests.yaml`
-- `outputs/stages/traceability-matrix.json`
-- `outputs/stages/s3-implementation-plan.md`
+- `outputs/stages/target-design-overview.md`
+- `outputs/stages/target-design-detail.md`
+- 条件性 `outputs/stages/target-node-designs/<node-id>.md`
+- `outputs/stages/target-acceptance-tests.yaml`
+- `outputs/stages/target-traceability-matrix.json`
+- `outputs/stages/target-implementation-plan.md`
 - `workflow-spec.yaml`，其中可选 `design_refs` 只引用上述文件路径
 - `outputs/stages/design-review/design-review-packet.json`
 - `outputs/stages/design-review/issues.json`

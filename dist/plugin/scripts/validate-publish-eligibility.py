@@ -11,6 +11,8 @@ from pathlib import Path
 from typing import Any, Dict, List
 
 from lib.io_utils import iso_now, write_json
+from lib.target_design_refs import PERSISTENT_DEFAULTS, resolve_target_design_refs
+from lib.yaml_utils import try_load_yaml_mapping
 
 
 PUBLISH_DIR = "outputs/stages/publish"
@@ -134,6 +136,19 @@ def validate_eligibility(
         check(f"required_target_file:{rel_path}", exists, f"{rel_path} {'exists' if exists else 'is missing'}")
         if exists and path.is_file():
             observed_files.append({"path": rel_path, "sha256": sha256_file(path)})
+
+    target_spec = try_load_yaml_mapping(target_root / ".workflowprogram" / "design" / "workflow-spec.yaml")
+    target_design_refs = resolve_target_design_refs(target_spec)
+    target_design_governed = target_design_refs.canonical or bool(target_design_refs.persistent_refs)
+    if target_design_governed:
+        for key in ("design_overview", "design_detail", "acceptance_tests", "traceability_matrix"):
+            rel_path = target_design_refs.persistent_refs.get(key, PERSISTENT_DEFAULTS[key])
+            path = target_root / rel_path
+            check(
+                f"persistent_target_design_source:{key}",
+                path.exists() and path.is_file(),
+                f"{rel_path} {'exists' if path.exists() else 'is missing'}",
+            )
 
     selected_develop_run = develop_run_root or latest_develop_run(target_root, run_root)
     if selected_develop_run is None:

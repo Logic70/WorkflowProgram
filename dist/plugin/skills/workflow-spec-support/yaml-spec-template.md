@@ -7,23 +7,37 @@ meta:
   name: example-workflow
   version: "1.0.0"
   target_platform: claude_code
-  source_design: outputs/stages/s3-design-highlevel.md
+  source_design: outputs/stages/target-design-overview.md
   complexity: M  # S/M/L/XL - 用于 Stage 5 Turn Count 配置
 
-# 可选设计源引用：只保存 RUN_ROOT 相对路径，完整设计推理不要塞进 YAML。
-# S5 使用这些引用检查 REQ -> design node -> asset -> acceptance test -> evidence。
+# 目标工作流设计源引用：RUN_ROOT refs 用于本轮 S5，persistent refs 用于完成后的目标工作流自描述。
+# 完整设计推理不要塞进 YAML；YAML 只作为 target runtime map / projection index。
 design_refs:
-  requirements: outputs/stages/s1-requirements.yaml
-  question_backlog: outputs/stages/question-backlog.json
-  requirement_logic_map: outputs/stages/requirement-logic-map.json
-  context_findings: outputs/stages/s2-context-findings.yaml
-  design_highlevel: outputs/stages/s3-design-highlevel.md
-  design_lowlevel: outputs/stages/s3-design-lowlevel.md
-  implementation_plan: outputs/stages/s3-implementation-plan.md
-  acceptance_tests: outputs/stages/acceptance-tests.yaml
-  traceability_matrix: outputs/stages/traceability-matrix.json
+  schema_version: 2
+  naming: target_design_v1
+  requirements: outputs/stages/target-requirements.yaml
+  question_backlog: outputs/stages/target-question-backlog.json
+  requirement_logic_map: outputs/stages/target-requirement-logic-map.json
+  context_findings: outputs/stages/target-context-findings.yaml
+  design_overview: outputs/stages/target-design-overview.md
+  design_detail: outputs/stages/target-design-detail.md
+  implementation_plan: outputs/stages/target-implementation-plan.md
+  acceptance_tests: outputs/stages/target-acceptance-tests.yaml
+  traceability_matrix: outputs/stages/target-traceability-matrix.json
   # node_designs:
-  #   build_dfd: outputs/stages/node-designs/build_dfd.md
+  #   build_dfd: outputs/stages/target-node-designs/build_dfd.md
+  persistent:
+    requirements: .workflowprogram/design/source/target-requirements.yaml
+    question_backlog: .workflowprogram/design/source/target-question-backlog.json
+    requirement_logic_map: .workflowprogram/design/source/target-requirement-logic-map.json
+    context_findings: .workflowprogram/design/source/target-context-findings.yaml
+    design_overview: .workflowprogram/design/source/target-design-overview.md
+    design_detail: .workflowprogram/design/source/target-design-detail.md
+    implementation_plan: .workflowprogram/design/source/target-implementation-plan.md
+    acceptance_tests: .workflowprogram/design/source/target-acceptance-tests.yaml
+    traceability_matrix: .workflowprogram/design/source/target-traceability-matrix.json
+    # node_designs:
+    #   build_dfd: .workflowprogram/design/source/target-node-designs/build_dfd.md
 
 # 阶段定义
 stages:
@@ -35,9 +49,9 @@ stages:
     input: $ARGUMENTS
     output: |
       workflow-spec.md
-      outputs/stages/s1-requirements.yaml
-      outputs/stages/question-backlog.json
-      outputs/stages/requirement-logic-map.json
+      outputs/stages/target-requirements.yaml
+      outputs/stages/target-question-backlog.json
+      outputs/stages/target-requirement-logic-map.json
     gate: user_approval
     max_retries: 3
     on_approve: context
@@ -50,12 +64,12 @@ stages:
     agent_ref: requirement_analyst
     input: |
       workflow-spec.md
-      outputs/stages/s1-requirements.yaml
-      outputs/stages/question-backlog.json
-      outputs/stages/requirement-logic-map.json
+      outputs/stages/target-requirements.yaml
+      outputs/stages/target-question-backlog.json
+      outputs/stages/target-requirement-logic-map.json
     output: |
       outputs/stages/s2-context-report.md
-      outputs/stages/s2-context-findings.yaml
+      outputs/stages/target-context-findings.yaml
     max_retries: 3
 
   - id: design
@@ -64,17 +78,17 @@ stages:
     pattern: Specialized
     agent_ref: workflow_designer
     input: |
-      outputs/stages/s1-requirements.yaml
-      outputs/stages/question-backlog.json
-      outputs/stages/requirement-logic-map.json
+      outputs/stages/target-requirements.yaml
+      outputs/stages/target-question-backlog.json
+      outputs/stages/target-requirement-logic-map.json
       outputs/stages/s2-context-report.md
-      outputs/stages/s2-context-findings.yaml
+      outputs/stages/target-context-findings.yaml
     output: |
-      outputs/stages/s3-design-highlevel.md
-      outputs/stages/s3-design-lowlevel.md
-      outputs/stages/s3-implementation-plan.md
-      outputs/stages/acceptance-tests.yaml
-      outputs/stages/traceability-matrix.json
+      outputs/stages/target-design-overview.md
+      outputs/stages/target-design-detail.md
+      outputs/stages/target-implementation-plan.md
+      outputs/stages/target-acceptance-tests.yaml
+      outputs/stages/target-traceability-matrix.json
       workflow-spec.yaml
       workflow-view.md
       workflow-lowlevel.md
@@ -110,6 +124,7 @@ stages:
       .workflowprogram/design/workflow-spec.yaml
       .workflowprogram/design/workflow-view.md
       .workflowprogram/design/workflow-lowlevel.md
+      .workflowprogram/design/source/**
       .workflowprogram/runtime/workflow-entry.py
       .workflowprogram/runtime/workflow-runner.py
       .workflowprogram/runtime/validate-run-state.py
@@ -472,6 +487,7 @@ test_contract:
       - .workflowprogram/design/workflow-spec.yaml
       - .workflowprogram/design/workflow-view.md
       - .workflowprogram/design/workflow-lowlevel.md
+      - .workflowprogram/design/source/**
       - .workflowprogram/runtime/workflow-entry.py
       - .workflowprogram/runtime/workflow-runner.py
       - .workflowprogram/runtime/validate-run-state.py

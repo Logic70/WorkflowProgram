@@ -12,18 +12,11 @@ from typing import Any, Dict, List
 
 from lib.io_utils import utc_now, write_json
 from lib.reporting import with_report_fields
+from lib.target_design_refs import CANONICAL_RUN_DEFAULTS, LEGACY_RUN_DEFAULTS, REQUIRED_RUN_REF_KEYS, iter_existing_node_design_refs, resolve_target_design_refs
+from lib.yaml_utils import try_load_yaml_mapping
 
 
-REQUIRED_ARTIFACTS = {
-    "requirements": "outputs/stages/s1-requirements.yaml",
-    "context_findings": "outputs/stages/s2-context-findings.yaml",
-    "design_highlevel": "outputs/stages/s3-design-highlevel.md",
-    "design_lowlevel": "outputs/stages/s3-design-lowlevel.md",
-    "acceptance_tests": "outputs/stages/acceptance-tests.yaml",
-    "traceability_matrix": "outputs/stages/traceability-matrix.json",
-    "implementation_plan": "outputs/stages/s3-implementation-plan.md",
-    "workflow_spec": "workflow-spec.yaml",
-}
+REQUIRED_ARTIFACT_KEYS = (*REQUIRED_RUN_REF_KEYS, "workflow_spec")
 
 OPTIONAL_ARTIFACTS = {
     "route_intent": "outputs/stages/route-intent.json",
@@ -80,18 +73,31 @@ def load_json(path: Path) -> Dict[str, Any]:
 
 
 def node_design_records(run_root: Path) -> List[Dict[str, Any]]:
-    root = run_root / "outputs" / "stages" / "node-designs"
-    if not root.exists():
-        return []
     records: List[Dict[str, Any]] = []
-    for path in sorted(root.rglob("*.md")):
-        rel_path = str(path.relative_to(run_root)).replace("\\", "/")
+    for rel_path in sorted(set(iter_existing_node_design_refs(run_root).values())):
         records.append(file_record(run_root, rel_path, required=False))
     return records
 
 
+def resolve_required_artifacts(run_root: Path) -> Dict[str, str]:
+    spec = try_load_yaml_mapping(run_root / "workflow-spec.yaml")
+    resolved = resolve_target_design_refs(spec)
+    artifacts: Dict[str, str] = {}
+    for key in REQUIRED_RUN_REF_KEYS:
+        candidates = []
+        if key in resolved.run_refs:
+            candidates.append(resolved.run_refs[key])
+        candidates.append(CANONICAL_RUN_DEFAULTS[key])
+        candidates.append(LEGACY_RUN_DEFAULTS[key])
+        selected = next((item for item in candidates if item and (run_root / item).exists()), candidates[0])
+        artifacts[key] = selected
+    artifacts["workflow_spec"] = "workflow-spec.yaml"
+    return artifacts
+
+
 def build_packet(run_root: Path, target_root: Path | None, request: str) -> Dict[str, Any]:
-    required = {name: file_record(run_root, rel, required=True) for name, rel in REQUIRED_ARTIFACTS.items()}
+    required_artifacts = resolve_required_artifacts(run_root)
+    required = {name: file_record(run_root, rel, required=True) for name, rel in required_artifacts.items()}
     optional = {name: file_record(run_root, rel, required=False) for name, rel in OPTIONAL_ARTIFACTS.items()}
     node_designs = node_design_records(run_root)
     missing_required = [name for name, item in required.items() if not item["exists"]]
