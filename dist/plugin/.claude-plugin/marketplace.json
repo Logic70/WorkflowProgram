@@ -17,7 +17,7 @@
         "ref": "main"
       },
       "description": "A Claude Code plugin that packages WorkflowProgram-CN as reusable workflow development commands, skills, agents, and validation assets",
-      "version": "0.1.9",
+      "version": "0.1.10",
       "author": {
         "name": "Logic_70",
         "email": "zjmp8870@outlook.com"
