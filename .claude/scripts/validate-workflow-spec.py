@@ -28,6 +28,12 @@ from lib.host_team_utils import (
     string_list,
 )
 from lib.spec_utils import stage_slot_id_map
+from lib.target_design_refs import (
+    ALLOWED_DESIGN_REF_FIELDS,
+    CANONICAL_RUN_DEFAULTS,
+    REQUIRED_RUN_REF_KEYS,
+    resolve_target_design_refs,
+)
 from lib.yaml_utils import load_yaml_mapping
 
 
@@ -85,6 +91,9 @@ VALID_WORKFLOW_GRAPH_GATES = {
     "test_gate",
     "done",
 }
+VALID_WORKFLOW_GRAPH_NODE_COMPLEXITY = {"simple", "moderate", "complex"}
+VALID_WORKFLOW_GRAPH_DESIGN_INTENSITY = {"basic", "standard", "detailed"}
+VALID_NODE_DESIGN_EXEMPTION_ACCEPTED_BY = {"user", "design_review"}
 VALID_LOOP_MODES = {"ralph"}
 VALID_LOOP_GOAL_SOURCES = {"user", "model_subgoal"}
 VALID_LOOP_FEEDBACK_KINDS = {"validator", "verifier", "test"}
@@ -488,6 +497,10 @@ def validate_workflow_graph(
         input_refs = node.get("input_refs")
         output_refs = node.get("output_refs")
         loop_policy = node.get("loop_policy")
+        node_complexity = node.get("complexity")
+        design_intensity = node.get("design_intensity")
+        node_design_required = node.get("node_design_required")
+        node_design_exemption = node.get("node_design_exemption")
 
         if not node_id:
             add_error(errors, f"{prefix}.id is required")
@@ -525,6 +538,24 @@ def validate_workflow_graph(
                     errors,
                     f"{prefix}.output_refs[{output_idx}] target asset must be declared in registry or test_contract.artifacts: {output_ref}",
                 )
+        if node_complexity is not None and str(node_complexity).strip() not in VALID_WORKFLOW_GRAPH_NODE_COMPLEXITY:
+            add_error(errors, f"{prefix}.complexity must be one of {sorted(VALID_WORKFLOW_GRAPH_NODE_COMPLEXITY)}")
+        if design_intensity is not None and str(design_intensity).strip() not in VALID_WORKFLOW_GRAPH_DESIGN_INTENSITY:
+            add_error(errors, f"{prefix}.design_intensity must be one of {sorted(VALID_WORKFLOW_GRAPH_DESIGN_INTENSITY)}")
+        if node_design_required is not None and not isinstance(node_design_required, bool):
+            add_error(errors, f"{prefix}.node_design_required must be boolean")
+        if node_design_exemption is not None:
+            if not isinstance(node_design_exemption, dict):
+                add_error(errors, f"{prefix}.node_design_exemption must be a mapping/object")
+            else:
+                if not str(node_design_exemption.get("reason", "")).strip():
+                    add_error(errors, f"{prefix}.node_design_exemption.reason is required")
+                accepted_by = str(node_design_exemption.get("accepted_by", "")).strip()
+                if accepted_by not in VALID_NODE_DESIGN_EXEMPTION_ACCEPTED_BY:
+                    add_error(
+                        errors,
+                        f"{prefix}.node_design_exemption.accepted_by must be one of {sorted(VALID_NODE_DESIGN_EXEMPTION_ACCEPTED_BY)}",
+                    )
         if loop_policy is not None:
             validate_node_loop_policy(node_id, loop_policy, prefix, errors, warnings)
 
@@ -1246,50 +1277,41 @@ def validate_design_refs(
     errors: List[str],
     warnings: List[str],
 ) -> None:
-    """校验 S1/S2/S3 设计源引用，只检查路径安全和 graph 引用。"""
+    """校验目标工作流设计源引用、迁移兼容和复杂节点设计约束。"""
 
     if not design_refs:
         return
 
-    allowed_fields = {
-        "requirements",
-        "question_backlog",
-        "requirement_logic_map",
-        "context_findings",
-        "design_highlevel",
-        "design_lowlevel",
-        "implementation_plan",
-        "acceptance_tests",
-        "traceability_matrix",
-        "node_designs",
-    }
-    extra = sorted(set(design_refs.keys()) - allowed_fields)
+    extra = sorted(set(design_refs.keys()) - ALLOWED_DESIGN_REF_FIELDS)
     if extra:
         add_warn(warnings, f"design_refs has unknown keys: {', '.join(extra)}")
 
-    def validate_ref_path(value: Any, field: str, require_node_design_prefix: bool = False) -> None:
-        path = str(value or "").strip()
-        if not path:
-            add_error(errors, f"{field} must not be empty")
-            return
-        if not SAFE_RELATIVE_PATH_RE.match(path):
-            add_error(errors, f"{field} must be a safe relative path")
-            return
-        if not path.startswith("outputs/stages/"):
-            add_error(errors, f"{field} must stay under outputs/stages/: {path}")
-        if require_node_design_prefix and not path.startswith("outputs/stages/node-designs/"):
-            add_error(errors, f"{field} must stay under outputs/stages/node-designs/: {path}")
+    resolved = resolve_target_design_refs(design_refs)
+    errors.extend(resolved.errors)
+    warnings.extend(resolved.warnings)
+    if resolved.canonical:
+        if resolved.schema_version != 2:
+            add_error(errors, "design_refs.schema_version must be 2 when naming=target_design_v1")
+        if resolved.naming != "target_design_v1":
+            add_error(errors, "design_refs.naming must be target_design_v1 when schema_version=2")
+        for key in REQUIRED_RUN_REF_KEYS:
+            value = resolved.run_refs.get(key, "")
+            if not value:
+                add_error(errors, f"design_refs.{key} is required when schema_version=2")
+            elif value != CANONICAL_RUN_DEFAULTS[key]:
+                add_error(errors, f"design_refs.{key} must use canonical target path {CANONICAL_RUN_DEFAULTS[key]}")
+        if not resolved.persistent_refs:
+            add_warn(warnings, "design_refs.persistent is recommended for completed target workflows")
 
-    for key in sorted(allowed_fields - {"node_designs"}):
-        if key in design_refs:
-            validate_ref_path(design_refs.get(key), f"design_refs.{key}")
-
-    raw_node_designs = design_refs.get("node_designs")
-    if raw_node_designs is None:
-        return
-    if not isinstance(raw_node_designs, dict):
-        add_error(errors, "design_refs.node_designs must be a mapping of node_id to path")
-        return
+    node_design_policy = design_refs.get("node_design_policy", {})
+    if node_design_policy is not None and not isinstance(node_design_policy, dict):
+        add_error(errors, "design_refs.node_design_policy must be a mapping/object")
+    elif isinstance(node_design_policy, dict):
+        if "required_for_complex_nodes" in node_design_policy and not isinstance(node_design_policy.get("required_for_complex_nodes"), bool):
+            add_error(errors, "design_refs.node_design_policy.required_for_complex_nodes must be boolean")
+        exemption_field = str(node_design_policy.get("exemption_field", "")).strip()
+        if exemption_field and exemption_field != "node_design_exemption":
+            add_error(errors, "design_refs.node_design_policy.exemption_field must be node_design_exemption")
 
     nodes = workflow_graph.get("nodes", []) if isinstance(workflow_graph, dict) else []
     graph_node_ids: Set[str] = set()
@@ -1300,16 +1322,39 @@ def validate_design_refs(
             if isinstance(node, dict) and str(node.get("id", "")).strip()
         }
 
-    for node_id, path in raw_node_designs.items():
-        node_text = str(node_id).strip()
-        if not node_text:
-            add_error(errors, "design_refs.node_designs contains an empty node id")
-            continue
+    for node_text in sorted(resolved.node_designs):
         if graph_node_ids and node_text not in graph_node_ids:
             add_error(errors, f"design_refs.node_designs references unknown workflow_graph node: {node_text}")
         elif not graph_node_ids:
             add_warn(warnings, "design_refs.node_designs declared without workflow_graph.nodes; node references cannot be fully checked")
-        validate_ref_path(path, f"design_refs.node_designs.{node_text}", require_node_design_prefix=True)
+
+    if not isinstance(nodes, list):
+        return
+    for idx, raw_node in enumerate(nodes):
+        if not isinstance(raw_node, dict):
+            continue
+        node_id = str(raw_node.get("id", "")).strip()
+        if not node_id:
+            continue
+        loop_policy = raw_node.get("loop_policy", {})
+        loop_enabled = isinstance(loop_policy, dict) and loop_policy.get("enabled") is True
+        requires_design = (
+            raw_node.get("node_design_required") is True
+            or str(raw_node.get("complexity", "")).strip() == "complex"
+            or str(raw_node.get("design_intensity", "")).strip() == "detailed"
+            or loop_enabled
+        )
+        if not requires_design:
+            continue
+        if node_id in resolved.node_designs:
+            continue
+        exemption = raw_node.get("node_design_exemption")
+        if isinstance(exemption, dict) and str(exemption.get("reason", "")).strip() and str(exemption.get("accepted_by", "")).strip() in VALID_NODE_DESIGN_EXEMPTION_ACCEPTED_BY:
+            continue
+        add_error(
+            errors,
+            f"workflow_graph.nodes[{idx}] requires design_refs.node_designs.{node_id} or valid node_design_exemption",
+        )
 
 
 def validate_generated_runtime_contract(

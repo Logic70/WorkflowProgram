@@ -28,6 +28,12 @@ from lib.host_team_utils import (
 )
 from lib.reporting import with_report_fields
 from lib.spec_utils import path_matches_any, stage_slot_id_map
+from lib.target_design_refs import (
+    artifact_kind_for_path,
+    iter_existing_node_design_refs,
+    resolve_existing_run_refs,
+    resolve_target_design_refs,
+)
 from lib.yaml_utils import try_load_yaml_mapping
 
 
@@ -361,19 +367,6 @@ def add_check(bucket: List[Dict[str, str]], name: str, status: str, detail: str,
     )
 
 
-DESIGN_REF_PATH_KEYS = (
-    "requirements",
-    "question_backlog",
-    "requirement_logic_map",
-    "context_findings",
-    "design_highlevel",
-    "design_lowlevel",
-    "implementation_plan",
-    "acceptance_tests",
-    "traceability_matrix",
-)
-
-
 def design_ref_path_is_safe(path_text: str, *, node_design: bool = False) -> bool:
     """S5 的防御性路径检查；schema 校验仍是主入口。"""
 
@@ -382,8 +375,9 @@ def design_ref_path_is_safe(path_text: str, *, node_design: bool = False) -> boo
     parts = Path(path_text).parts
     if any(part in {"", ".", ".."} for part in parts):
         return False
-    required_prefix = "outputs/stages/node-designs/" if node_design else "outputs/stages/"
-    return path_text.startswith(required_prefix)
+    if node_design:
+        return path_text.startswith("outputs/stages/target-node-designs/") or path_text.startswith("outputs/stages/node-designs/")
+    return path_text.startswith("outputs/stages/")
 
 
 def workflow_graph_node_ids(spec: Dict[str, Any]) -> set[str]:
@@ -427,6 +421,8 @@ def add_design_lineage_checks(
     design_refs = spec.get("design_refs", {}) if isinstance(spec, dict) else {}
     if not isinstance(design_refs, dict) or not design_refs:
         return
+    resolved = resolve_target_design_refs(spec)
+    strict_governance = resolved.canonical
 
     lineage_stage_reached = result in {"PASS", "WARN"} or any(
         stage in stage_history for stage in ["design", "generate", "validate", "lessons"]
@@ -442,24 +438,33 @@ def add_design_lineage_checks(
         return
 
     resolved_paths: Dict[str, Path] = {}
-    for key in DESIGN_REF_PATH_KEYS:
-        raw_value = design_refs.get(key)
-        if raw_value is None:
-            continue
-        rel_path = str(raw_value).strip()
+    for warning in resolved.warnings:
+        add_check(checks["artifacts"], "target_design_refs_migration_warning", "INFO", warning, "workflow-spec.yaml.design_refs")
+    for error in resolved.errors:
+        add_check(checks["artifacts"], "target_design_refs_invalid", "FAIL", error, "workflow-spec.yaml.design_refs")
+    for key, rel_path in sorted(resolved.run_refs.items()):
         safe = design_ref_path_is_safe(rel_path)
         exists = safe and (run_root / rel_path).exists()
         resolved_paths[key] = run_root / rel_path
         add_check(
             checks["artifacts"],
-            f"design_ref_{key}_exists",
+            f"target_design_ref_{key}_exists",
             "PASS" if exists else "FAIL",
             f"{key}={rel_path or '<missing>'}; safe={safe}; exists={exists}",
             f"workflow-spec.yaml.design_refs.{key}",
         )
+    if strict_governance:
+        for key in ("requirements", "context_findings", "design_overview", "design_detail", "implementation_plan", "acceptance_tests", "traceability_matrix"):
+            add_check(
+                checks["artifacts"],
+                f"target_design_ref_{key}_declared",
+                "PASS" if key in resolved.run_refs else "FAIL",
+                f"{key} declared={key in resolved.run_refs}",
+                f"workflow-spec.yaml.design_refs.{key}",
+            )
 
-    node_designs = design_refs.get("node_designs", {})
-    if isinstance(node_designs, dict) and node_designs:
+    node_designs = resolved.node_designs
+    if node_designs:
         declared_nodes = workflow_graph_node_ids(spec)
         for node_id, raw_path in node_designs.items():
             node_key = str(node_id).strip()
@@ -469,14 +474,15 @@ def add_design_lineage_checks(
             node_declared = node_key in declared_nodes
             add_check(
                 checks["artifacts"],
-                f"design_ref_node_design_{node_key or 'missing'}",
+                f"target_design_ref_node_design_{node_key or 'missing'}",
                 "PASS" if safe and exists and node_declared else "FAIL",
                 f"node={node_key or '<missing>'}; declared={node_declared}; path={rel_path or '<missing>'}; safe={safe}; exists={exists}",
                 f"workflow-spec.yaml.design_refs.node_designs.{node_key or '<missing>'}",
             )
 
-    requirements_path = resolved_paths.get("requirements")
-    traceability_path = resolved_paths.get("traceability_matrix")
+    existing_refs = resolve_existing_run_refs(run_root, spec)
+    requirements_path = resolved_paths.get("requirements") or (run_root / existing_refs["requirements"] if "requirements" in existing_refs else None)
+    traceability_path = resolved_paths.get("traceability_matrix") or (run_root / existing_refs["traceability_matrix"] if "traceability_matrix" in existing_refs else None)
     if requirements_path and traceability_path and requirements_path.exists() and traceability_path.exists():
         requirement_ids = requirement_ids_from_index(requirements_path)
         try:
@@ -489,8 +495,78 @@ def add_design_lineage_checks(
             "design_lineage_requirement_traceability",
             "PASS" if requirement_ids and not missing else "FAIL",
             f"requirements={requirement_ids or ['<none>']}; missing_in_traceability={missing or ['<none>']}",
-            "outputs/stages/traceability-matrix.json",
+            str(traceability_path.relative_to(run_root)),
         )
+        graph_nodes = sorted(workflow_graph_node_ids(spec))
+        missing_nodes = [node_id for node_id in graph_nodes if node_id not in traceability_text]
+        add_check(
+            checks["artifacts"],
+            "target_traceability_covers_graph_nodes",
+            "PASS" if not missing_nodes else ("FAIL" if strict_governance else "WARN"),
+            f"workflow_graph_nodes={graph_nodes or ['<none>']}; missing_in_traceability={missing_nodes or ['<none>']}",
+            str(traceability_path.relative_to(run_root)),
+        )
+    acceptance_path = resolved_paths.get("acceptance_tests") or (run_root / existing_refs["acceptance_tests"] if "acceptance_tests" in existing_refs else None)
+    if requirements_path and acceptance_path and requirements_path.exists() and acceptance_path.exists():
+        requirement_ids = requirement_ids_from_index(requirements_path)
+        acceptance_payload = load_yaml(acceptance_path)
+        tests = acceptance_payload.get("tests", acceptance_payload.get("acceptance_tests", [])) if isinstance(acceptance_payload, dict) else []
+        if not isinstance(tests, list):
+            tests = []
+        covered: set[str] = set()
+        malformed: List[str] = []
+        for idx, test in enumerate(tests):
+            if not isinstance(test, dict):
+                malformed.append(f"index:{idx}")
+                continue
+            test_id = str(test.get("id", f"index:{idx}")).strip()
+            raw_refs = test.get("requirement_ids", test.get("covers", test.get("requirement", [])))
+            if isinstance(raw_refs, str):
+                refs = [raw_refs]
+            elif isinstance(raw_refs, list):
+                refs = [str(item).strip() for item in raw_refs if str(item).strip()]
+            else:
+                refs = []
+            if not refs:
+                malformed.append(test_id)
+            covered.update(refs)
+        missing_acceptance = [requirement_id for requirement_id in requirement_ids if requirement_id not in covered]
+        add_check(
+            checks["artifacts"],
+            "target_acceptance_tests_cover_requirements",
+            "PASS" if tests and not malformed and not missing_acceptance else ("FAIL" if strict_governance else "WARN"),
+            f"tests={len(tests)}; malformed={malformed or ['<none>']}; missing_requirements={missing_acceptance or ['<none>']}",
+            str(acceptance_path.relative_to(run_root)),
+        )
+    graph = spec.get("workflow_graph", {}) if isinstance(spec, dict) else {}
+    nodes = graph.get("nodes", []) if isinstance(graph, dict) else []
+    if isinstance(nodes, list):
+        missing_complex_designs: List[str] = []
+        for node in nodes:
+            if not isinstance(node, dict):
+                continue
+            node_id = str(node.get("id", "")).strip()
+            if not node_id:
+                continue
+            loop_policy = node.get("loop_policy", {})
+            requires_design = (
+                node.get("node_design_required") is True
+                or str(node.get("complexity", "")).strip() == "complex"
+                or str(node.get("design_intensity", "")).strip() == "detailed"
+                or (isinstance(loop_policy, dict) and loop_policy.get("enabled") is True)
+            )
+            exemption = node.get("node_design_exemption")
+            exempted = isinstance(exemption, dict) and str(exemption.get("reason", "")).strip() and str(exemption.get("accepted_by", "")).strip()
+            if requires_design and node_id not in node_designs and not exempted:
+                missing_complex_designs.append(node_id)
+        if missing_complex_designs or strict_governance:
+            add_check(
+                checks["artifacts"],
+                "target_complex_nodes_have_design_or_exemption",
+                "PASS" if not missing_complex_designs else "FAIL",
+                f"missing_node_designs={missing_complex_designs or ['<none>']}",
+                "workflow-spec.yaml.workflow_graph.nodes",
+            )
 
 
 def run_validator(script_name: str, *args: str) -> Dict[str, Any]:
@@ -1318,13 +1394,8 @@ def build_checks(
                     f"test_contract_change_required={impact_analysis.get('test_contract_change_required', '<missing>')}; reason_present={bool(str(impact_analysis.get('test_contract_change_reason', '')).strip())}",
                     "outputs/stages/impact-analysis.json",
                 )
-        s3_design_paths = [
-            run_root / "outputs" / "stages" / "s3-design-highlevel.md",
-            run_root / "outputs" / "stages" / "s3-design-lowlevel.md",
-            run_root / "outputs" / "stages" / "acceptance-tests.yaml",
-            run_root / "outputs" / "stages" / "traceability-matrix.json",
-            run_root / "outputs" / "stages" / "s3-implementation-plan.md",
-        ]
+        active_design_refs = resolve_existing_run_refs(run_root, spec)
+        s3_design_paths = [run_root / rel_path for rel_path in active_design_refs.values()]
         s3_design_present = any(path.exists() for path in s3_design_paths)
         semantic_managed_paths = [
             path
@@ -1398,13 +1469,14 @@ def build_checks(
                     "outputs/stages/entry-orchestration-summary.json",
                 )
             if semantic_managed_paths:
-                traceability_path = run_root / "outputs" / "stages" / "traceability-matrix.json"
+                active_traceability = active_design_refs.get("traceability_matrix", "outputs/stages/traceability-matrix.json")
+                traceability_path = run_root / active_traceability
                 add_check(
                     checks["flow"],
                     "design_review_semantic_changes_have_traceability",
                     "PASS" if traceability_path.exists() and gate_status == "PASS" else "FAIL",
                     f"semantic_paths={semantic_managed_paths}; traceability_exists={traceability_path.exists()}; gate_status={gate_status or '<missing>'}",
-                    "outputs/stages/traceability-matrix.json",
+                    active_traceability,
                 )
         runner_summary = load_json(run_root / "outputs" / "stages" / "runner-summary.json")
         if runner_summary:
@@ -1429,6 +1501,21 @@ def build_checks(
                 "outputs/stages/runner-summary.json",
             )
         add_design_lineage_checks(checks, spec, run_root, stage_history, result)
+        if isinstance(spec.get("design_refs"), dict) and spec.get("design_refs"):
+            target_design_validation = run_validator(
+                "validate-target-design-governance.py",
+                "--run-root",
+                str(run_root),
+                "--spec",
+                str(run_root / "workflow-spec.yaml"),
+            )
+            add_check(
+                checks["artifacts"],
+                "target_design_governance_validator",
+                "PASS" if target_design_validation.get("status") == "PASS" else "FAIL",
+                f"errors={target_design_validation.get('errors', [])}; warnings={target_design_validation.get('warnings', [])}",
+                "outputs/stages/target-design-governance-validation.json",
+            )
         requires_s1_draft = observed_intent_text == "develop" and (
             result in {"PASS", "WARN"} or any(stage in stage_history for stage in ["context", "design", "generate", "validate", "lessons"])
         )

@@ -25,6 +25,7 @@ import yaml
 from lib.control_plane import emit_stage_progress
 from lib.io_utils import utc_now, write_json
 from lib.spec_utils import path_matches_any, require_stage_slot, resolve_required_stage_slots, stage_slot_object_map
+from lib.target_design_refs import artifact_kind_for_path
 from lib.yaml_utils import load_yaml_mapping
 
 from runtime_host import RuntimeHostConfig, probe_runtime_host, resolve_runtime_host_config
@@ -443,24 +444,9 @@ def infer_kind(path: str) -> str:
 
     cleaned = path.strip().rstrip("/")
     name = Path(cleaned).name
-    if cleaned.endswith("outputs/stages/s1-requirements.yaml"):
-        return "requirement_index"
-    if cleaned.endswith("outputs/stages/question-backlog.json"):
-        return "question_backlog"
-    if cleaned.endswith("outputs/stages/requirement-logic-map.json"):
-        return "requirement_logic_map"
-    if cleaned.endswith("outputs/stages/s2-context-findings.yaml"):
-        return "context_findings"
-    if cleaned.endswith("outputs/stages/s3-design-highlevel.md") or cleaned.endswith("outputs/stages/s3-design-lowlevel.md"):
-        return "design_source"
-    if "/outputs/stages/node-designs/" in cleaned:
-        return "node_design"
-    if cleaned.endswith("outputs/stages/s3-implementation-plan.md"):
-        return "implementation_plan"
-    if cleaned.endswith("outputs/stages/acceptance-tests.yaml"):
-        return "acceptance_tests"
-    if cleaned.endswith("outputs/stages/traceability-matrix.json"):
-        return "traceability_matrix"
+    target_design_kind = artifact_kind_for_path(cleaned)
+    if target_design_kind:
+        return target_design_kind
     if cleaned.endswith("outputs/stages/design-review/design-review-packet.json"):
         return "design_review_packet"
     if cleaned.endswith("outputs/stages/design-review/issues.json") or cleaned.endswith("outputs/stages/design-review/round-1.json"):
