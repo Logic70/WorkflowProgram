@@ -24,6 +24,8 @@ from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
 from lib.io_utils import utc_now, write_json
+from lib.target_design_refs import PERSISTENT_DEFAULTS, iter_existing_node_design_refs, resolve_existing_run_refs
+from lib.yaml_utils import try_load_yaml_mapping
 
 
 ENTRY_TO_INTENT = {
@@ -414,10 +416,11 @@ def resolve_candidate_layout(candidate_root: Path) -> Tuple[Path, Path]:
 def stage_persistent_design_assets(
     *,
     candidate_stage_root: Path,
+    run_root: Path,
     spec_path: Path,
     view_path: Path,
     lowlevel_path: Path,
-) -> Dict[str, str]:
+) -> Dict[str, Any]:
     """把本轮设计资产复制到 candidate/.workflowprogram/design/，供 managed apply 持久化。"""
 
     design_root = candidate_stage_root / ".workflowprogram" / "design"
@@ -428,11 +431,31 @@ def stage_persistent_design_assets(
     shutil.copy2(spec_path, target_spec)
     shutil.copy2(view_path, target_view)
     shutil.copy2(lowlevel_path, target_lowlevel)
+    spec_payload = try_load_yaml_mapping(spec_path)
+    copied_sources: Dict[str, str] = {}
+    for key, rel_path in resolve_existing_run_refs(run_root, spec_payload).items():
+        source = run_root / rel_path
+        persistent_rel = PERSISTENT_DEFAULTS.get(key)
+        if not persistent_rel or not source.exists() or not source.is_file():
+            continue
+        target = candidate_stage_root / persistent_rel
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(source, target)
+        copied_sources[key] = str(target)
+    for node_id, rel_path in iter_existing_node_design_refs(run_root, spec_payload).items():
+        source = run_root / rel_path
+        if not source.exists() or not source.is_file():
+            continue
+        target = candidate_stage_root / ".workflowprogram" / "design" / "source" / "target-node-designs" / f"{node_id}.md"
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(source, target)
+        copied_sources[f"node_design:{node_id}"] = str(target)
     return {
         "design_root": str(design_root),
         "workflow_spec": str(target_spec),
         "workflow_view": str(target_view),
         "workflow_lowlevel": str(target_lowlevel),
+        "source_archive": copied_sources,
     }
 
 
@@ -701,6 +724,7 @@ def command_run(args: argparse.Namespace) -> int:
     )
 
     spec_validation = validate_spec(spec_path)
+    spec_payload = try_load_yaml_mapping(spec_path)
     view_path = run_root / "workflow-view.md"
     view_generation = generate_view(spec_path, view_path)
     lowlevel_path = run_root / "workflow-lowlevel.md"
@@ -717,7 +741,7 @@ def command_run(args: argparse.Namespace) -> int:
     state_validation: Dict[str, Any] | None = None
     stopped_before_runner = False
     final_status = "PASS"
-    design_assets: Dict[str, str] | None = None
+    design_assets: Dict[str, Any] | None = None
     target_runtime_assets: Dict[str, Any] | None = None
     change_policy_validation: Dict[str, Any] | None = None
     design_review_validation: Dict[str, Any] | None = None
@@ -750,13 +774,7 @@ def command_run(args: argparse.Namespace) -> int:
 
         if final_status != "BLOCKED":
             candidate_stage_root, candidate_claude_root = resolve_candidate_layout(candidate_root)
-            s3_design_markers = [
-                stages_root / "s3-design-highlevel.md",
-                stages_root / "s3-design-lowlevel.md",
-                stages_root / "acceptance-tests.yaml",
-                stages_root / "traceability-matrix.json",
-                stages_root / "s3-implementation-plan.md",
-            ]
+            s3_design_markers = [run_root / rel_path for rel_path in resolve_existing_run_refs(run_root, spec_payload).values()]
             design_review_required = candidate_stage_root.exists() or any(path.exists() for path in s3_design_markers)
             if design_review_required:
                 design_review_validation = validate_design_review_gate(run_root)
@@ -774,6 +792,7 @@ def command_run(args: argparse.Namespace) -> int:
                 raise RuntimeError(f"develop flow requires candidate .claude root before orchestration: {candidate_claude_root}")
             design_assets = stage_persistent_design_assets(
                 candidate_stage_root=candidate_stage_root,
+                run_root=run_root,
                 spec_path=spec_path,
                 view_path=view_path,
                 lowlevel_path=lowlevel_path,

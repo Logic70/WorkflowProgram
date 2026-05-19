@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """
-根据 workflow-spec.yaml 生成目标工作流的维护级 LowLevel 说明。
+根据 workflow-spec.yaml 生成目标工作流的派生维护说明。
 
 定位：
 - workflow-spec.yaml: 机器可执行真源
 - workflow-view.md: 人类只读概览
-- workflow-lowlevel.md: 维护/迭代指导，不得覆盖 YAML 语义
+- workflow-lowlevel.md: derived target view，维护/迭代指导，不得覆盖 YAML 语义
 """
 
 from __future__ import annotations
@@ -84,8 +84,9 @@ def render_truth_hierarchy() -> List[str]:
         "## Truth Hierarchy",
         "",
         "- `workflow-spec.yaml`：唯一机器真源。任何影响执行、校验、阶段流转、输入输出边界的内容都必须先进入这里。",
-        "- `workflow-view.md`：从 YAML 单向渲染出的只读概览，便于快速审查，不允许反向改语义。",
-        "- `workflow-lowlevel.md`：维护与迭代指导文档，用于解释阶段职责、证据归属和修改方法；不得覆盖 YAML 语义。",
+        "- `workflow-view.md`：从 YAML 单向渲染出的 derived target view，便于快速审查，不允许反向改语义。",
+        "- `workflow-lowlevel.md`：derived target view，用于解释阶段职责、证据归属和修改方法；不得覆盖 YAML 语义。",
+        "- `target-design-overview.md` / `target-design-detail.md`：target design source，负责保存完整设计推理。",
         "",
     ]
 
@@ -290,6 +291,7 @@ def render_delivery_rules() -> List[str]:
         "## Persistent Design Assets",
         "",
         "- develop 成功后，应把 `workflow-spec.yaml`、`workflow-view.md`、`workflow-lowlevel.md` 持久化到 `TARGET_ROOT/.workflowprogram/design/`。",
+        "- develop 成功后，应把 target design source 归档到 `TARGET_ROOT/.workflowprogram/design/source/**`，用于后续修改、审计和发布。",
         "- develop 成功后，应把 `workflow-entry.py`、`workflow-runner.py`、`validate-run-state.py`、`runtime-manifest.json` 持久化到 `TARGET_ROOT/.workflowprogram/runtime/`。",
         "- 持久化副本属于 WorkflowProgram 托管资产，必须走 managed apply / manifest，而不是直接裸写目标目录。",
         "- 目标侧副本用于后续 audit / iterate / 人工维护理解当前工作流；当前运行的控制面输入仍以 `RUN_ROOT/workflow-spec.yaml` 为准。",

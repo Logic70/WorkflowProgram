@@ -50,9 +50,13 @@ def main() -> int:
         stages_root / "clarification-record.json",
         stages_root / "open-questions.json",
         stages_root / "design-readiness-report.json",
-        stages_root / "question-backlog.json",
-        stages_root / "requirement-logic-map.json",
+        stages_root / "target-question-backlog.json",
+        stages_root / "target-requirement-logic-map.json",
     ]
+    if not required_inputs[3].exists():
+        required_inputs[3] = stages_root / "question-backlog.json"
+    if not required_inputs[4].exists():
+        required_inputs[4] = stages_root / "requirement-logic-map.json"
     missing = [str(path) for path in required_inputs if not path.exists()]
     if missing:
         payload = {
@@ -68,8 +72,8 @@ def main() -> int:
 
     data = draft_data_from_text(load_text(spec_path))
     readiness = readiness_report_from_data(data)
-    question_backlog = load_json(stages_root / "question-backlog.json")
-    requirement_logic_map = load_json(stages_root / "requirement-logic-map.json")
+    question_backlog = load_json(required_inputs[3])
+    requirement_logic_map = load_json(required_inputs[4])
     challenge_report = clarification_challenge_report_from_data(
         data,
         readiness,

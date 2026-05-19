@@ -57,6 +57,8 @@ def main() -> int:
     readiness_report_path = stages_root / "design-readiness-report.json"
     question_backlog_path = stages_root / "question-backlog.json"
     requirement_logic_map_path = stages_root / "requirement-logic-map.json"
+    target_question_backlog_path = stages_root / "target-question-backlog.json"
+    target_requirement_logic_map_path = stages_root / "target-requirement-logic-map.json"
 
     clarification_record = clarification_record_from_data(data)
     open_questions = open_questions_from_data(data)
@@ -70,6 +72,8 @@ def main() -> int:
     write_json(readiness_report_path, readiness_report)
     write_json(question_backlog_path, question_backlog)
     write_json(requirement_logic_map_path, requirement_logic_map)
+    write_json(target_question_backlog_path, question_backlog)
+    write_json(target_requirement_logic_map_path, requirement_logic_map)
     assumption_log_path.parent.mkdir(parents=True, exist_ok=True)
     assumption_log_path.write_text(assumption_log, encoding="utf-8", newline="\n")
 
@@ -85,6 +89,8 @@ def main() -> int:
         "design_readiness_report": str(readiness_report_path),
         "question_backlog": str(question_backlog_path),
         "requirement_logic_map": str(requirement_logic_map_path),
+        "target_question_backlog": str(target_question_backlog_path),
+        "target_requirement_logic_map": str(target_requirement_logic_map_path),
         "ready": readiness_report.get("ready", False),
     }
     if args.json:

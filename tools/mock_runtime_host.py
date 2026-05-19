@@ -24,6 +24,12 @@ if str(SCRIPT_ROOT) not in sys.path:
 
 from lib.io_utils import iso_now, write_json
 from lib.reporting import with_report_fields
+from lib.target_design_refs import (
+    PERSISTENT_DEFAULTS,
+    iter_existing_node_design_refs,
+    resolve_existing_run_refs,
+    resolve_target_design_refs,
+)
 
 
 def write_text(path: Path, content: str) -> None:
@@ -232,6 +238,21 @@ def write_design_source_artifacts(run_root: Path, request: str) -> None:
             ],
         },
     )
+    canonical_pairs = {
+        "s1-requirements.yaml": "target-requirements.yaml",
+        "question-backlog.json": "target-question-backlog.json",
+        "requirement-logic-map.json": "target-requirement-logic-map.json",
+        "s2-context-findings.yaml": "target-context-findings.yaml",
+        "s3-design-highlevel.md": "target-design-overview.md",
+        "s3-design-lowlevel.md": "target-design-detail.md",
+        "s3-implementation-plan.md": "target-implementation-plan.md",
+        "acceptance-tests.yaml": "target-acceptance-tests.yaml",
+        "traceability-matrix.json": "target-traceability-matrix.json",
+    }
+    for legacy_name, canonical_name in canonical_pairs.items():
+        source = stages_root / legacy_name
+        if source.exists():
+            shutil.copy2(source, stages_root / canonical_name)
 
 
 def copy_runtime_spec(
@@ -307,6 +328,24 @@ def copy_runtime_spec(
         nodes = graph.get("nodes", []) if isinstance(graph, dict) else []
         if isinstance(nodes, list) and nodes:
             nodes[-1]["loop_policy"] = node_loop_policy
+            node_id = str(nodes[-1].get("id", "implement")).strip() or "implement"
+            design_refs = payload.setdefault("design_refs", {})
+            if isinstance(design_refs, dict):
+                node_designs = design_refs.setdefault("node_designs", {})
+                if isinstance(node_designs, dict):
+                    node_designs[node_id] = f"outputs/stages/target-node-designs/{node_id}.md"
+                persistent_refs = design_refs.setdefault("persistent", {})
+                if isinstance(persistent_refs, dict):
+                    persistent_node_designs = persistent_refs.setdefault("node_designs", {})
+                    if isinstance(persistent_node_designs, dict):
+                        persistent_node_designs[node_id] = f".workflowprogram/design/source/target-node-designs/{node_id}.md"
+            write_text(
+                run_root / "outputs" / "stages" / "target-node-designs" / f"{node_id}.md",
+                "# Target Node Design\n\n"
+                f"- Node: `{node_id}`\n"
+                "- Loop policy requires bounded TDD-style iteration evidence.\n"
+                "- Exit condition: verifier/test evidence satisfies the declared loop policy.\n",
+            )
         if isinstance(generated_runtime_contract, dict):
             caps = generated_runtime_contract.get("runtime_capabilities", [])
             if isinstance(caps, list) and "node_loop_execution" not in caps:
@@ -771,6 +810,7 @@ def write_change_policy_inputs(
             "allowed_derived_artifacts": [
                 ".workflowprogram/design/workflow-view.md",
                 ".workflowprogram/design/workflow-lowlevel.md",
+                ".workflowprogram/design/source/**",
                 ".workflowprogram/runtime/**",
             ],
             "preserve_user_edits": True,
@@ -1264,6 +1304,45 @@ def generate_target_runtime_assets(repo_root: Path, spec_path: Path, out_root: P
     }
 
 
+def stage_design_source_archive(run_root: Path, spec_path: Path, destination_root: Path) -> Dict[str, str]:
+    """Copy target design source files to a managed destination root."""
+
+    try:
+        spec_payload = yaml.safe_load(spec_path.read_text(encoding="utf-8"))
+    except Exception:
+        spec_payload = {}
+    if not isinstance(spec_payload, dict):
+        spec_payload = {}
+    resolved = resolve_target_design_refs(spec_payload)
+    persistent_refs = dict(PERSISTENT_DEFAULTS)
+    persistent_refs.update(resolved.persistent_refs)
+
+    copied: Dict[str, str] = {}
+    for key, rel_path in resolve_existing_run_refs(run_root, spec_payload).items():
+        target_rel = persistent_refs.get(key)
+        source = run_root / rel_path
+        if not target_rel or not source.exists() or not source.is_file():
+            continue
+        target = destination_root / target_rel
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(source, target)
+        copied[key] = target.relative_to(destination_root).as_posix()
+
+    for node_id, rel_path in iter_existing_node_design_refs(run_root, spec_payload).items():
+        source = run_root / rel_path
+        if not source.exists() or not source.is_file():
+            continue
+        target_rel = resolved.persistent_node_designs.get(
+            node_id,
+            f".workflowprogram/design/source/target-node-designs/{node_id}.md",
+        )
+        target = destination_root / target_rel
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(source, target)
+        copied[f"node_design:{node_id}"] = target.relative_to(destination_root).as_posix()
+    return copied
+
+
 def write_progress_outputs(
     run_root: Path,
     stage_history: List[str],
@@ -1357,7 +1436,8 @@ def write_managed_outputs(run_root: Path, target_root: Path, conflict: bool) -> 
     outputs = run_root / "outputs"
     settings_path = target_root / ".claude" / "settings.json"
     manifest_path = manifest_path_for(target_root)
-    candidate_source = run_root / "outputs" / "candidate" / ".claude" / "settings.json"
+    candidate_root = run_root / "outputs" / "candidate"
+    candidate_source = candidate_root / ".claude" / "settings.json"
     write_text(candidate_source, '{\n  "commands": ["example"],\n  "managed": true\n}\n')
     rules_source = run_root / "outputs" / "candidate" / ".claude" / "rules" / "constraints.md"
     command_source = run_root / "outputs" / "candidate" / ".claude" / "commands" / "example.md"
@@ -1374,7 +1454,17 @@ def write_managed_outputs(run_root: Path, target_root: Path, conflict: bool) -> 
         (design_lowlevel_source, run_root / "workflow-lowlevel.md"),
     ):
         source_path.write_text(run_path.read_text(encoding="utf-8"), encoding="utf-8", newline="\n")
+    source_archive = stage_design_source_archive(run_root, run_root / "workflow-spec.yaml", candidate_root)
     runtime_files = generate_target_runtime_assets(Path(__file__).resolve().parents[1], run_root / "workflow-spec.yaml", runtime_root)
+    source_plan_entries = [
+        {
+            "relative_path": rel_path,
+            "source_path": str(candidate_root / rel_path),
+            "target_path": str(target_root / rel_path),
+            "decision": "create",
+        }
+        for rel_path in sorted(source_archive.values())
+    ]
     plan_entries = [
         {
             "relative_path": ".claude/settings.json",
@@ -1436,11 +1526,12 @@ def write_managed_outputs(run_root: Path, target_root: Path, conflict: bool) -> 
             "target_path": str(target_root / ".workflowprogram" / "runtime" / "runtime-manifest.json"),
             "decision": "create",
         },
+        *source_plan_entries,
     ]
     managed_summary = {
-        "create": 9,
-        "update": 0 if conflict else 1,
-        "conflict": 1 if conflict else 0,
+        "create": sum(1 for entry in plan_entries if entry["decision"] == "create"),
+        "update": sum(1 for entry in plan_entries if entry["decision"] == "update"),
+        "conflict": sum(1 for entry in plan_entries if str(entry["decision"]).startswith("conflict")),
     }
     write_json(
         outputs / "managed-change-plan.json",
@@ -1491,6 +1582,16 @@ def write_managed_outputs(run_root: Path, target_root: Path, conflict: bool) -> 
                     "run_id": run_root.name,
                 }
             )
+    source_manifest_entries = [
+        {
+            "relative_path": entry["relative_path"],
+            "last_applied_hash": "mock-managed-hash-design-source",
+            "ownership": "workflowprogram",
+            "producer_version": "mock-runtime-host",
+            "updated_at": iso_now(),
+        }
+        for entry in source_plan_entries
+    ]
     write_json(
         manifest_path,
         {
@@ -1569,7 +1670,8 @@ def write_managed_outputs(run_root: Path, target_root: Path, conflict: bool) -> 
                         "ownership": "workflowprogram",
                         "producer_version": "mock-runtime-host",
                         "updated_at": iso_now(),
-                    }
+                    },
+                    *source_manifest_entries,
                 ]
             ),
         },
@@ -1648,6 +1750,8 @@ def create_target_outputs(run_root: Path, target_root: Path, *, include_claude_a
         target_path = design_root / name
         target_path.write_text(source_path.read_text(encoding="utf-8"), encoding="utf-8", newline="\n")
         files.append(f".workflowprogram/design/{name}")
+    source_archive = stage_design_source_archive(run_root, run_root / "workflow-spec.yaml", target_root)
+    files.extend(source_archive.values())
     runtime_root = target_root / ".workflowprogram" / "runtime"
     runtime_files = generate_target_runtime_assets(Path(__file__).resolve().parents[1], run_root / "workflow-spec.yaml", runtime_root)
     files.extend(

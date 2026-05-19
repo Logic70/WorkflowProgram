@@ -19,6 +19,12 @@ from typing import Any, Dict, List, Optional
 import yaml
 from lib.failure_codes import failure_kind_from_code
 from lib.io_utils import iso_now, write_json
+from lib.target_design_refs import (
+    PERSISTENT_DEFAULTS,
+    iter_existing_node_design_refs,
+    resolve_existing_run_refs,
+    resolve_target_design_refs,
+)
 
 
 AUTH_STATUS_TIMEOUT_SECONDS = 5
@@ -694,6 +700,21 @@ def _write_design_source_artifacts(run_root: Path, request: str) -> None:
             ],
         },
     )
+    canonical_pairs = {
+        "s1-requirements.yaml": "target-requirements.yaml",
+        "question-backlog.json": "target-question-backlog.json",
+        "requirement-logic-map.json": "target-requirement-logic-map.json",
+        "s2-context-findings.yaml": "target-context-findings.yaml",
+        "s3-design-highlevel.md": "target-design-overview.md",
+        "s3-design-lowlevel.md": "target-design-detail.md",
+        "s3-implementation-plan.md": "target-implementation-plan.md",
+        "acceptance-tests.yaml": "target-acceptance-tests.yaml",
+        "traceability-matrix.json": "target-traceability-matrix.json",
+    }
+    for legacy_name, canonical_name in canonical_pairs.items():
+        source = stages_root / legacy_name
+        if source.exists():
+            shutil.copy2(source, stages_root / canonical_name)
 
 
 def _copy_runtime_spec(repo_root: Path, run_root: Path, entry_skill: str) -> Path:
@@ -707,6 +728,45 @@ def _copy_runtime_spec(repo_root: Path, run_root: Path, entry_skill: str) -> Pat
     _write_text(target, yaml.safe_dump(payload, allow_unicode=True, sort_keys=False))
     _write_design_review_evidence(repo_root, run_root, request="fixture_host request")
     return target
+
+
+def _stage_design_source_archive(run_root: Path, spec_path: Path, candidate_root: Path) -> Dict[str, str]:
+    """把 target design source 放入 managed candidate，模拟真实 workflow-entry 行为。"""
+
+    try:
+        spec_payload = yaml.safe_load(spec_path.read_text(encoding="utf-8"))
+    except Exception:
+        spec_payload = {}
+    if not isinstance(spec_payload, dict):
+        spec_payload = {}
+    resolved = resolve_target_design_refs(spec_payload)
+    persistent_refs = dict(PERSISTENT_DEFAULTS)
+    persistent_refs.update(resolved.persistent_refs)
+
+    copied: Dict[str, str] = {}
+    for key, rel_path in resolve_existing_run_refs(run_root, spec_payload).items():
+        target_rel = persistent_refs.get(key)
+        source = run_root / rel_path
+        if not target_rel or not source.exists() or not source.is_file():
+            continue
+        target = candidate_root / target_rel
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(source, target)
+        copied[key] = target.relative_to(candidate_root).as_posix()
+
+    for node_id, rel_path in iter_existing_node_design_refs(run_root, spec_payload).items():
+        source = run_root / rel_path
+        if not source.exists() or not source.is_file():
+            continue
+        target_rel = resolved.persistent_node_designs.get(
+            node_id,
+            f".workflowprogram/design/source/target-node-designs/{node_id}.md",
+        )
+        target = candidate_root / target_rel
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(source, target)
+        copied[f"node_design:{node_id}"] = target.relative_to(candidate_root).as_posix()
+    return copied
 
 
 def _sha256_file(path: Path) -> str:
@@ -1247,6 +1307,7 @@ def _invoke_fixture_host(
             ("workflow_lowlevel", "workflow-lowlevel.md"),
         ):
             shutil.copy2(design_docs[source_name], candidate_design_root / target_name)
+        _stage_design_source_archive(run_root, spec_path, candidate_root)
         _generate_target_runtime_assets(spec_path, candidate_root / ".workflowprogram" / "runtime")
 
         cmd = [
