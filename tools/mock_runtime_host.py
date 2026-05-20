@@ -255,6 +255,136 @@ def write_design_source_artifacts(run_root: Path, request: str) -> None:
             shutil.copy2(source, stages_root / canonical_name)
 
 
+def render_target_node_design(node: Dict[str, Any]) -> str:
+    """Return a minimal valid target node design for deterministic smoke fixtures."""
+
+    node_id = str(node.get("id", "implement")).strip() or "implement"
+    owner = str(node.get("owner", "example-skill")).strip() or "example-skill"
+    template = str(node.get("template", "flexible-target-graph")).strip() or "flexible-target-graph"
+    gate = str(node.get("gate", "none")).strip() or "none"
+    complexity = str(node.get("complexity", "moderate")).strip() or "moderate"
+    design_intensity = str(node.get("design_intensity", "standard")).strip() or "standard"
+    inputs = node.get("input_refs", [])
+    outputs = node.get("output_refs", [])
+    input_refs = [str(item).strip() for item in inputs if str(item).strip()] if isinstance(inputs, list) else []
+    output_refs = [str(item).strip() for item in outputs if str(item).strip()] if isinstance(outputs, list) else []
+    loop_policy = node.get("loop_policy", {})
+    loop_enabled = isinstance(loop_policy, dict) and loop_policy.get("enabled") is True
+    input_rows = "\n".join(
+        f"| `{ref}` | yes | previous node | Ref must exist before `{node_id}` starts. |" for ref in (input_refs or ["$ARGUMENTS"])
+    )
+    output_rows = "\n".join(
+        f"| `{ref}` | yes | downstream node or S5 | Ref must be present and traceable. |" for ref in (output_refs or ["outputs/target-workflow/result.md"])
+    )
+    return f"""# Target Node Design: {node_id}
+
+## 1. Node Metadata / 节点元信息
+
+- Node ID: `{node_id}`
+- Workflow spec path: `workflow_graph.nodes[id={node_id}]`
+- Owner: `{owner}`
+- Template: `{template}`
+- Gate: `{gate}`
+- Complexity: `{complexity}`
+- Design intensity: `{design_intensity}`
+
+## 2. Purpose And Boundary / 设计目的与职责边界
+
+- Purpose: Execute `{node_id}` for the generated target workflow.
+- In scope: Consume declared inputs and produce declared outputs.
+- Out of scope: Modify undeclared target assets or bypass S5 validation.
+- Upstream assumptions: WorkflowProgram has produced accepted target design source.
+
+## 3. Input Contract / 输入契约
+
+| Input ref | Required | Producer | Validation rule |
+| --- | --- | --- | --- |
+{input_rows}
+
+## 4. Output Contract And Consumers / 输出契约与消费者
+
+| Output ref | Required | Consumer | Pass criteria |
+| --- | --- | --- | --- |
+{output_rows}
+
+## 5. Context Read/Write Rules / 上下文读写规则
+
+- Reads: declared input refs and `workflow-spec.yaml`.
+- Writes: declared output refs and runtime evidence.
+- Must not mutate: unmanaged target files.
+- Persistence rule: outputs are persisted under managed target paths or RUN_ROOT evidence paths.
+
+## 6. Internal Execution Plan / 内部执行编排
+
+1. Validate input refs.
+2. Generate node outputs.
+3. Record evidence for S5.
+4. Stop only after verifier evidence is present.
+
+Loop policy:
+
+- Loop allowed: {str(loop_enabled).lower()}
+- loop_policy evidence: `outputs/stages/loops/{node_id}/loop-plan.json`, `iteration-summary.jsonl`, and `final-verdict.json` when enabled.
+
+## 7. Agent / Skill / Script / Tool Calls / 调用关系
+
+| Capability | Name | Purpose | Input | Output |
+| --- | --- | --- | --- | --- |
+| skill | `{owner}` | Execute node work | declared inputs | declared outputs |
+| script | `workflow-runner.py` | Record state transition | stage context | `state.json` |
+
+## 8. Data Field Contract / 数据字段契约
+
+| Field | Type | Required | Source | Meaning |
+| --- | --- | --- | --- | --- |
+| `node_id` | string | yes | workflow_graph | Node identity for evidence joins. |
+| `result` | string | yes | verifier | PASS, WARN, FAIL, or ENVIRONMENT-SKIP. |
+
+## 9. Exit Gate / 准出目标
+
+- Gate decision: `{gate}`.
+- Required evidence: declared outputs, `state.json`, and `events.jsonl`.
+- Human approval rule: required only when gate is not `none`.
+- Auto-approval rule: allowed only when the spec declares it.
+
+## 10. Failure, Retry, And Degrade Strategy / 失败、重试与降级策略
+
+- `FAIL` when required output refs are missing.
+- `WARN` when optional evidence is incomplete but safe to inspect.
+- `ENVIRONMENT-SKIP` when a required host capability is unavailable.
+- Retry limit: follow workflow stage retry limits.
+- Degrade strategy: degrade only to WARN with explicit evidence.
+
+## 11. Verification And Tests / 验证与测试要求
+
+- Unit or fixture test: deterministic smoke fixture covers this node.
+- Runtime verifier: S5 checks state, events, outputs, and traceability.
+- Acceptance test refs: `AT-001`.
+- Evidence paths: `state.json`, `events.jsonl`, and `outputs/stages/s5-validation-summary.json`.
+
+## 12. Observability And Debug Artifacts / 观测与调试产物
+
+- Logs: `events.jsonl`.
+- Reports: `outputs/stages/s5-validation-summary.json`.
+- State artifacts: `state.json`.
+- Debug reproduction: rerun the same fixture and inspect RUN_ROOT.
+
+## 13. Safety And Execution Constraints / 安全与执行约束
+
+- Path boundary: write only declared managed outputs.
+- Approval boundary: do not bypass declared gates.
+- Host capability boundary: missing required capability remains environment failure.
+- Secret handling: never persist secrets in node outputs.
+- Destructive action policy: destructive commands are not allowed in this fixture node.
+
+## 14. Open Tasks And Extension Points / 遗留任务与扩展点
+
+- Open tasks: none
+- Extension points: add domain-specific verifier details in real workflows.
+- Deferred decisions: none
+"""
+
+
 def copy_runtime_spec(
     repo_root: Path,
     run_root: Path,
@@ -341,10 +471,7 @@ def copy_runtime_spec(
                         persistent_node_designs[node_id] = f".workflowprogram/design/source/target-node-designs/{node_id}.md"
             write_text(
                 run_root / "outputs" / "stages" / "target-node-designs" / f"{node_id}.md",
-                "# Target Node Design\n\n"
-                f"- Node: `{node_id}`\n"
-                "- Loop policy requires bounded TDD-style iteration evidence.\n"
-                "- Exit condition: verifier/test evidence satisfies the declared loop policy.\n",
+                render_target_node_design(nodes[-1]),
             )
         if isinstance(generated_runtime_contract, dict):
             caps = generated_runtime_contract.get("runtime_capabilities", [])

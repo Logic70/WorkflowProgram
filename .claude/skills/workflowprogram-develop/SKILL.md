@@ -33,7 +33,8 @@ disable-model-invocation: true
 - S2 必须把上下文研究结构化为 `RUN_ROOT/outputs/stages/target-context-findings.yaml`，并把可复用资产、能力候选、风险、约束候选回溯到 `REQ-*`。
 - S3 必须先产出 `target-design-overview.md`、`target-design-detail.md`、`target-acceptance-tests.yaml`、`target-traceability-matrix.json` 和 `target-implementation-plan.md`，再把可执行语义投影成 `workflow-spec.yaml`。
 - S3 完成后、S4 候选资产或 managed 写入前，必须生成 `outputs/stages/design-review/design-review-packet.json`，调用内部 `workflow-design-reviewer` 做隔离上下文审视，并产出 `issues.json`、`closure.json`、`gate-validation.json`；只有 `gate-validation.json.status=PASS` 才能进入实现。
-- 若某个目标业务节点需要跨模块推理、专业工具、独立 agent/team、loop 或会影响多个下游节点，必须为它生成 `RUN_ROOT/outputs/stages/target-node-designs/<node-id>.md`；简单整理节点不得强制拆独立 agent。
+- 若某个目标业务节点需要跨模块推理、专业工具、独立 agent/team、loop、逆向/安全等高风险领域能力，或会影响多个下游节点，必须按 `${CLAUDE_PLUGIN_ROOT}/skills/workflow-spec-support/target-node-design-template.md` 生成 `RUN_ROOT/outputs/stages/target-node-designs/<node-id>.md`；简单整理节点不得强制拆独立 agent。
+- 每个 `design_refs.node_designs` 文件必须能通过 `${CLAUDE_PLUGIN_ROOT}/scripts/validate-target-node-design.py --spec <RUN_ROOT>/workflow-spec.yaml --node-design <path> --node-id <node-id>`，证明 node id、owner、template、gate、input_refs、output_refs、loop_policy、失败策略和验证证据与 `workflow_graph.nodes[*]` 一致。
 - `workflow-spec.yaml` 是机器控制面投影，不是完整设计文档；完整设计推理留在 S3 设计源，YAML 只通过可选 `design_refs` 引用这些文件路径。
 - `workflow-spec.yaml` 产出后必须调用 `${CLAUDE_PLUGIN_ROOT}/scripts/validate-workflow-spec.py` 进行结构校验。
 - `workflow-spec.yaml` 必须包含 `intent_flows`，明确 `develop / audit / iterate / validate` 的逻辑阶段流。
@@ -58,7 +59,7 @@ disable-model-invocation: true
 - 生成链路完成后必须调用 `${CLAUDE_PLUGIN_ROOT}/scripts/workflow-runner.py` 进行程序化 stage 转移和状态落盘；runner 只负责控制面，不负责 S5 主判定。
 - develop 主链的确定性脚本入口是 `${CLAUDE_PLUGIN_ROOT}/scripts/workflow-entry.py run`；它负责串起 spec 校验、视图生成、managed apply、runner 与 run-state 校验。
 - S5 主判定必须由 `workflowprogram-validate` 承担，`runtime_smoke.py` 仅作为动态 harness 补证据。
-- S5 必须检查 `REQ -> design node -> asset -> acceptance test -> evidence` 的需求血缘；缺设计节点、缺验收测试、缺证据映射或 node-design 未投影到 YAML 时，不得给出 clean PASS。
+- S5 必须检查 `REQ -> design node -> asset -> acceptance test -> evidence` 的需求血缘；缺设计节点、缺验收测试、缺证据映射、node-design 未投影到 YAML 或 node-design 内容未通过验证时，不得给出 clean PASS。
 - `RUN_ROOT/state.json` 必须通过 `${CLAUDE_PLUGIN_ROOT}/scripts/validate-run-state.py`，确保 `kind/producer/status` 枚举合规。
 - S5 必须检查 design-review gate 证据；缺 packet、缺 closure、存在 open blocking issue、stale fingerprint 或 managed apply 发生在 gate 未通过时，不得给出 clean PASS。
 
@@ -92,7 +93,7 @@ disable-model-invocation: true
 
 - `outputs/stages/target-design-overview.md`
 - `outputs/stages/target-design-detail.md`
-- 条件性 `outputs/stages/target-node-designs/<node-id>.md`
+- 条件性 `outputs/stages/target-node-designs/<node-id>.md`，复杂/loop/工具重节点必须按 target node design template 填写并通过验证
 - `outputs/stages/target-acceptance-tests.yaml`
 - `outputs/stages/target-traceability-matrix.json`
 - `outputs/stages/target-implementation-plan.md`
@@ -133,7 +134,7 @@ disable-model-invocation: true
    - `workflow-runner.py run`
    - `validate-run-state.py`
 6. 若 `managed-assets.py apply-staged` 报冲突，停止在 S4，保留 candidate 与 conflict 副本，不静默覆盖目标项目
-7. 交由 `workflowprogram-validate` 形成 S5 主判定，并在可用时运行 `runtime_smoke.py` 补充动态证据；S5 必须检查 traceability、node-design 投影一致性与 design-review gate 证据
+7. 交由 `workflowprogram-validate` 形成 S5 主判定，并在可用时运行 `runtime_smoke.py` 补充动态证据；S5 必须检查 traceability、node-design 内容与投影一致性、design-review gate 证据
 8. 读取 `RUN_ROOT/outputs/stages/entry-orchestration-summary.json` 作为产品入口编排摘要
 9. 写入进展事件：`S4 StageStarted`、`S4 StageCheckpoint`、`S4 StageCompleted`
 

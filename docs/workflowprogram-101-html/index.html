@@ -339,6 +339,11 @@
             <strong>新增证据：</strong>
             <span><code>question-backlog.json</code> 记录每个追问为什么会影响设计；<code>requirement-logic-map.json</code> 把 <code>REQ-*</code> 链接到 process / evidence / acceptance 等逻辑元素。</span>
           </div>
+
+          <div class="note-strip">
+            <strong>复杂节点设计：</strong>
+            <span>复杂、loop、工具重、逆向/安全或多下游节点需要 <code>target-node-designs/&lt;node-id&gt;.md</code>；它必须和 <code>workflow_graph.nodes[*]</code> 的 owner、template、gate、input/output、loop policy 对齐，并由 <code>validate-target-node-design.py</code> 与 S5 校验。</span>
+          </div>
         </section>
 
         <!-- ==================== 编排主链 ==================== -->

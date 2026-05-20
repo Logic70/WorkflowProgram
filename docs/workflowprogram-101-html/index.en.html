@@ -254,6 +254,11 @@
             <strong>New evidence:</strong>
             <span><code>question-backlog.json</code> records why each question changes design; <code>requirement-logic-map.json</code> links <code>REQ-*</code> items to process / evidence / acceptance elements.</span>
           </div>
+
+          <div class="note-strip">
+            <strong>Complex node design:</strong>
+            <span>Complex, loop-enabled, tool-heavy, reverse-engineering/security, or multi-downstream nodes need <code>target-node-designs/&lt;node-id&gt;.md</code>. It must align with <code>workflow_graph.nodes[*]</code> owner, template, gate, inputs, outputs, and loop policy, and is checked by <code>validate-target-node-design.py</code> plus S5.</span>
+          </div>
         </section>
 
         <section class="panel" id="orchestration">

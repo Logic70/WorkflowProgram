@@ -102,6 +102,8 @@ Claude Code 加载插件后，会在 `SessionStart` 自动执行 Python runtime 
 
 设计源归档使用 target-prefixed 命名，例如 `target-design-overview.md`、`target-design-detail.md`、`target-acceptance-tests.yaml`、`target-traceability-matrix.json`。这些文件解释“为什么这样设计”和“如何验证”，`workflow-spec.yaml` 只保存可执行、可校验的机器投影。
 
+复杂、loop、工具重、逆向/安全或多下游节点还会使用 `target-node-designs/<node-id>.md` 作为单节点可执行设计契约。该文件必须符合 `workflow-spec-support/target-node-design-template.md`，并由 `validate-target-node-design.py` / S5 校验它与 `workflow_graph.nodes[*]` 的 owner、template、gate、input/output、loop policy 是否一致。
+
 发布目标 workflow 时，`workflowprogram-publish` 会检查 develop/S5/design-review/managed/target-design-source 证据；publish 不负责临时补设计源，也不修复缺失的 traceability 或 acceptance tests。
 
 ## Python Runtime

@@ -4,6 +4,7 @@
 > 对于机器可读的编排配置，请使用 `yaml-spec-template.md`。
 > 两者关系：`spec-template.md` → target design source → `workflow-spec.yaml` target runtime map → 生成 `workflow-view.md` / `workflow-maintenance.md` derived target views。
 > `workflow-spec.yaml` 是机器语义真源与运行态地图；完整目标工作流设计推理应保留在 `target-design-overview.md` / `target-design-detail.md` / 条件性 `target-node-designs/**` 中。
+> 复杂、loop、工具重、逆向、安全或多下游节点的 node-design 必须参考 `target-node-design-template.md`，并能通过 `validate-target-node-design.py`。
 
 ## Workflow Identity
 
@@ -115,6 +116,8 @@
 - 是否需要 `target-design-detail.md`：
 - 是否存在复杂节点需要 `target-node-designs/<node-id>.md`：
 - 复杂节点升级理由：
+- 每个复杂节点的 node-design 是否覆盖 Node Metadata、Purpose/Boundary、Input、Output、Context、Execution、Calls、Data Fields、Exit Gate、Failure、Verification、Observability、Safety、Open Tasks：
+- 每个 node-design 是否和 `workflow_graph.nodes[*]` 的 owner、template、gate、input_refs、output_refs、loop_policy 一致：
 - `workflow-spec.yaml.design_refs` 应引用哪些 target design source：
 - 是否需要持久化 `.workflowprogram/design/source/**`：
 
@@ -143,6 +146,7 @@
 - 哪些 node 需要独立 agent，原因是什么：
 - 哪些 node 不需要独立 agent，原因是什么：
 - 复杂 node-design 输出路径：
+- 复杂 node-design 验证方式：`validate-target-node-design.py --spec <RUN_ROOT>/workflow-spec.yaml --node-design <path> --node-id <node-id>`
 - 需要 `loop_policy` 的 graph 节点：
 - 每个 loop 节点的 `max_iterations`、反馈命令、停止条件、证据输出：
 - 目标输出是否已映射到 `registry` 或 `test_contract.artifacts`：

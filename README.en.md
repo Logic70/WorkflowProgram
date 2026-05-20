@@ -136,6 +136,7 @@ Execution order is decided by programs, not by hoping the model remembers the ne
 
 - A successful develop flow persists not only `.claude/` assets, but also `TARGET_ROOT/.workflowprogram/design/{workflow-spec.yaml,workflow-view.md,workflow-maintenance.md}`, plus the target design-source archive under `TARGET_ROOT/.workflowprogram/design/source/**`.
 - Target design source uses `target-design-overview.md`, `target-design-detail.md`, `target-acceptance-tests.yaml`, and `target-traceability-matrix.json`; `workflow-view.md` / `workflow-maintenance.md` are YAML-derived views, not new design truth.
+- Complex, loop-enabled, tool-heavy, reverse-engineering/security, or multi-downstream target nodes must also produce `target-node-designs/<node-id>.md`. That file is the executable single-node design contract and must stay aligned with `workflow_graph.nodes[*]` owner, template, gate, inputs, outputs, and loop policy; `validate-target-node-design.py` and S5 validate it.
 - The target project also receives its own deterministic runtime wrapper at `TARGET_ROOT/.workflowprogram/runtime/{workflow-entry.py,workflow-runner.py,validate-run-state.py,runtime-manifest.json}`.
 - If a workflow declares `capability_discovery`, the entry path first generates candidate `skill / MCP / CLI` recommendations plus manual guidance.
 - If a workflow declares `host_capabilities`, both the entry path and S5 consume `host-capability-report.json`, `environment-remediation-report.json`, and `environment-remediation-guide.md`.

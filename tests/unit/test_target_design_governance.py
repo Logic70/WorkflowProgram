@@ -43,12 +43,127 @@ def write_json(path: Path, payload: dict) -> None:
     path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8", newline="\n")
 
 
-def seed_canonical_run(run_root: Path, *, missing_acceptance_ref: bool = False, complex_node: bool = False) -> None:
+def valid_implement_node_design() -> str:
+    return """# Target Node Design: implement
+
+## 1. Node Metadata / 节点元信息
+
+- Node ID: `implement`
+- Workflow spec path: `workflow_graph.nodes[id=implement]`
+- Owner: `example-skill`
+- Template: `flexible-target-graph`
+- Gate: `user_approval`
+- Complexity: `complex`
+- Design intensity: `standard`
+
+## 2. Purpose And Boundary / 设计目的与职责边界
+
+- Purpose: Implement target workflow assets.
+- In scope: Generate declared workflow assets.
+- Out of scope: Modify unmanaged target files.
+- Upstream assumptions: intake summary exists.
+
+## 3. Input Contract / 输入契约
+
+| Input ref | Required | Producer | Validation rule |
+| --- | --- | --- | --- |
+| `outputs/target-workflow/intake-summary.md` | yes | intake | file exists |
+
+## 4. Output Contract And Consumers / 输出契约与消费者
+
+| Output ref | Required | Consumer | Pass criteria |
+| --- | --- | --- | --- |
+| `.claude/skills/example/SKILL.md` | yes | runtime | managed asset exists |
+
+## 5. Context Read/Write Rules / 上下文读写规则
+
+- Reads: `outputs/target-workflow/intake-summary.md`.
+- Writes: `.claude/skills/example/SKILL.md`.
+- Must not mutate: unmanaged files.
+- Persistence rule: managed apply records file ownership.
+
+## 6. Internal Execution Plan / 内部执行编排
+
+1. Read intake summary.
+2. Generate skill asset.
+3. Record managed result.
+4. Verify S5 evidence.
+
+Loop policy:
+
+- Loop allowed: false
+
+## 7. Agent / Skill / Script / Tool Calls / 调用关系
+
+| Capability | Name | Purpose | Input | Output |
+| --- | --- | --- | --- | --- |
+| skill | `example-skill` | implement asset | intake | skill file |
+
+## 8. Data Field Contract / 数据字段契约
+
+| Field | Type | Required | Source | Meaning |
+| --- | --- | --- | --- | --- |
+| `node_id` | string | yes | workflow_graph | node identity |
+
+## 9. Exit Gate / 准出目标
+
+- Gate decision: `user_approval`.
+- Required evidence: `.claude/skills/example/SKILL.md`.
+- Human approval rule: user approval required.
+- Auto-approval rule: only explicit auto approve.
+
+## 10. Failure, Retry, And Degrade Strategy / 失败、重试与降级策略
+
+- `FAIL` when the skill file is missing.
+- `WARN` when optional evidence is incomplete.
+- `ENVIRONMENT-SKIP` when runtime host is unavailable.
+- Retry limit: stage default.
+- Degrade strategy: only with explicit evidence.
+
+## 11. Verification And Tests / 验证与测试要求
+
+- Unit or fixture test: target governance unit test.
+- Runtime verifier: S5 checks managed assets.
+- Acceptance test refs: `AT-001`.
+- Evidence paths: `state.json`, `events.jsonl`.
+
+## 12. Observability And Debug Artifacts / 观测与调试产物
+
+- Logs: `events.jsonl`.
+- Reports: `outputs/stages/s5-validation-summary.json`.
+- State artifacts: `state.json`.
+- Debug reproduction: rerun governance test.
+
+## 13. Safety And Execution Constraints / 安全与执行约束
+
+- Path boundary: managed output only.
+- Approval boundary: user approval.
+- Host capability boundary: missing host capability is environment failure.
+- Secret handling: do not persist secrets.
+- Destructive action policy: none.
+
+## 14. Open Tasks And Extension Points / 遗留任务与扩展点
+
+- Open tasks: none
+- Extension points: add domain-specific checks.
+- Deferred decisions: none
+"""
+
+
+def seed_canonical_run(
+    run_root: Path,
+    *,
+    missing_acceptance_ref: bool = False,
+    complex_node: bool = False,
+    with_node_design: bool = False,
+) -> None:
     run_root.mkdir(parents=True, exist_ok=True)
     shutil.copy2(ROOT / "tests" / "spec-fixtures" / "valid-minimal.yaml", run_root / "workflow-spec.yaml")
     if complex_node:
         spec = yaml.safe_load((run_root / "workflow-spec.yaml").read_text(encoding="utf-8"))
         spec["workflow_graph"]["nodes"][1]["complexity"] = "complex"
+        if with_node_design:
+            spec.setdefault("design_refs", {}).setdefault("node_designs", {})["implement"] = "outputs/stages/target-node-designs/implement.md"
         (run_root / "workflow-spec.yaml").write_text(yaml.safe_dump(spec, allow_unicode=True, sort_keys=False), encoding="utf-8")
     stages = run_root / "outputs" / "stages"
     write_text(
@@ -89,6 +204,8 @@ def seed_canonical_run(run_root: Path, *, missing_acceptance_ref: bool = False, 
             ],
         },
     )
+    if with_node_design:
+        write_text(stages / "target-node-designs" / "implement.md", valid_implement_node_design())
 
 
 def main() -> int:
@@ -108,6 +225,10 @@ def main() -> int:
         seed_canonical_run(complex_missing, complex_node=True)
         failed = run_json(str(SCRIPT_ROOT / "validate-target-design-governance.py"), "--run-root", str(complex_missing), expect=1)
         assert any("complex nodes missing" in error for error in failed["errors"])
+
+        complex_valid = temp / "complex-valid"
+        seed_canonical_run(complex_valid, complex_node=True, with_node_design=True)
+        assert run_json(str(SCRIPT_ROOT / "validate-target-design-governance.py"), "--run-root", str(complex_valid))["status"] == "PASS"
     return 0
 
 

@@ -44,7 +44,7 @@
 - 决策 D12：managed apply 必须同时产出 `managed-rollback-manifest.json` 与 `managed-recover-instructions.md`，用于覆盖 created / updated / conflicted / user-modified 文件的恢复边界。
 - 决策 D13：面向用户或跨阶段消费的 JSON 报告必须带 `schema_version`、`error_code`、`failure_kind` 与 `remediation` 字段，并对 token/password/key-like 内容做脱敏。
 - 决策 D14：原始需求必须沿 `target-requirements.yaml -> target-context-findings.yaml -> target design source -> workflow-spec.yaml projection -> S4 assets -> S5 evidence -> S6 lessons` 保留需求血缘，禁止在阶段切换中丢失来源。
-- 决策 D15：复杂目标业务节点不拆成新的 WorkflowProgram `S1..S6`，而是升级为 `node-design`，并由 `workflow_graph.nodes[*]`、可选 `loop_policy`、可选 agent/team 契约承接。
+- 决策 D15：复杂目标业务节点不拆成新的 WorkflowProgram `S1..S6`，而是升级为 `target-node-designs/<node-id>.md` 单节点设计契约，并由 `workflow_graph.nodes[*]`、可选 `loop_policy`、可选 agent/team 契约承接；node-design 内容必须通过确定性校验。
 - 决策 D16：node 是流程单位，agent 是执行角色；二者不强制一一对应，只有复杂认知边界、专业能力边界或独立上下文边界才需要独立 agent。
 - 决策 D17：简单工作流不得被强行重型化；`target-node-designs/**`、agent team、loop policy、host bootstrap 都是按复杂度和需求触发的条件性设计，不是所有工作流的默认负担。
 - 决策 D21：completed develop 必须把 target design source 归档到 `TARGET_ROOT/.workflowprogram/design/source/**`，使后续修改、审计、validate 与 publish 不依赖旧 `RUN_ROOT`。
@@ -270,7 +270,7 @@ TARGET_ROOT/
   - `validation-runtime-report.md` 与 `outputs/stages/s5-validation-summary.json` 属于 S5 判定产物。
   - `transcript.md` 属于动态运行证据，由 `runtime_smoke.py` 或等效 harness 补充，供 S5 消费。
   - S5 必须校验设计源、`workflow-spec.yaml`、生成资产与运行证据之间的覆盖关系；若某个 `REQ-*` 没有设计节点、验收测试或证据映射，不得判为 clean PASS。
-  - 若存在 `node-designs/<node-id>.md`，S5 必须确认对应 `workflow_graph.nodes[*].id` 存在，且该节点的关键输入、输出、gate、owner、能力与证据已投影到 YAML 或 traceability。
+  - 若存在 `target-node-designs/<node-id>.md`，S5 必须确认对应 `workflow_graph.nodes[*].id` 存在，且该节点的关键输入、输出、gate、owner、能力、loop policy、失败策略与验证证据已投影到 YAML 或 traceability，并通过 `validate-target-node-design.py`。
   - 若声明 `capability_discovery`，S5 必须消费 `host-capability-candidates.json` 与 `host-bootstrap-instructions.md`，并验证候选与人工指引都已生成。
   - 若声明 `host_capabilities`，S5 必须消费 `host-capability-report.json`，并在 `validate/audit` 场景对当前宿主执行实时 probe。
   - 若声明 `host_capabilities`，`validate/audit/iterate` 还必须产出 `environment-remediation-report.json` 与 `environment-remediation-guide.md`，把未解决的 manual step / bootstrap / re-check 指引显式写给用户。
@@ -328,7 +328,7 @@ TARGET_ROOT/
 - `agent_team_contract` 只在显式声明时生效；普通 subagent 并不自动等于 team orchestration。
 - `workflow_graph.nodes[*].loop_policy` 只适合验证驱动的迭代节点，例如逆向分析、迁移修复、报告修订、测试驱动实现；不适合一次性问答、不可自动验证的主观写作、宿主环境安装或人工审批动作。
 - `loop_policy.goal_source` 可以来自用户，也可以来自模型分解的子目标；模型子目标必须通过 `parent_goal_ref` 回溯到用户目标或上游节点输出，TDD 型 loop 必须先有 failing verifier/test 再进入实现。
-- `node-design` 只在复杂节点需要时生成；它必须被投影到 `workflow_graph`、能力契约、team 契约、loop 契约或 traceability，而不能成为孤立说明文档。
+- `node-design` 只在复杂节点需要时生成；它必须按 target node design template 覆盖目的/边界、输入、输出、上下文读写、调用关系、失败策略、验证与观测，并被投影到 `workflow_graph`、能力契约、team 契约、loop 契约或 traceability，不能成为孤立说明文档。
 - `workflowprogram-validate` 是 `test_contract` 的主消费方，`runtime_smoke.py` 是补充烟测与证据采集工具。
 - `test_contract` 对执行字段只允许引用，不允许复制同名内容。
 - `test_contract.failure.implemented_now` 仅表达“当前实现覆盖度”，不得反向改变 runner 的 `verdict` 或 `failure_kind` 语义。

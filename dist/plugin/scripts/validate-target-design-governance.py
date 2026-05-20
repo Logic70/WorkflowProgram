@@ -6,6 +6,8 @@ from __future__ import annotations
 
 import argparse
 import json
+import subprocess
+import sys
 from pathlib import Path
 from typing import Any, Dict, List
 
@@ -99,6 +101,34 @@ def node_has_exemption(node: Dict[str, Any]) -> bool:
     )
 
 
+def run_node_design_validator(run_root: Path, spec_path: Path, node_id: str, rel_path: str) -> Dict[str, Any]:
+    script_path = Path(__file__).resolve().parent / "validate-target-node-design.py"
+    cmd = [
+        sys.executable,
+        str(script_path),
+        "--node-design",
+        str(run_root / rel_path),
+        "--spec",
+        str(spec_path),
+        "--node-id",
+        node_id,
+        "--json",
+    ]
+    completed = subprocess.run(cmd, capture_output=True, text=True, check=False)
+    try:
+        payload = json.loads(completed.stdout)
+    except json.JSONDecodeError:
+        payload = {
+            "status": "FAIL",
+            "errors": [completed.stderr.strip() or completed.stdout.strip() or "validate-target-node-design.py returned invalid JSON"],
+            "warnings": [],
+        }
+    if completed.returncode != 0 and payload.get("status") == "PASS":
+        payload["status"] = "FAIL"
+        payload.setdefault("errors", []).append(f"validate-target-node-design.py exited with code {completed.returncode}")
+    return payload if isinstance(payload, dict) else {"status": "FAIL", "errors": ["validate-target-node-design.py returned non-object payload"], "warnings": []}
+
+
 def validate(run_root: Path, spec_path: Path) -> Dict[str, Any]:
     diagnostics = DiagnosticCollector()
     spec = try_load_yaml_mapping(spec_path)
@@ -163,6 +193,20 @@ def validate(run_root: Path, spec_path: Path) -> Dict[str, Any]:
     if missing_node_designs:
         diagnostics.error(f"complex nodes missing node design or exemption: {missing_node_designs}")
 
+    node_design_validation_results: Dict[str, Any] = {}
+    for node_id, rel_path in sorted(node_designs.items()):
+        payload = run_node_design_validator(run_root, spec_path, node_id, rel_path)
+        node_design_validation_results[node_id] = {
+            "path": rel_path,
+            "status": payload.get("status", "FAIL"),
+            "errors": payload.get("errors", []),
+            "warnings": payload.get("warnings", []),
+        }
+        for error in payload.get("errors", []):
+            diagnostics.error(f"node design validation failed for {node_id}: {error}")
+        for warning in payload.get("warnings", []):
+            diagnostics.warn(f"node design validation warning for {node_id}: {warning}")
+
     payload = diagnostics.payload(
         run_root=str(run_root),
         spec=str(spec_path),
@@ -172,6 +216,7 @@ def validate(run_root: Path, spec_path: Path) -> Dict[str, Any]:
         acceptance_test_count=len(tests),
         graph_node_ids=graph_node_ids(spec),
         node_design_ids=sorted(node_designs),
+        node_design_validation_results=node_design_validation_results,
     )
     return payload
 

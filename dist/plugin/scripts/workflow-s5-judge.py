@@ -203,7 +203,7 @@ def failure_kind_for_check(category: str, name: str) -> str:
         return "implementation"
     if "team_contract" in lowered_name or "team_evidence" in lowered_name:
         return "design"
-    if "design_lineage" in lowered_name or "design_ref" in lowered_name:
+    if "design_lineage" in lowered_name or "design_ref" in lowered_name or "node_design" in lowered_name:
         return "design"
     if "node_loop" in lowered_name or "loop_iteration" in lowered_name:
         return "implementation"
@@ -480,6 +480,23 @@ def add_design_lineage_checks(
                 f"node={node_key or '<missing>'}; declared={node_declared}; path={rel_path or '<missing>'}; safe={safe}; exists={exists}",
                 f"workflow-spec.yaml.design_refs.node_designs.{node_key or '<missing>'}",
             )
+            if safe and exists and node_declared:
+                node_design_validation = run_validator(
+                    "validate-target-node-design.py",
+                    "--node-design",
+                    str(run_root / rel_path),
+                    "--spec",
+                    str(run_root / "workflow-spec.yaml"),
+                    "--node-id",
+                    node_key,
+                )
+                add_check(
+                    checks["artifacts"],
+                    f"target_node_design_{node_key}_content_valid",
+                    "PASS" if node_design_validation.get("status") == "PASS" else "FAIL",
+                    f"errors={node_design_validation.get('errors', [])}; warnings={node_design_validation.get('warnings', [])}",
+                    rel_path,
+                )
 
     existing_refs = resolve_existing_run_refs(run_root, spec)
     requirements_path = resolved_paths.get("requirements") or (run_root / existing_refs["requirements"] if "requirements" in existing_refs else None)

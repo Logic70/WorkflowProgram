@@ -392,6 +392,7 @@ def validate_required_paths(root: Path, result: ValidationResult) -> None:
         ".claude/scripts/generate-design-review-packet.py",
         ".claude/scripts/validate-design-review-gate.py",
         ".claude/scripts/validate-target-design-governance.py",
+        ".claude/scripts/validate-target-node-design.py",
         ".claude/scripts/runtime_host.py",
         ".claude/scripts/generate-target-runtime.py",
         ".claude/scripts/generate-workflow-view.py",
@@ -456,6 +457,7 @@ def validate_required_paths(root: Path, result: ValidationResult) -> None:
         "docs/workflowprogram-capability-matrix.json",
         "docs/phase-07-implementation-plan.md",
         ".claude/skills/workflow-spec-support/yaml-spec-template.md",
+        ".claude/skills/workflow-spec-support/target-node-design-template.md",
     ]
 
     for relative_path in required_paths:
@@ -1214,6 +1216,8 @@ def validate_dist_plugin(root: Path, plugin_meta: Optional[Dict[str, Any]], resu
         dist_root / "scripts" / "validate-change-policy.py",
         dist_root / "scripts" / "generate-design-review-packet.py",
         dist_root / "scripts" / "validate-design-review-gate.py",
+        dist_root / "scripts" / "validate-target-design-governance.py",
+        dist_root / "scripts" / "validate-target-node-design.py",
         dist_root / "scripts" / "runtime_host.py",
         dist_root / "scripts" / "generate-target-runtime.py",
         dist_root / "scripts" / "generate-workflow-view.py",

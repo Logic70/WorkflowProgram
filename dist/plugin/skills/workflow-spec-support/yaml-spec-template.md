@@ -24,8 +24,12 @@ design_refs:
   implementation_plan: outputs/stages/target-implementation-plan.md
   acceptance_tests: outputs/stages/target-acceptance-tests.yaml
   traceability_matrix: outputs/stages/target-traceability-matrix.json
+  # 复杂、loop、工具重、逆向/安全或多下游节点才需要 node_designs；文件内容应符合 target-node-design-template.md。
   # node_designs:
   #   build_dfd: outputs/stages/target-node-designs/build_dfd.md
+  node_design_policy:
+    required_for_complex_nodes: true
+    exemption_field: node_design_exemption
   persistent:
     requirements: .workflowprogram/design/source/target-requirements.yaml
     question_backlog: .workflowprogram/design/source/target-question-backlog.json

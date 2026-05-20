@@ -247,7 +247,7 @@ Artifact 使用固定结构：
 - `RUN_ROOT/outputs/stages/s2-context-findings.yaml`
 - `RUN_ROOT/outputs/stages/s3-design-highlevel.md`
 - `RUN_ROOT/outputs/stages/s3-design-lowlevel.md`
-- 条件性 `RUN_ROOT/outputs/stages/node-designs/<node-id>.md`
+- 条件性 `RUN_ROOT/outputs/stages/target-node-designs/<node-id>.md`
 - `RUN_ROOT/outputs/stages/s3-implementation-plan.md`
 - `RUN_ROOT/outputs/stages/acceptance-tests.yaml`
 - `RUN_ROOT/outputs/stages/traceability-matrix.json`
@@ -400,8 +400,8 @@ ref: runtime_contract.<field>
 
 1. 所有路径必须是安全相对路径，不得以 `/` 开头，不得包含 `..`。
 2. 普通字段应位于 `outputs/stages/**`。
-3. `node_designs` 可以是 `node_id -> outputs/stages/node-designs/<node-id>.md` 的 mapping。
-4. 若存在 `node_designs`，每个 `node_id` 必须能解析到 `workflow_graph.nodes[*].id`。
+3. `node_designs` 可以是 `node_id -> outputs/stages/target-node-designs/<node-id>.md` 的 mapping；legacy `outputs/stages/node-designs/**` 仅作迁移兼容。
+4. 若存在 `node_designs`，每个 `node_id` 必须能解析到 `workflow_graph.nodes[*].id`，且文件内容必须通过 `validate-target-node-design.py`。
 5. S5 只通过 `design_refs` 定位设计源和 traceability，不以设计源 prose 直接替代 YAML 执行语义。
 
 #### 2.5.5 `generated_runtime_contract`（目标工作流运行时契约）
@@ -484,6 +484,7 @@ ref: runtime_contract.<field>
 - 节点需要跨模块阅读、多步推理或生成中间模型时，必须有 `node-design`。
 - 节点需要专业工具、MCP、CLI、独立 agent、team 或 loop 时，必须有 `node-design`。
 - 节点输出会影响多个后续节点时，必须有 `node-design`。
+- `node-design` 必须覆盖节点元信息、目的/边界、输入、输出、上下文读写、内部执行、调用关系、数据字段、准出、失败/重试/降级、验证、观测、安全和扩展点，并和 `workflow_graph.nodes[*]` 的 owner/template/gate/input_refs/output_refs/loop_policy 一致。
 - 简单格式转换、归档、命名、状态更新等节点不应拆独立 agent，也不应强制生成 node-design。
 
 `node_execution_model` 设计规则：
@@ -964,7 +965,7 @@ WorkflowProgram 自身必须按原子能力组织，每个 Stage 必须可拆分
 
 - `RUN_ROOT/outputs/stages/s3-design-highlevel.md`
 - `RUN_ROOT/outputs/stages/s3-design-lowlevel.md`
-- 条件性 `RUN_ROOT/outputs/stages/node-designs/<node-id>.md`
+- 条件性 `RUN_ROOT/outputs/stages/target-node-designs/<node-id>.md`
 - `RUN_ROOT/outputs/stages/s3-implementation-plan.md`
 - `RUN_ROOT/outputs/stages/acceptance-tests.yaml`
 - `RUN_ROOT/outputs/stages/traceability-matrix.json`
@@ -996,7 +997,7 @@ WorkflowProgram 自身必须按原子能力组织，每个 Stage 必须可拆分
 
 1. `design_workflow`（agent_node）
    - `workflow-designer` 先产出 `s3-design-highlevel.md` 与 `s3-design-lowlevel.md`，说明整体方案、节点拆分、能力依赖、agent 策略、loop 策略、失败路径与验证策略。
-   - 若节点满足复杂节点升级规则，则在 `outputs/stages/node-designs/<node-id>.md` 生成子设计。
+   - 若节点满足复杂节点升级规则，则在 `outputs/stages/target-node-designs/<node-id>.md` 生成子设计，并按 target node design template 覆盖单节点契约。
    - agent 规划必须说明 node 与 agent 的关系；不得默认每个 node 一个 agent。
 2. `derive_acceptance_and_traceability`（agent_node）
    - 从 `REQ-*`、S2 findings 与 S3 设计源派生 `acceptance-tests.yaml`、`traceability-matrix.json` 与 `s3-implementation-plan.md`。
@@ -1027,7 +1028,7 @@ WorkflowProgram 自身必须按原子能力组织，每个 Stage 必须可拆分
 
 1. `s3-design-highlevel.md`、`s3-design-lowlevel.md`、`acceptance-tests.yaml`、`traceability-matrix.json` 存在。
 2. `traceability-matrix.json` 覆盖所有 `REQ-*`，每条需求至少映射到一个 design node、一个 acceptance test 或明确豁免理由。
-3. 复杂节点若存在，`node-designs/<node-id>.md` 必须存在，且 `<node-id>` 能解析到 `workflow_graph.nodes[*].id`。
+3. 复杂节点若存在，`target-node-designs/<node-id>.md` 必须存在，且 `<node-id>` 能解析到 `workflow_graph.nodes[*].id`，并通过 `validate-target-node-design.py` 内容校验。
 4. `workflow-spec.yaml` 可被 YAML 解析。
 5. 顶层必须包含：`meta`、`stages`、`agent_refs`、`skills`、`registry`、`constraints`、`resource_limits`、`runtime_contract`、`test_contract`、`generated_runtime_contract`。
 6. 若声明 `design_refs`，其路径必须安全、相对，且 `node_designs` 引用已声明 graph node。
@@ -1213,7 +1214,7 @@ WorkflowProgram 自身必须按原子能力组织，每个 Stage 必须可拆分
 3. `design_projection_checks`（script_node / judge check）
    - 读取 `design_refs`、`traceability-matrix.json`、`workflow_graph`、`registry` 与 `test_contract.artifacts`。
    - 检查每个 `REQ-*` 是否至少有 design node、acceptance test 和 evidence expectation。
-   - 检查每个 `node-design` 是否投影到 `workflow_graph.nodes[*]`，并验证关键 input/output/gate/owner/能力字段未丢失。
+   - 检查每个 `node-design` 是否投影到 `workflow_graph.nodes[*]`，并通过 `validate-target-node-design.py` 验证关键 input/output/gate/owner/template/loop/failure/verification 字段未丢失。
 4. `runtime_smoke_optional`（script_node）
    - 按需执行 `tools/runtime_smoke.py` 或等效 harness 采集动态证据。
    - 动态验证目标应优先从 `test_contract` 派生；其中执行期边界、skip 与失败枚举仍以 `runtime_contract` 为准。
@@ -1235,7 +1236,7 @@ WorkflowProgram 自身必须按原子能力组织，每个 Stage 必须可拆分
 6. `validation-runtime-report.md`、`transcript.md` 和 `s5-validation-summary.json` 的责任归属必须清晰区分。
 7. 若声明 `design_refs`，S5 必须定位所有引用文件；缺失设计源或 traceability 时不得 clean PASS。
 8. 每个 `REQ-*` 必须在 `traceability-matrix.json` 中映射到至少一个 design node、asset、acceptance test 或明确豁免理由。
-9. 每个 `node-design` 必须映射到真实 `workflow_graph.nodes[*].id`；若 node-design 声明 host/tool/team/loop，YAML 中必须有对应投影。
+9. 每个 `node-design` 必须映射到真实 `workflow_graph.nodes[*].id`，并通过内容校验证明 owner、template、gate、input_refs、output_refs、loop_policy、失败策略和验证证据与 YAML 投影一致；若 node-design 声明 host/tool/team/loop，YAML 中必须有对应投影。
 10. 若声明 `capability_discovery`，则 `host-capability-candidates.json` 与 `host-bootstrap-instructions.md` 必须被 S5 消费。
 11. 若声明 `host_capabilities`，则 `host-capability-report.json` 必须被 S5 消费；required 缺失应判为 `FAIL/environment`，optional 缺失只记 `INFO`。
 12. 若声明 `host_capabilities`，则 `environment-remediation-report.json` 与 `environment-remediation-guide.md` 也必须被 S5 消费；`validate/audit` 必须让 unresolved manual steps 对用户可见。
