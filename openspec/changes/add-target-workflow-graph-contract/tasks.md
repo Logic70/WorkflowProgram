@@ -5,7 +5,7 @@
 - [x] 1.1 Document the two-layer model: WorkflowProgram lifecycle `S0..S6` vs target workflow `workflow_graph`.
 - [x] 1.2 Update HighLevel and LowLevel docs to state that generated target workflows do not need to follow the S1-S6 template.
 - [x] 1.3 Define `workflow-spec.md` as accepted human readback and `workflow-spec.yaml` as the only machine-readable semantic source.
-- [x] 1.4 Mark `workflow-view.md` and `workflow-lowlevel.md` as derived non-semantic reports for target graph decisions.
+- [x] 1.4 Mark `workflow-view.md` and `workflow-maintenance.md` as derived non-semantic reports for target graph decisions.
 
 ## 2. Graph Spec
 

@@ -50,9 +50,9 @@ disable-model-invocation: true
 - 若 workflow 依赖宿主专业能力或显式 team，则 `workflow-spec.yaml` 还必须声明 `host_capabilities`、`agent_team_contract`，并同步扩展 `generated_runtime_contract.runtime_capabilities`。
 - 若 `host_capabilities.bootstrap.scope=project_local`，优先用声明式 `bootstrap.assets` 生成复用配置 / wrapper / marker 资产，而不是只留下占位输出。
 - 若声明 `host_capabilities`，产品入口与目标侧 runtime 都必须在 probe/bootstrap 后生成 `environment-remediation-report.json` 与 `environment-remediation-guide.md`；若重复环境失败存在，则 S6 必须把修复建议提升到 `s6-lessons-delta.md`。
-- develop 成功后，必须把 `workflow-spec.yaml`、`workflow-view.md`、`workflow-lowlevel.md` 持久化到 `TARGET_ROOT/.workflowprogram/design/`。
+- develop 成功后，必须把 `workflow-spec.yaml`、`workflow-view.md`、`workflow-maintenance.md` 持久化到 `TARGET_ROOT/.workflowprogram/design/`。
 - develop 成功后，还必须把目标侧 runtime 资产持久化到 `TARGET_ROOT/.workflowprogram/runtime/`。
-- `workflow-lowlevel.md` 仅用于维护与迭代指导，不得覆盖 `workflow-spec.yaml` 语义。
+- `workflow-maintenance.md` 仅用于维护与迭代指导，不得覆盖 `workflow-spec.yaml` 语义。
 - `test_contract` 对执行字段必须使用 `runtime_contract.<field>` 固定引用语法，且不得复制 `runtime_contract` 同名字段。
 - `test_contract.failure.implemented_now` 必须是 `runtime_contract.failure_kinds` 的子集，且不得反向改变 runner 的 verdict/failure_kind 语义。
 - 生成链路完成后必须调用 `${CLAUDE_PLUGIN_ROOT}/scripts/workflow-runner.py` 进行程序化 stage 转移和状态落盘；runner 只负责控制面，不负责 S5 主判定。
@@ -107,7 +107,7 @@ disable-model-invocation: true
 - `agents/`
 - `rules/`
 - 必要时的 `commands/` 兼容层
-- `.workflowprogram/design/{workflow-spec.yaml,workflow-view.md,workflow-lowlevel.md}`
+- `.workflowprogram/design/{workflow-spec.yaml,workflow-view.md,workflow-maintenance.md}`
 - `.workflowprogram/runtime/{workflow-entry.py,workflow-runner.py,validate-run-state.py,runtime-manifest.json}`
 
 进入 S4 实现与写入链路时，使用以下流程：
@@ -120,7 +120,7 @@ disable-model-invocation: true
    - `resolve-change-context.py`（复核目标状态与 stale context）
    - `validate-workflow-spec.py`
    - `generate-workflow-view.py`
-   - `generate-workflow-lowlevel.py`
+   - `generate-workflow-maintenance.py`
    - `validate-change-policy.py`（仅当 `change_policy_required=true`，且必须发生在 managed apply 前）
    - `validate-design-review-gate.py`（必须发生在 candidate/runtime staging 与 managed apply 前）
    - `generate-target-runtime.py`

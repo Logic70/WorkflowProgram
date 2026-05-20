@@ -17,7 +17,7 @@ The semantic chain is:
 clarification package
   -> accepted workflow-spec.md
   -> accepted workflow-spec.yaml
-  -> derived workflow-view.md / workflow-lowlevel.md
+  -> derived workflow-view.md / workflow-maintenance.md
   -> candidate bundle
   -> managed apply
   -> validation and recovery evidence
@@ -27,7 +27,7 @@ Rules:
 
 - `workflow-spec.yaml` is the only machine-readable semantic source.
 - `workflow-spec.md` is the human readback and approval artifact.
-- `workflow-view.md` and `workflow-lowlevel.md` must be generated from YAML and must not introduce new semantics.
+- `workflow-view.md` and `workflow-maintenance.md` must be generated from YAML and must not introduce new semantics.
 
 ## Proposed `workflow_graph`
 

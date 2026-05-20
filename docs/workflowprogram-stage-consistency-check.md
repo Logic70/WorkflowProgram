@@ -90,7 +90,7 @@
 | Round 2 | 原始需求在 S1/S2/S3/S5 之间缺少可追踪转化链 | 增加 `s1-requirements.yaml`、`s2-context-findings.yaml`、`traceability-matrix.json` 的需求血缘口径 |
 | Round 3 | STRIDE / DFD 这类复杂环节如果只写整体 LowLevel，会导致上下文丢失或设计过载 | 增加条件性 `node-designs/<node-id>.md`，复杂节点独立设计但不改变 S1-S6 主链 |
 | Round 4 | “每个 node 是否一个 agent”会导致过度拆分和调度噪声 | 明确 node 是流程单位、agent 是执行角色，只有复杂认知/专业能力/上下文边界才独立 agent |
-| Round 5 | 新增设计源可能让流程变重并与历史派生 `workflow-lowlevel.md` 混淆 | 设计源只在 S3/RUN_ROOT 形成审计证据，`workflow-lowlevel.md` 继续是 YAML 派生维护视图，简单工作流不强制 node-design/team/loop |
+| Round 5 | 新增设计源可能让流程变重并与历史派生 `workflow-maintenance.md` 混淆 | 设计源只在 S3/RUN_ROOT 形成审计证据，`workflow-maintenance.md` 继续是 YAML 派生维护视图，简单工作流不强制 node-design/team/loop |
 
 ## 5. 结论
 

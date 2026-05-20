@@ -96,8 +96,13 @@ def fingerprints_changed(original: Dict[str, Any], current: Dict[str, Any]) -> L
     original_fps = original.get("fingerprints", {}) if isinstance(original.get("fingerprints"), dict) else {}
     current_fps = current.get("fingerprints", {}) if isinstance(current.get("fingerprints"), dict) else {}
     changed: List[str] = []
-    for key in ("design_spec_sha256", "lowlevel_sha256", "managed_manifest_sha256"):
-        if original_fps.get(key) != current_fps.get(key):
+    fingerprint_keys = ("design_spec_sha256", "maintenance_sha256", "managed_manifest_sha256")
+    legacy_aliases = {"maintenance_sha256": "lowlevel_sha256"}
+    for key in fingerprint_keys:
+        legacy_key = legacy_aliases.get(key)
+        original_value = original_fps.get(key, original_fps.get(legacy_key)) if legacy_key else original_fps.get(key)
+        current_value = current_fps.get(key, current_fps.get(legacy_key)) if legacy_key else current_fps.get(key)
+        if original_value != current_value:
             changed.append(key)
     return changed
 

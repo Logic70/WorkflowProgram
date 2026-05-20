@@ -40,7 +40,7 @@
 - 决策 D8：`test_contract` 只能通过 `runtime_contract.<field>` 引用执行约束，禁止复制或削弱 runner 已声明的执行语义。
 - 决策 D9：逻辑阶段模型与执行阶段列表分离。`S0..S6` 用于统一描述职责与证据归属，具体执行链可由 `workflow-spec.yaml.stages` 承载；其中 `workflowprogram-validate` 负责 S5 判定，`runtime_smoke.py` 负责补充运行态证据，`learn` 负责 S6 闭环。
 - 决策 D10：`workflow-spec.yaml.intent_flows` 作为“意图到逻辑阶段流”的机器可读真源；`test_contract.flow` 默认表达 `develop` 主链，其他意图流由 `intent_flows` 解释。
-- 决策 D11：`workflow-spec.yaml.workflow_graph` 作为目标工作流业务图的机器可读真源；`workflow-view.md` 与 `workflow-lowlevel.md` 只能从 YAML 派生展示，不得反向定义新的执行语义。
+- 决策 D11：`workflow-spec.yaml.workflow_graph` 作为目标工作流业务图的机器可读真源；`workflow-view.md` 与 `workflow-maintenance.md` 只能从 YAML 派生展示，不得反向定义新的执行语义。
 - 决策 D12：managed apply 必须同时产出 `managed-rollback-manifest.json` 与 `managed-recover-instructions.md`，用于覆盖 created / updated / conflicted / user-modified 文件的恢复边界。
 - 决策 D13：面向用户或跨阶段消费的 JSON 报告必须带 `schema_version`、`error_code`、`failure_kind` 与 `remediation` 字段，并对 token/password/key-like 内容做脱敏。
 - 决策 D14：原始需求必须沿 `target-requirements.yaml -> target-context-findings.yaml -> target design source -> workflow-spec.yaml projection -> S4 assets -> S5 evidence -> S6 lessons` 保留需求血缘，禁止在阶段切换中丢失来源。
@@ -125,7 +125,7 @@ TARGET_ROOT/
 最终输出（交付层）：
 
 - `TARGET_ROOT/.claude/` 资产（`settings.json`、`skills/`、`agents/`、`rules/`、可选 `commands/`）
-- `TARGET_ROOT/.workflowprogram/design/` 机器契约与派生视图（`workflow-spec.yaml`、`workflow-view.md`、`workflow-lowlevel.md`）
+- `TARGET_ROOT/.workflowprogram/design/` 机器契约与派生视图（`workflow-spec.yaml`、`workflow-view.md`、`workflow-maintenance.md`）
 - `TARGET_ROOT/.workflowprogram/runtime/` 目标侧 deterministic runtime 资产（`workflow-entry.py`、`workflow-runner.py`、`validate-run-state.py`、`runtime-manifest.json`）
 - `TARGET_ROOT/.workflowprogram/managed-files.json`
 - `RUN_ROOT` 证据（`context.json`、`state.json`、`events.jsonl`、`transcript.md`、`validation-runtime-report.md`、`outputs/`）
@@ -207,7 +207,7 @@ TARGET_ROOT/
   - 可选 `agent_team_contract`（显式 team 拓扑契约）
   - 其中 `test_contract.flow` 默认表达 `develop` 主链；非 `develop` 流转由 `intent_flows` 约束
   - `workflow-view.md`（只读视图）
-  - `workflow-lowlevel.md`（维护与迭代指导；不得覆盖 YAML 语义）
+  - `workflow-maintenance.md`（维护与迭代指导；不得覆盖 YAML 语义）
 - 规范要求：
   - S3 必须先产出设计源，再投影 `workflow-spec.yaml`；不得跳过设计源直接写 YAML。
   - `target-design-overview.md` 回答目标工作流为什么存在、整体怎么组织、用户怎么使用、如何验证。
@@ -245,7 +245,7 @@ TARGET_ROOT/
   - `managed-recover-instructions.md`
   - `TARGET_ROOT/.workflowprogram/managed-files.json`
   - 应用后的 `TARGET_ROOT/.claude/*`（无冲突场景）
-  - 应用后的 `TARGET_ROOT/.workflowprogram/design/{workflow-spec.yaml,workflow-view.md,workflow-lowlevel.md}`（无冲突场景）
+  - 应用后的 `TARGET_ROOT/.workflowprogram/design/{workflow-spec.yaml,workflow-view.md,workflow-maintenance.md}`（无冲突场景）
   - 应用后的 `TARGET_ROOT/.workflowprogram/runtime/{workflow-entry.py,workflow-runner.py,validate-run-state.py,runtime-manifest.json}`（无冲突场景）
 - 规范要求：
   - 若 `change-context.json.change_policy_required=true`，S4 不得进入 managed apply，直到 `validate-change-policy.py` 返回 PASS。
@@ -292,7 +292,7 @@ TARGET_ROOT/
 | S0 | `intent` 属于 4 个枚举，`target_root` 为绝对路径且目录已存在（不存在时已创建） | `RUN_ROOT/outputs/stages/s0-route.json` |
 | S1 | `workflow-spec.md` 存在、不含 `TBD/待补`，包含 `User Intent`、`Clarification Summary`、`Requirement Logic Interview`、`Open Questions`、`Assumptions and Boundaries`、`Readback Confirmation`；`澄清轮次 >= 2`；`target-requirements.yaml` 至少包含一条 `REQ-*`；M+ 草案必须有完整七个 logic lenses、`target-question-backlog.json`、`target-requirement-logic-map.json` 且 `REQ-*` 链接到 process/evidence/acceptance；`design-readiness-report.json=READY`；`clarification-handoff.json.ready=true`；challenge roles 未直接面向用户 | `RUN_ROOT/workflow-spec.md`、`RUN_ROOT/outputs/stages/target-requirements.yaml`、`RUN_ROOT/outputs/stages/target-question-backlog.json`、`RUN_ROOT/outputs/stages/target-requirement-logic-map.json`、`RUN_ROOT/outputs/stages/clarification-record.json`、`RUN_ROOT/outputs/stages/open-questions.json`、`RUN_ROOT/outputs/stages/assumption-log.md`、`RUN_ROOT/outputs/stages/design-readiness-report.json`、`RUN_ROOT/outputs/stages/clarification-challenge-report.json`、`RUN_ROOT/outputs/stages/clarification-handoff.json`、`RUN_ROOT/outputs/stages/clarification-evidence.json` |
 | S2 | 上下文报告包含“可复用资产/缺口/命名建议”三段，结构化 findings 能回溯到 `REQ-*` | `RUN_ROOT/outputs/stages/s2-context-report.md`、`RUN_ROOT/outputs/stages/target-context-findings.yaml` |
-| S3 | `target-design-overview.md`、`target-design-detail.md`、`target-acceptance-tests.yaml`、`target-traceability-matrix.json` 存在且覆盖 `REQ-*`；复杂节点已有 target node design 或明确豁免；`workflow-spec.yaml` 可解析且关键键存在；`workflow-view.md` 与 `workflow-lowlevel.md` 已生成，且 `workflow-lowlevel.md` 可由 `workflow-spec.yaml` 确定性重算；审批状态已记录且未绕过 gate；design-review gate 已闭合且 fingerprints 未过期 | `RUN_ROOT/outputs/stages/target-design-overview.md`、`RUN_ROOT/outputs/stages/target-design-detail.md`、条件性 `RUN_ROOT/outputs/stages/target-node-designs/`、`RUN_ROOT/outputs/stages/target-implementation-plan.md`、`RUN_ROOT/outputs/stages/target-acceptance-tests.yaml`、`RUN_ROOT/outputs/stages/target-traceability-matrix.json`、`RUN_ROOT/outputs/stages/design-review/design-review-packet.json`、`RUN_ROOT/outputs/stages/design-review/issues.json`、`RUN_ROOT/outputs/stages/design-review/closure.json`、`RUN_ROOT/outputs/stages/design-review/gate-validation.json`、`RUN_ROOT/workflow-spec.yaml`、`RUN_ROOT/workflow-view.md`、`RUN_ROOT/workflow-lowlevel.md`、`outputs/stages/s3-design-summary.json` |
+| S3 | `target-design-overview.md`、`target-design-detail.md`、`target-acceptance-tests.yaml`、`target-traceability-matrix.json` 存在且覆盖 `REQ-*`；复杂节点已有 target node design 或明确豁免；`workflow-spec.yaml` 可解析且关键键存在；`workflow-view.md` 与 `workflow-maintenance.md` 已生成，且 `workflow-maintenance.md` 可由 `workflow-spec.yaml` 确定性重算；审批状态已记录且未绕过 gate；design-review gate 已闭合且 fingerprints 未过期 | `RUN_ROOT/outputs/stages/target-design-overview.md`、`RUN_ROOT/outputs/stages/target-design-detail.md`、条件性 `RUN_ROOT/outputs/stages/target-node-designs/`、`RUN_ROOT/outputs/stages/target-implementation-plan.md`、`RUN_ROOT/outputs/stages/target-acceptance-tests.yaml`、`RUN_ROOT/outputs/stages/target-traceability-matrix.json`、`RUN_ROOT/outputs/stages/design-review/design-review-packet.json`、`RUN_ROOT/outputs/stages/design-review/issues.json`、`RUN_ROOT/outputs/stages/design-review/closure.json`、`RUN_ROOT/outputs/stages/design-review/gate-validation.json`、`RUN_ROOT/workflow-spec.yaml`、`RUN_ROOT/workflow-view.md`、`RUN_ROOT/workflow-maintenance.md`、`outputs/stages/s3-design-summary.json` |
 | S4 | candidate 目录存在；managed plan/result 存在；`TARGET_ROOT/.workflowprogram/managed-files.json` 已写入且带 `updated_at`；目标侧设计包与 `.workflowprogram/runtime/` 已持久化；冲突不覆盖目标文件 | `RUN_ROOT/outputs/candidate/.claude/`、`RUN_ROOT/outputs/candidate/.workflowprogram/design/`、`RUN_ROOT/outputs/candidate/.workflowprogram/runtime/`、`managed-change-plan/result`、`TARGET_ROOT/.workflowprogram/managed-files.json` |
 | S5 | 产生 workflow 级结论，且证据链文件齐全；若声明能力发现、宿主能力或 team 契约，则对应 discovery / probe / team evidence 已纳入判定 | `validation-runtime-report.md`、`outputs/stages/s5-validation-summary.json`、条件性 `outputs/stages/host-capability-candidates.json`、`outputs/stages/host-bootstrap-instructions.md`、`outputs/stages/host-capability-report.json`、`outputs/stages/team-plan.json`、`outputs/stages/team-results.json`、`outputs/stages/team-join-summary.json` |
 | S6 | 输出 lessons 增量与约束候选，关联本次 `run-id` 与 `failure_kind`，且 `user-progress.md` 含“历史关键节点结果” | `RUN_ROOT/outputs/stages/s6-lessons-delta.md` |
@@ -340,7 +340,7 @@ TARGET_ROOT/
 - `workflow-entry.py` 必须按固定顺序执行：
   - `validate-workflow-spec.py`
   - `generate-workflow-view.py`
-  - `generate-workflow-lowlevel.py`
+  - `generate-workflow-maintenance.py`
   - `validate-design-review-gate.py`（在 S4 写入链路前复核 S3 设计审视闭合状态）
   - `generate-target-runtime.py`
   - `managed-assets.py plan/apply-staged`

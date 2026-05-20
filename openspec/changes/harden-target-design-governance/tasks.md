@@ -12,7 +12,7 @@
 - [x] 2.1 Update `workflowprogram-develop` so new runs emit canonical target design source names.
 - [x] 2.2 Update `workflow-spec-support/spec-template.md` to request target design overview/detail, target acceptance tests, and target traceability matrix.
 - [x] 2.3 Update `workflow-spec-support/yaml-spec-template.md` so `design_refs` uses `schema_version: 2`, `naming: target_design_v1`, canonical target-prefixed run paths, and `.workflowprogram/design/source/**` persistent paths.
-- [x] 2.4 Update generated view/lowlevel language so `workflow-view.md` and `workflow-lowlevel.md` are clearly described as derived target views, not target design source.
+- [x] 2.4 Update generated view/lowlevel language so `workflow-view.md` and `workflow-maintenance.md` are clearly described as derived target views, not target design source.
 
 ## 3. Shared Resolver And Spec Validator
 

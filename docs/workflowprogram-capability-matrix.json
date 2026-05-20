@@ -6,7 +6,7 @@
       "checks": [
         {
           "file": "docs/workflowprogram-stage-highlevel-design.md",
-          "markers": ["intent_flows", "approved", "auto-approved", "workflow-entry.py", "workflow-lowlevel.md"]
+          "markers": ["intent_flows", "approved", "auto-approved", "workflow-entry.py", "workflow-maintenance.md"]
         },
         {
           "file": "docs/workflowprogram-stage-lowlevel-design.md",
@@ -74,11 +74,11 @@
       "checks": [
         {
           "file": ".claude/scripts/workflow-entry.py",
-          "markers": ["managed-assets.py", "generate-workflow-lowlevel.py", "generate-target-runtime.py", "discover-host-capabilities.py", "probe-host-capabilities.py", "apply-host-bootstrap.py", "generate-environment-remediation.py", "workflow-runner.py", "validate-run-state.py", "entry-orchestration-summary.json"]
+          "markers": ["managed-assets.py", "generate-workflow-maintenance.py", "generate-target-runtime.py", "discover-host-capabilities.py", "probe-host-capabilities.py", "apply-host-bootstrap.py", "generate-environment-remediation.py", "workflow-runner.py", "validate-run-state.py", "entry-orchestration-summary.json"]
         },
         {
           "file": ".claude/commands/develop.md",
-          "markers": ["workflow-entry.py run", "generate-workflow-lowlevel.py", "managed-assets.py", "workflow-runner.py"]
+          "markers": ["workflow-entry.py run", "generate-workflow-maintenance.py", "managed-assets.py", "workflow-runner.py"]
         },
         {
           "file": ".claude/skills/workflowprogram-develop/SKILL.md",

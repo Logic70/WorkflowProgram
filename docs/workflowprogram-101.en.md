@@ -34,7 +34,7 @@ Behind that single entry, the current implementation does all of this:
 
 1. identify the intent and the target directory
 2. generate `workflow-spec.md` and `workflow-spec.yaml`
-3. generate `workflow-view.md`, `workflow-lowlevel.md`, and the target-side runtime wrapper bundle
+3. generate `workflow-view.md`, `workflow-maintenance.md`, and the target-side runtime wrapper bundle
 4. write candidate `.claude/` and `.workflowprogram/` assets into `RUN_ROOT/outputs/candidate/`
 5. use managed apply to decide what may safely land in `TARGET_ROOT`
 6. if external capabilities are declared, run capability discovery, host probing, bootstrap, and remediation guidance first
@@ -80,7 +80,7 @@ So WorkflowProgram is not about adding more skills. It is about systematically t
 | `workflow-entry.py` | How the main path becomes deterministic | product entry wrapper |
 | `workflow-runner.py` | Who owns transitions and runtime constraints | control-plane runner |
 | `workflowprogram-validate` | Who produces the workflow-level verdict | S5 judge entry |
-| `workflow-lowlevel.md` | Where maintenance and iteration guidance comes from | a one-way render from YAML |
+| `workflow-maintenance.md` | Where maintenance and iteration guidance comes from | a one-way render from YAML |
 | `target design source` | Where the target workflow's rationale, node details, acceptance tests, and traceability live | `TARGET_ROOT/.workflowprogram/design/source/**` |
 | `runtime-manifest.json` | Whether the target-side runtime was really delivered | the machine contract inside `.workflowprogram/runtime/` |
 | `capability_discovery` / `host_capabilities` | How external capabilities are discovered, probed, and repaired | candidate reports, host reports, remediation guidance |

@@ -91,7 +91,7 @@ stages:
       outputs/stages/target-traceability-matrix.json
       workflow-spec.yaml
       workflow-view.md
-      workflow-lowlevel.md
+      workflow-maintenance.md
     gate: user_approval
     auto_approve_cond: "--auto-approve or CI=true"
     max_retries: 3
@@ -123,7 +123,7 @@ stages:
       .claude/settings.json
       .workflowprogram/design/workflow-spec.yaml
       .workflowprogram/design/workflow-view.md
-      .workflowprogram/design/workflow-lowlevel.md
+      .workflowprogram/design/workflow-maintenance.md
       .workflowprogram/design/source/**
       .workflowprogram/runtime/workflow-entry.py
       .workflowprogram/runtime/workflow-runner.py
@@ -486,7 +486,7 @@ test_contract:
       - .claude/rules/constraints.md
       - .workflowprogram/design/workflow-spec.yaml
       - .workflowprogram/design/workflow-view.md
-      - .workflowprogram/design/workflow-lowlevel.md
+      - .workflowprogram/design/workflow-maintenance.md
       - .workflowprogram/design/source/**
       - .workflowprogram/runtime/workflow-entry.py
       - .workflowprogram/runtime/workflow-runner.py

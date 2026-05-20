@@ -72,7 +72,7 @@ def infer_target_state(flags: Dict[str, Any]) -> str:
         return "partial_workflow"
     if flags["has_design_spec"] or flags["managed_manifest_valid"]:
         return "existing_managed_workflow"
-    if flags["has_lowlevel"]:
+    if flags["has_maintenance"]:
         return "partial_workflow"
     if flags["has_claude_assets"]:
         return "existing_unmanaged_workflow"
@@ -92,16 +92,19 @@ def fallback_request_kind(request: str) -> str:
 
 def build_context(target_root: Path, request: str, route_payload: Dict[str, Any]) -> Dict[str, Any]:
     design_spec = target_root / ".workflowprogram" / "design" / "workflow-spec.yaml"
-    lowlevel = target_root / ".workflowprogram" / "design" / "workflow-lowlevel.md"
+    maintenance = target_root / ".workflowprogram" / "design" / "workflow-maintenance.md"
     managed_manifest = target_root / ".workflowprogram" / "managed-files.json"
+    maintenance_sha256 = sha256_file(maintenance)
     flags: Dict[str, Any] = {
         "has_design_spec": design_spec.exists(),
-        "has_lowlevel": lowlevel.exists(),
+        "has_maintenance": maintenance.exists(),
+        "has_lowlevel": maintenance.exists(),  # Deprecated compatibility alias.
         "has_managed_manifest": managed_manifest.exists(),
         "managed_manifest_valid": managed_manifest_valid(managed_manifest),
         "has_claude_assets": has_relevant_claude_assets(target_root),
         "design_spec_sha256": sha256_file(design_spec),
-        "lowlevel_sha256": sha256_file(lowlevel),
+        "maintenance_sha256": maintenance_sha256,
+        "lowlevel_sha256": maintenance_sha256,  # Deprecated compatibility alias.
         "managed_manifest_sha256": sha256_file(managed_manifest),
     }
     target_state = infer_target_state(flags)
@@ -121,6 +124,7 @@ def build_context(target_root: Path, request: str, route_payload: Dict[str, Any]
         "flags": flags,
         "fingerprints": {
             "design_spec_sha256": flags["design_spec_sha256"],
+            "maintenance_sha256": flags["maintenance_sha256"],
             "lowlevel_sha256": flags["lowlevel_sha256"],
             "managed_manifest_sha256": flags["managed_manifest_sha256"],
         },

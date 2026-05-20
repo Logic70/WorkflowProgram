@@ -9,7 +9,7 @@ Use explicit names for the two design layers:
 | WorkflowProgram product design | `WP product design` | `docs/workflowprogram-stage-highlevel-design.md`, `docs/workflowprogram-stage-lowlevel-design.md` | Design of WorkflowProgram itself. |
 | Generated workflow design source | `target design source` | `outputs/stages/s3-design-highlevel.md`, `outputs/stages/s3-design-lowlevel.md` | Human-reviewable design for the workflow being created or modified. |
 | Generated workflow machine projection | `target runtime map` | `TARGET_ROOT/.workflowprogram/design/workflow-spec.yaml` | Machine-readable map used by validators, runtime, and S5. |
-| Generated workflow derived reports | `target derived views` | `workflow-view.md`, `workflow-lowlevel.md` | Generated from YAML; cannot introduce new semantics. |
+| Generated workflow derived reports | `target derived views` | `workflow-view.md`, `workflow-maintenance.md` | Generated from YAML; cannot introduce new semantics. |
 
 The words `HighLevel` and `LowLevel` should not be used without a qualifier. Product docs may use `WP product high-level design`; target artifacts should use `target design overview` and `target design detail`.
 
@@ -261,7 +261,7 @@ Add target design governance checks:
 
 - `workflowprogram-develop` should produce canonical target design source names.
 - `workflow-spec-support` templates should use target-prefixed names.
-- `generate-workflow-view.py` and `generate-workflow-lowlevel.py` should label outputs as derived target views and include the target design contract summary.
+- `generate-workflow-view.py` and `generate-workflow-maintenance.py` should label outputs as derived target views and include the target design contract summary.
 - `workflow-entry.py` should stage the canonical target design source archive under `outputs/candidate/.workflowprogram/design/source/**` before managed apply.
 - `managed-assets.py` already allows `.workflowprogram/design/**`, so no new write prefix is required.
 

@@ -365,14 +365,14 @@ def generate_view(spec_path: Path, out_path: Path) -> Dict[str, Any]:
     return payload
 
 
-def generate_lowlevel(spec_path: Path, out_path: Path) -> Dict[str, Any]:
-    """根据 workflow-spec.yaml 生成维护级 lowlevel 指南。"""
+def generate_maintenance(spec_path: Path, out_path: Path) -> Dict[str, Any]:
+    """根据 workflow-spec.yaml 生成维护说明。"""
 
     payload = run_required_json_command(
-        "generate-workflow-lowlevel.py",
+        "generate-workflow-maintenance.py",
         [
             sys.executable,
-            str(script_dir() / "generate-workflow-lowlevel.py"),
+            str(script_dir() / "generate-workflow-maintenance.py"),
             "--spec",
             str(spec_path),
             "--out",
@@ -381,8 +381,12 @@ def generate_lowlevel(spec_path: Path, out_path: Path) -> Dict[str, Any]:
         ],
     )
     if payload.get("status") != "PASS":
-        raise RuntimeError(f"workflow lowlevel generation failed: {payload}")
+        raise RuntimeError(f"workflow maintenance generation failed: {payload}")
     return payload
+
+
+# Deprecated compatibility name for older internal callers.
+generate_lowlevel = generate_maintenance
 
 
 def generate_target_runtime(spec_path: Path, out_root: Path) -> Dict[str, Any]:
@@ -419,7 +423,7 @@ def stage_persistent_design_assets(
     run_root: Path,
     spec_path: Path,
     view_path: Path,
-    lowlevel_path: Path,
+    maintenance_path: Path,
 ) -> Dict[str, Any]:
     """把本轮设计资产复制到 candidate/.workflowprogram/design/，供 managed apply 持久化。"""
 
@@ -427,10 +431,10 @@ def stage_persistent_design_assets(
     design_root.mkdir(parents=True, exist_ok=True)
     target_spec = design_root / "workflow-spec.yaml"
     target_view = design_root / "workflow-view.md"
-    target_lowlevel = design_root / "workflow-lowlevel.md"
+    target_maintenance = design_root / "workflow-maintenance.md"
     shutil.copy2(spec_path, target_spec)
     shutil.copy2(view_path, target_view)
-    shutil.copy2(lowlevel_path, target_lowlevel)
+    shutil.copy2(maintenance_path, target_maintenance)
     spec_payload = try_load_yaml_mapping(spec_path)
     copied_sources: Dict[str, str] = {}
     for key, rel_path in resolve_existing_run_refs(run_root, spec_payload).items():
@@ -454,7 +458,7 @@ def stage_persistent_design_assets(
         "design_root": str(design_root),
         "workflow_spec": str(target_spec),
         "workflow_view": str(target_view),
-        "workflow_lowlevel": str(target_lowlevel),
+        "workflow_maintenance": str(target_maintenance),
         "source_archive": copied_sources,
     }
 
@@ -727,8 +731,8 @@ def command_run(args: argparse.Namespace) -> int:
     spec_payload = try_load_yaml_mapping(spec_path)
     view_path = run_root / "workflow-view.md"
     view_generation = generate_view(spec_path, view_path)
-    lowlevel_path = run_root / "workflow-lowlevel.md"
-    lowlevel_generation = generate_lowlevel(spec_path, lowlevel_path)
+    maintenance_path = run_root / "workflow-maintenance.md"
+    maintenance_generation = generate_maintenance(spec_path, maintenance_path)
 
     managed_plan: Dict[str, Any] | None = None
     managed_result: Dict[str, Any] | None = None
@@ -795,7 +799,7 @@ def command_run(args: argparse.Namespace) -> int:
                 run_root=run_root,
                 spec_path=spec_path,
                 view_path=view_path,
-                lowlevel_path=lowlevel_path,
+                maintenance_path=maintenance_path,
             )
             target_runtime_assets = stage_target_runtime_assets(
                 candidate_stage_root=candidate_stage_root,
@@ -916,7 +920,7 @@ def command_run(args: argparse.Namespace) -> int:
         "block_reason": block_reason,
         "failure_kind": "design" if final_status == "BLOCKED" else ("conflict" if final_status == "CONFLICT" else ("environment" if required_host_missing else "none")),
         "view_path": str(view_path),
-        "lowlevel_path": str(lowlevel_path),
+        "maintenance_path": str(maintenance_path),
         "candidate_root": str(resolve_candidate_layout(candidate_root)[0]) if intent == "develop" else None,
         "persistent_design_assets": design_assets,
         "target_runtime_assets": target_runtime_assets,
@@ -926,7 +930,7 @@ def command_run(args: argparse.Namespace) -> int:
             "warning_count": len(spec_validation.get("warnings", [])),
         },
         "view_generation": view_generation,
-        "lowlevel_generation": lowlevel_generation,
+        "maintenance_generation": maintenance_generation,
         "managed_plan_path": str(run_root / "outputs" / "managed-change-plan.json") if managed_plan else None,
         "managed_result_path": str(run_root / "outputs" / "managed-change-result.json") if managed_result else None,
         "managed_conflict_count": len(managed_result.get("conflicts", [])) if managed_result else 0,

@@ -36,7 +36,7 @@ stages:
 
     workflow-view.md
 
-    workflow-lowlevel.md
+    workflow-maintenance.md
 
     '
   gate: user_approval
@@ -79,7 +79,7 @@ stages:
 
     .workflowprogram/design/workflow-view.md
 
-    .workflowprogram/design/workflow-lowlevel.md
+    .workflowprogram/design/workflow-maintenance.md
 
     .workflowprogram/runtime/workflow-entry.py
 
@@ -343,7 +343,7 @@ test_contract:
     - .claude/rules/constraints.md
     - .workflowprogram/design/workflow-spec.yaml
     - .workflowprogram/design/workflow-view.md
-    - .workflowprogram/design/workflow-lowlevel.md
+    - .workflowprogram/design/workflow-maintenance.md
     - .workflowprogram/runtime/workflow-entry.py
     - .workflowprogram/runtime/workflow-runner.py
     - .workflowprogram/runtime/validate-run-state.py

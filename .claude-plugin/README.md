@@ -97,7 +97,7 @@ Claude Code 加载插件后，会在 `SessionStart` 自动执行 Python runtime 
 
 - `TARGET_ROOT/.workflowprogram/design/workflow-spec.yaml`：目标 workflow 的机器控制面和运行态地图。
 - `TARGET_ROOT/.workflowprogram/design/workflow-view.md`：从 YAML 派生的只读概览。
-- `TARGET_ROOT/.workflowprogram/design/workflow-lowlevel.md`：从 YAML 派生的维护指导。
+- `TARGET_ROOT/.workflowprogram/design/workflow-maintenance.md`：从 YAML 派生的维护指导。
 - `TARGET_ROOT/.workflowprogram/design/source/**`：目标 workflow 的设计源归档。
 
 设计源归档使用 target-prefixed 命名，例如 `target-design-overview.md`、`target-design-detail.md`、`target-acceptance-tests.yaml`、`target-traceability-matrix.json`。这些文件解释“为什么这样设计”和“如何验证”，`workflow-spec.yaml` 只保存可执行、可校验的机器投影。

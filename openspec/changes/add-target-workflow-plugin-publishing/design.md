@@ -34,7 +34,7 @@ A target workflow is publishable only when it has completed `workflowprogram-dev
 Required target-side artifacts:
 
 - `TARGET_ROOT/.workflowprogram/design/workflow-spec.yaml`;
-- `TARGET_ROOT/.workflowprogram/design/workflow-lowlevel.md`;
+- `TARGET_ROOT/.workflowprogram/design/workflow-maintenance.md`;
 - `TARGET_ROOT/.workflowprogram/runtime/runtime-manifest.json`;
 - `TARGET_ROOT/.workflowprogram/managed-files.json`;
 - generated command/skill/agent assets referenced by the spec.

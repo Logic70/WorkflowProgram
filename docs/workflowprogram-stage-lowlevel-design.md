@@ -103,16 +103,16 @@
 | target design source | 解释用户需求为何被这样拆解、节点为何这样组织、复杂节点如何分析与验证 | `outputs/stages/target-design-overview.md`、`outputs/stages/target-design-detail.md`、`outputs/stages/target-node-designs/<node-id>.md` |
 | 设计审视门禁 | 由隔离上下文复核 S3 设计是否可进入 S4，并冻结参与审视的 artifact fingerprints | `outputs/stages/design-review/design-review-packet.json`、`issues.json`、`closure.json`、`gate-validation.json` |
 | 机器投影 | 提供脚本、validator、runner、judge 可执行和可验证的最小契约 | `workflow-spec.yaml`、可选 `workflow-spec.yaml.design_refs` |
-| 派生视图 | 从机器投影生成维护说明，不新增执行语义 | `workflow-view.md`、`workflow-lowlevel.md` |
+| 派生视图 | 从机器投影生成维护说明，不新增执行语义 | `workflow-view.md`、`workflow-maintenance.md` |
 | 运行证据 | 证明生成结果是否满足需求、设计与契约 | `state.json`、`events.jsonl`、`validation-runtime-report.md`、`outputs/stages/s5-validation-summary.json` |
 
 固定约束：
 
 1. S1/S2/S3 的设计源可以包含推理、取舍和未决风险；`workflow-spec.yaml` 只引用这些文件并承载机器字段。
-2. `workflow-lowlevel.md` 是从 `workflow-spec.yaml` 派生的维护指南，不等同于 `target-design-detail.md`。
+2. `workflow-maintenance.md` 是从 `workflow-spec.yaml` 派生的维护指南，不等同于 `target-design-detail.md`。
 3. S5 必须按 `REQ -> design node -> asset -> acceptance test -> evidence` 检查需求血缘；缺少映射时不得给出 clean PASS。
 4. 简单工作流可以没有 `target-node-designs/**`；复杂节点必须有节点级设计或明确豁免理由。
-5. 任何修改执行语义的变更必须先更新 `workflow-spec.yaml`，再重生成 `workflow-view.md` 与 `workflow-lowlevel.md`；任何修改设计理由的变更必须先更新 target design source，再检查是否需要同步投影。
+5. 任何修改执行语义的变更必须先更新 `workflow-spec.yaml`，再重生成 `workflow-view.md` 与 `workflow-maintenance.md`；任何修改设计理由的变更必须先更新 target design source，再检查是否需要同步投影。
 7. completed develop 必须将 target design source 复制到 `TARGET_ROOT/.workflowprogram/design/source/**`，供后续修改、审计、validate 与 publish 使用。
 6. S3 设计审视产物属于 run evidence，只证明“本轮设计进入实现前已被复核并闭合”，不得作为 `workflow-spec.yaml` 顶层字段长期持久化。
 
@@ -257,7 +257,7 @@ Artifact 使用固定结构：
 - `RUN_ROOT/outputs/stages/design-review/gate-validation.json`
 - `RUN_ROOT/workflow-spec.yaml`
 - `RUN_ROOT/workflow-view.md`
-- `RUN_ROOT/workflow-lowlevel.md`
+- `RUN_ROOT/workflow-maintenance.md`
 - `RUN_ROOT/outputs/stages/s3-design-summary.json`
 - `RUN_ROOT/outputs/candidate/.claude/`
 - `RUN_ROOT/outputs/candidate/.workflowprogram/design/`
@@ -450,7 +450,7 @@ ref: runtime_contract.<field>
 - `workflow-spec.yaml`：机器语义真源和运行态地图，不承载完整设计推理。
 - `workflow-spec.md`：需求澄清后的用户回读材料。
 - `s3-design-highlevel.md` / `s3-design-lowlevel.md`：目标工作流设计源，负责解释整体方案、复杂节点和取舍。
-- `workflow-view.md` / `workflow-lowlevel.md`：从 YAML 派生的只读概览与维护说明，不得反向覆盖 graph 语义。
+- `workflow-view.md` / `workflow-maintenance.md`：从 YAML 派生的只读概览与维护说明，不得反向覆盖 graph 语义。
 
 必须字段：
 
@@ -476,7 +476,7 @@ ref: runtime_contract.<field>
 2. `transitions[*].from/to` 必须引用已声明节点或终止状态。
 3. 所有节点必须能从至少一个 entrypoint 到达。
 4. 目标资产类 `output_refs` 必须能回到 `registry` 或 `test_contract.artifacts`，避免生成未声明文件。
-5. 修改目标工作流图的执行语义时，只能先改 `workflow-spec.yaml.workflow_graph`，再重新生成 `workflow-view.md` 与 `workflow-lowlevel.md`。
+5. 修改目标工作流图的执行语义时，只能先改 `workflow-spec.yaml.workflow_graph`，再重新生成 `workflow-view.md` 与 `workflow-maintenance.md`。
 6. 修改目标工作流图的设计理由或复杂节点分析时，必须先改 S3 设计源，再确认是否需要同步投影到 YAML。
 
 复杂节点升级规则：
@@ -974,7 +974,7 @@ WorkflowProgram 自身必须按原子能力组织，每个 Stage 必须可拆分
 - `RUN_ROOT/outputs/stages/design-review/gate-validation.json`
 - `RUN_ROOT/workflow-spec.yaml`（机器可读控制面投影）
 - `RUN_ROOT/workflow-view.md`（只读视图）
-- `RUN_ROOT/workflow-lowlevel.md`（由 YAML 派生的维护指导）
+- `RUN_ROOT/workflow-maintenance.md`（由 YAML 派生的维护指导）
 - 可选 `design_refs`
 - `generated_runtime_contract`（内嵌于 `workflow-spec.yaml`）
 - 可选 `capability_discovery`
@@ -1003,7 +1003,7 @@ WorkflowProgram 自身必须按原子能力组织，每个 Stage 必须可拆分
 3. `render_yaml_and_view`（script_node）
    - 再把设计源投影为 `RUN_ROOT/workflow-spec.yaml`，其中 `design_refs` 只引用设计源和 traceability 文件路径。
    - 再调用 `python ${CLAUDE_PLUGIN_ROOT}/scripts/generate-workflow-view.py --spec <RUN_ROOT>/workflow-spec.yaml --out <RUN_ROOT>/workflow-view.md` 生成只读视图。
-   - 再调用 `python ${CLAUDE_PLUGIN_ROOT}/scripts/generate-workflow-lowlevel.py --spec <RUN_ROOT>/workflow-spec.yaml --out <RUN_ROOT>/workflow-lowlevel.md` 生成维护指导文档。
+   - 再调用 `python ${CLAUDE_PLUGIN_ROOT}/scripts/generate-workflow-maintenance.py --spec <RUN_ROOT>/workflow-spec.yaml --out <RUN_ROOT>/workflow-maintenance.md` 生成维护指导文档。
 4. `validate_yaml_contract`（script_node）
    - 调用 `${CLAUDE_PLUGIN_ROOT}/scripts/validate-workflow-spec.py --spec <RUN_ROOT>/workflow-spec.yaml`，同时校验 `runtime_contract` 与 `test_contract`；失败则回退到设计步骤。
 5. `generate_design_review_packet`（script_node）
@@ -1037,7 +1037,7 @@ WorkflowProgram 自身必须按原子能力组织，每个 Stage 必须可拆分
 10. `test_contract.failure.implemented_now` 必须是 `runtime_contract.failure_kinds` 的子集。
 11. `s3-design-summary.json` 必须记录 `approval_status` 与 `complexity`。
 12. `workflow-view.md` 必须存在且标注来源 `workflow-spec.yaml`。
-13. `workflow-lowlevel.md` 必须存在，并通过 `${CLAUDE_PLUGIN_ROOT}/scripts/validate-workflow-lowlevel.py --spec <workflow-spec.yaml> --lowlevel <workflow-lowlevel.md>` 的确定性校验。
+13. `workflow-maintenance.md` 必须存在，并通过 `${CLAUDE_PLUGIN_ROOT}/scripts/validate-workflow-maintenance.py --spec <workflow-spec.yaml> --maintenance <workflow-maintenance.md>` 的确定性校验。
 14. `approval_status` 必须写入 `current-progress.json`。
 15. `validate-workflow-spec.py` 必须返回 `PASS`。
 16. 若存在 `user_approval` gate，则未经批准不得进入 S4。
@@ -1055,11 +1055,11 @@ WorkflowProgram 自身必须按原子能力组织，每个 Stage 必须可拆分
 - 主承载：`workflowprogram-orchestrate` 路由后的 develop Stage 3；`/develop` Stage 3 仅为兼容参考
 - YAML 模板来源：`yaml-spec-template.md`
 - 视图渲染脚本：`generate-workflow-view.py`（确定性渲染，不依赖自由文本）
-- 维护指导渲染脚本：`generate-workflow-lowlevel.py`
+- 维护指导渲染脚本：`generate-workflow-maintenance.py`
 - 设计审视输入包：`generate-design-review-packet.py`
 - 设计审视门禁：`validate-design-review-gate.py`
 - 内部审视角色：`workflow-design-reviewer`
-- 维护指导校验脚本：`${CLAUDE_PLUGIN_ROOT}/scripts/validate-workflow-lowlevel.py`
+- 维护指导校验脚本：`${CLAUDE_PLUGIN_ROOT}/scripts/validate-workflow-maintenance.py`
 - 规格校验脚本：`${CLAUDE_PLUGIN_ROOT}/scripts/validate-workflow-spec.py`
 
 ### 承载文件
@@ -1067,8 +1067,8 @@ WorkflowProgram 自身必须按原子能力组织，每个 Stage 必须可拆分
 - [develop.md](/mnt/d/Code/WorkflowProgram-CN/.claude/commands/develop.md)
 - [yaml-spec-template.md](/mnt/d/Code/WorkflowProgram-CN/.claude/skills/workflow-spec-support/yaml-spec-template.md)
 - [generate-workflow-view.py](/mnt/d/Code/WorkflowProgram-CN/.claude/scripts/generate-workflow-view.py)
-- [generate-workflow-lowlevel.py](/mnt/d/Code/WorkflowProgram-CN/.claude/scripts/generate-workflow-lowlevel.py)
-- [validate-workflow-lowlevel.py](/mnt/d/Code/WorkflowProgram-CN/.claude/scripts/validate-workflow-lowlevel.py)
+- [generate-workflow-maintenance.py](/mnt/d/Code/WorkflowProgram-CN/.claude/scripts/generate-workflow-maintenance.py)
+- [validate-workflow-maintenance.py](/mnt/d/Code/WorkflowProgram-CN/.claude/scripts/validate-workflow-maintenance.py)
 - [validate-workflow-spec.py](/mnt/d/Code/WorkflowProgram-CN/.claude/scripts/validate-workflow-spec.py)
 
 ## S4 生成与受控写入（Generate + Managed Apply）
@@ -1132,7 +1132,7 @@ WorkflowProgram 自身必须按原子能力组织，每个 Stage 必须可拆分
    - 无冲突执行 `apply-staged`；有冲突写入 `outputs/conflicts/` 并标记失败分类。
 10. `product_entry_finalize`（script_node）
    - develop 主链必须通过 `${CLAUDE_PLUGIN_ROOT}/scripts/workflow-entry.py run --spec <RUN_ROOT>/workflow-spec.yaml --run-root <RUN_ROOT> --target-root <TARGET_ROOT> --entry-skill workflowprogram-develop --request "<原始需求>" --route-evidence <RUN_ROOT>/outputs/stages/route-intent.json --change-context <RUN_ROOT>/outputs/stages/change-context.json` 驱动，而不是只在 skill 中罗列口头顺序。
-   - 该脚本必须顺序调用 `resolve-change-context.py`（复核）、`validate-workflow-spec.py`、`generate-workflow-view.py`、`generate-workflow-lowlevel.py`、`validate-change-policy.py`（条件执行且在 managed apply 前）、`validate-design-review-gate.py`（在 candidate/runtime staging 与 managed apply 前）、`generate-target-runtime.py`、`managed-assets.py`、`discover-host-capabilities.py`、`probe-host-capabilities.py`、`apply-host-bootstrap.py`（条件执行）、`generate-environment-remediation.py`、`workflow-runner.py`、`validate-run-state.py`，并写入 `outputs/stages/entry-orchestration-summary.json`。
+   - 该脚本必须顺序调用 `resolve-change-context.py`（复核）、`validate-workflow-spec.py`、`generate-workflow-view.py`、`generate-workflow-maintenance.py`、`validate-change-policy.py`（条件执行且在 managed apply 前）、`validate-design-review-gate.py`（在 candidate/runtime staging 与 managed apply 前）、`generate-target-runtime.py`、`managed-assets.py`、`discover-host-capabilities.py`、`probe-host-capabilities.py`、`apply-host-bootstrap.py`（条件执行）、`generate-environment-remediation.py`、`workflow-runner.py`、`validate-run-state.py`，并写入 `outputs/stages/entry-orchestration-summary.json`。
 11. `run_transition_control_plane`（script_node）
    - 调 `${CLAUDE_PLUGIN_ROOT}/scripts/workflow-runner.py run --spec <RUN_ROOT>/workflow-spec.yaml --run-root <RUN_ROOT> --target-root <TARGET_ROOT>`，由程序执行状态转移并产出 `state.json` / `events.jsonl`。
 12. `validate_state_artifacts`（script_node）

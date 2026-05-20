@@ -710,7 +710,7 @@ def write_existing_managed_seed(target_root: Path) -> None:
     """Create enough target-side evidence for resolve-change-context to see a managed workflow."""
 
     write_text(target_root / ".workflowprogram" / "design" / "workflow-spec.yaml", "name: existing-managed\n")
-    write_text(target_root / ".workflowprogram" / "design" / "workflow-lowlevel.md", "# Existing LowLevel\n")
+    write_text(target_root / ".workflowprogram" / "design" / "workflow-maintenance.md", "# Existing Maintenance Guide\n")
     write_json(
         manifest_path_for(target_root),
         {
@@ -809,7 +809,7 @@ def write_change_policy_inputs(
             "affected_artifacts": affected,
             "allowed_derived_artifacts": [
                 ".workflowprogram/design/workflow-view.md",
-                ".workflowprogram/design/workflow-lowlevel.md",
+                ".workflowprogram/design/workflow-maintenance.md",
                 ".workflowprogram/design/source/**",
                 ".workflowprogram/runtime/**",
             ],
@@ -1242,18 +1242,18 @@ def write_lessons_delta(
 
 
 def generate_design_docs(repo_root: Path, run_root: Path) -> Dict[str, Path]:
-    """基于真实生成器产出 workflow-view.md 与 workflow-lowlevel.md。"""
+    """基于真实生成器产出 workflow-view.md 与 workflow-maintenance.md。"""
 
     spec_path = run_root / "workflow-spec.yaml"
     script_root = repo_root / ".claude" / "scripts"
     outputs = {
         "workflow_spec": spec_path,
         "workflow_view": run_root / "workflow-view.md",
-        "workflow_lowlevel": run_root / "workflow-lowlevel.md",
+        "workflow_maintenance": run_root / "workflow-maintenance.md",
     }
     for script_name, out_path in (
         ("generate-workflow-view.py", outputs["workflow_view"]),
-        ("generate-workflow-lowlevel.py", outputs["workflow_lowlevel"]),
+        ("generate-workflow-maintenance.py", outputs["workflow_maintenance"]),
     ):
         completed = subprocess.run(
             [
@@ -1443,7 +1443,7 @@ def write_managed_outputs(run_root: Path, target_root: Path, conflict: bool) -> 
     command_source = run_root / "outputs" / "candidate" / ".claude" / "commands" / "example.md"
     design_spec_source = run_root / "outputs" / "candidate" / ".workflowprogram" / "design" / "workflow-spec.yaml"
     design_view_source = run_root / "outputs" / "candidate" / ".workflowprogram" / "design" / "workflow-view.md"
-    design_lowlevel_source = run_root / "outputs" / "candidate" / ".workflowprogram" / "design" / "workflow-lowlevel.md"
+    design_maintenance_source = run_root / "outputs" / "candidate" / ".workflowprogram" / "design" / "workflow-maintenance.md"
     runtime_root = run_root / "outputs" / "candidate" / ".workflowprogram" / "runtime"
     write_text(rules_source, "# Constraints\n\n- Keep workflow assets managed.\n")
     write_text(command_source, "## Usage\n\n1. Goal\n2. Verify\n")
@@ -1451,7 +1451,7 @@ def write_managed_outputs(run_root: Path, target_root: Path, conflict: bool) -> 
     for source_path, run_path in (
         (design_spec_source, run_root / "workflow-spec.yaml"),
         (design_view_source, run_root / "workflow-view.md"),
-        (design_lowlevel_source, run_root / "workflow-lowlevel.md"),
+        (design_maintenance_source, run_root / "workflow-maintenance.md"),
     ):
         source_path.write_text(run_path.read_text(encoding="utf-8"), encoding="utf-8", newline="\n")
     source_archive = stage_design_source_archive(run_root, run_root / "workflow-spec.yaml", candidate_root)
@@ -1497,9 +1497,9 @@ def write_managed_outputs(run_root: Path, target_root: Path, conflict: bool) -> 
             "decision": "create",
         },
         {
-            "relative_path": ".workflowprogram/design/workflow-lowlevel.md",
-            "source_path": str(design_lowlevel_source),
-            "target_path": str(target_root / ".workflowprogram" / "design" / "workflow-lowlevel.md"),
+            "relative_path": ".workflowprogram/design/workflow-maintenance.md",
+            "source_path": str(design_maintenance_source),
+            "target_path": str(target_root / ".workflowprogram" / "design" / "workflow-maintenance.md"),
             "decision": "create",
         },
         {
@@ -1623,7 +1623,7 @@ def write_managed_outputs(run_root: Path, target_root: Path, conflict: bool) -> 
                         "updated_at": iso_now(),
                     },
                     {
-                        "relative_path": ".workflowprogram/design/workflow-lowlevel.md",
+                        "relative_path": ".workflowprogram/design/workflow-maintenance.md",
                         "last_applied_hash": "mock-managed-hash-lowlevel",
                         "ownership": "workflowprogram",
                         "producer_version": "mock-runtime-host",
@@ -1745,7 +1745,7 @@ def create_target_outputs(run_root: Path, target_root: Path, *, include_claude_a
         files.append(".claude/commands/example.md")
     design_root = target_root / ".workflowprogram" / "design"
     design_root.mkdir(parents=True, exist_ok=True)
-    for name in ("workflow-spec.yaml", "workflow-view.md", "workflow-lowlevel.md"):
+    for name in ("workflow-spec.yaml", "workflow-view.md", "workflow-maintenance.md"):
         source_path = run_root / name
         target_path = design_root / name
         target_path.write_text(source_path.read_text(encoding="utf-8"), encoding="utf-8", newline="\n")
@@ -1976,7 +1976,7 @@ def main() -> int:
             for source_name, target_name in (
                 ("workflow_spec", "workflow-spec.yaml"),
                 ("workflow_view", "workflow-view.md"),
-                ("workflow_lowlevel", "workflow-lowlevel.md"),
+                ("workflow_maintenance", "workflow-maintenance.md"),
             ):
                 destination = candidate_root / ".workflowprogram" / "design" / target_name
                 destination.parent.mkdir(parents=True, exist_ok=True)
@@ -2053,7 +2053,7 @@ def main() -> int:
             for source_name, target_name in (
                 ("workflow_spec", "workflow-spec.yaml"),
                 ("workflow_view", "workflow-view.md"),
-                ("workflow_lowlevel", "workflow-lowlevel.md"),
+                ("workflow_maintenance", "workflow-maintenance.md"),
             ):
                 destination = candidate_root / ".workflowprogram" / "design" / target_name
                 destination.parent.mkdir(parents=True, exist_ok=True)
@@ -2109,7 +2109,7 @@ def main() -> int:
             for source_name, target_name in (
                 ("workflow_spec", "workflow-spec.yaml"),
                 ("workflow_view", "workflow-view.md"),
-                ("workflow_lowlevel", "workflow-lowlevel.md"),
+                ("workflow_maintenance", "workflow-maintenance.md"),
             ):
                 destination = candidate_root / ".workflowprogram" / "design" / target_name
                 destination.parent.mkdir(parents=True, exist_ok=True)
@@ -2159,7 +2159,7 @@ def main() -> int:
             for source_name, target_name in (
                 ("workflow_spec", "workflow-spec.yaml"),
                 ("workflow_view", "workflow-view.md"),
-                ("workflow_lowlevel", "workflow-lowlevel.md"),
+                ("workflow_maintenance", "workflow-maintenance.md"),
             ):
                 destination = candidate_root / ".workflowprogram" / "design" / target_name
                 destination.parent.mkdir(parents=True, exist_ok=True)
@@ -2214,7 +2214,7 @@ def main() -> int:
             for source_name, target_name in (
                 ("workflow_spec", "workflow-spec.yaml"),
                 ("workflow_view", "workflow-view.md"),
-                ("workflow_lowlevel", "workflow-lowlevel.md"),
+                ("workflow_maintenance", "workflow-maintenance.md"),
             ):
                 destination = candidate_root / ".workflowprogram" / "design" / target_name
                 destination.parent.mkdir(parents=True, exist_ok=True)
@@ -2368,7 +2368,7 @@ def main() -> int:
             for source_name, target_name in (
                 ("workflow_spec", "workflow-spec.yaml"),
                 ("workflow_view", "workflow-view.md"),
-                ("workflow_lowlevel", "workflow-lowlevel.md"),
+                ("workflow_maintenance", "workflow-maintenance.md"),
             ):
                 destination = candidate_root / ".workflowprogram" / "design" / target_name
                 destination.parent.mkdir(parents=True, exist_ok=True)
@@ -2411,7 +2411,7 @@ def main() -> int:
             for source_name, target_name in (
                 ("workflow_spec", "workflow-spec.yaml"),
                 ("workflow_view", "workflow-view.md"),
-                ("workflow_lowlevel", "workflow-lowlevel.md"),
+                ("workflow_maintenance", "workflow-maintenance.md"),
             ):
                 destination = candidate_root / ".workflowprogram" / "design" / target_name
                 destination.parent.mkdir(parents=True, exist_ok=True)
@@ -2498,7 +2498,7 @@ def main() -> int:
             for source_name, target_name in (
                 ("workflow_spec", "workflow-spec.yaml"),
                 ("workflow_view", "workflow-view.md"),
-                ("workflow_lowlevel", "workflow-lowlevel.md"),
+                ("workflow_maintenance", "workflow-maintenance.md"),
             ):
                 destination = candidate_root / ".workflowprogram" / "design" / target_name
                 destination.parent.mkdir(parents=True, exist_ok=True)
@@ -2541,7 +2541,7 @@ def main() -> int:
             for source_name, target_name in (
                 ("workflow_spec", "workflow-spec.yaml"),
                 ("workflow_view", "workflow-view.md"),
-                ("workflow_lowlevel", "workflow-lowlevel.md"),
+                ("workflow_maintenance", "workflow-maintenance.md"),
             ):
                 destination = candidate_root / ".workflowprogram" / "design" / target_name
                 destination.parent.mkdir(parents=True, exist_ok=True)
@@ -2588,7 +2588,7 @@ def main() -> int:
             for source_name, target_name in (
                 ("workflow_spec", "workflow-spec.yaml"),
                 ("workflow_view", "workflow-view.md"),
-                ("workflow_lowlevel", "workflow-lowlevel.md"),
+                ("workflow_maintenance", "workflow-maintenance.md"),
             ):
                 destination = candidate_root / ".workflowprogram" / "design" / target_name
                 destination.parent.mkdir(parents=True, exist_ok=True)
@@ -2762,7 +2762,7 @@ def main() -> int:
             for source_name, target_name in (
                 ("workflow_spec", "workflow-spec.yaml"),
                 ("workflow_view", "workflow-view.md"),
-                ("workflow_lowlevel", "workflow-lowlevel.md"),
+                ("workflow_maintenance", "workflow-maintenance.md"),
             ):
                 destination = candidate_root / ".workflowprogram" / "design" / target_name
                 destination.parent.mkdir(parents=True, exist_ok=True)

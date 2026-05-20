@@ -48,7 +48,7 @@ def valid_policy(target_state: str = "existing_managed_workflow") -> dict:
         ],
         "allowed_derived_artifacts": [
             ".workflowprogram/design/workflow-view.md",
-            ".workflowprogram/design/workflow-lowlevel.md",
+            ".workflowprogram/design/workflow-maintenance.md",
             ".workflowprogram/runtime/**",
         ],
         "preserve_user_edits": True,

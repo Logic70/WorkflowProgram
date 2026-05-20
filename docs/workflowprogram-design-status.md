@@ -40,7 +40,7 @@
 - 产品主入口的确定性脚本链为 `workflow-entry.py -> managed-assets.py -> workflow-runner.py -> validate-run-state.py`。
 - 目标工作流 runtime 的交付模式固定为 `generated_runtime_contract.mode = shared-control-plane-wrapper`。
 - S1/S2/S3 的需求转化链为 `target-requirements.yaml -> target-context-findings.yaml -> target-design-overview.md / target-design-detail.md -> workflow-spec.yaml -> target-traceability-matrix.json`。
-- `workflow-spec.md` 是用户回读，`workflow-view.md` 与 `workflow-lowlevel.md` 是从 YAML 派生的报告，`target-design-detail.md` 才是目标工作流低层设计源。
+- `workflow-spec.md` 是用户回读，`workflow-view.md` 与 `workflow-maintenance.md` 是从 YAML 派生的报告，`target-design-detail.md` 才是目标工作流低层设计源。
 - 复杂目标业务节点应升级为 `outputs/stages/target-node-designs/<node-id>.md`，而不是拆成新的 WorkflowProgram `S1..S6`；node 与 agent 不要求一一对应。
 - completed develop 需要把 target design source 归档到 `TARGET_ROOT/.workflowprogram/design/source/**`，供后续修改、审计、validate 与 publish 使用。
 - managed apply 必须保留 `managed-rollback-manifest.json` 与 `managed-recover-instructions.md`，并在共享报告中包含 schema/remediation 字段。

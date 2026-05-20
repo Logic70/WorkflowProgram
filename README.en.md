@@ -134,8 +134,8 @@ Execution order is decided by programs, not by hoping the model remembers the ne
 
 ### Target Runtime And Optional Capability Layers
 
-- A successful develop flow persists not only `.claude/` assets, but also `TARGET_ROOT/.workflowprogram/design/{workflow-spec.yaml,workflow-view.md,workflow-lowlevel.md}`, plus the target design-source archive under `TARGET_ROOT/.workflowprogram/design/source/**`.
-- Target design source uses `target-design-overview.md`, `target-design-detail.md`, `target-acceptance-tests.yaml`, and `target-traceability-matrix.json`; `workflow-view.md` / `workflow-lowlevel.md` are YAML-derived views, not new design truth.
+- A successful develop flow persists not only `.claude/` assets, but also `TARGET_ROOT/.workflowprogram/design/{workflow-spec.yaml,workflow-view.md,workflow-maintenance.md}`, plus the target design-source archive under `TARGET_ROOT/.workflowprogram/design/source/**`.
+- Target design source uses `target-design-overview.md`, `target-design-detail.md`, `target-acceptance-tests.yaml`, and `target-traceability-matrix.json`; `workflow-view.md` / `workflow-maintenance.md` are YAML-derived views, not new design truth.
 - The target project also receives its own deterministic runtime wrapper at `TARGET_ROOT/.workflowprogram/runtime/{workflow-entry.py,workflow-runner.py,validate-run-state.py,runtime-manifest.json}`.
 - If a workflow declares `capability_discovery`, the entry path first generates candidate `skill / MCP / CLI` recommendations plus manual guidance.
 - If a workflow declares `host_capabilities`, both the entry path and S5 consume `host-capability-report.json`, `environment-remediation-report.json`, and `environment-remediation-guide.md`.
@@ -222,7 +222,7 @@ python .claude/scripts/validate-workflow.py
 
 # Spec / lowlevel / generated runtime validation
 python .claude/scripts/validate-workflow-spec.py --spec <workflow-spec.yaml>
-python .claude/scripts/validate-workflow-lowlevel.py --spec <workflow-spec.yaml> --lowlevel <workflow-lowlevel.md>
+python .claude/scripts/validate-workflow-maintenance.py --spec <workflow-spec.yaml> --maintenance <workflow-maintenance.md>
 python .claude/scripts/validate-generated-runtime.py --spec <workflow-spec.yaml> --runtime-root <target-runtime-root>
 
 # Smoke test a single fixture

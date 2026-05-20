@@ -31,7 +31,7 @@
 
 1. 识别意图和目标目录
 2. 生成 `workflow-spec.md` 和 `workflow-spec.yaml`
-3. 生成 `workflow-view.md`、`workflow-lowlevel.md` 和目标侧 runtime 包装层
+3. 生成 `workflow-view.md`、`workflow-maintenance.md` 和目标侧 runtime 包装层
 4. 把候选 `.claude/` 与 `.workflowprogram/` 资产先写到 `RUN_ROOT/outputs/candidate/`
 5. 通过 managed apply 决定哪些文件可以安全落到 `TARGET_ROOT`
 6. 若声明外部能力依赖，先做能力发现、宿主探测、bootstrap 与环境修复指引
@@ -79,7 +79,7 @@
 | `workflow-entry.py` | 主入口如何变成固定脚本链 | 产品入口确定性 wrapper |
 | `workflow-runner.py` | 谁负责状态转移和硬约束 | 控制面 runner |
 | `workflowprogram-validate` | 谁给最终 workflow 级 verdict | S5 主 judge |
-| `workflow-lowlevel.md` | 维护与迭代说明从哪来 | 由 YAML 单向渲染的维护指导 |
+| `workflow-maintenance.md` | 维护与迭代说明从哪来 | 由 YAML 单向渲染的维护指导 |
 | `target design source` | 目标 workflow 的设计理由、节点细节、验收与 traceability 放哪 | `TARGET_ROOT/.workflowprogram/design/source/**` |
 | `runtime-manifest.json` | 目标侧 runtime 是否真的交付了 | `.workflowprogram/runtime/` 的机器契约 |
 | `capability_discovery` / `host_capabilities` | 外部能力怎么发现、探测和修复 | 能力候选、宿主报告、修复指引 |
@@ -341,7 +341,7 @@ TARGET_ROOT/.workflowprogram/runs/<run-id>/
 
 1. `validate-workflow-spec.py`
 2. `generate-workflow-view.py`
-3. `generate-workflow-lowlevel.py`
+3. `generate-workflow-maintenance.py`
 4. `generate-target-runtime.py`
 5. `managed-assets.py plan/apply-staged`
 6. `discover-host-capabilities.py`（按契约启用）

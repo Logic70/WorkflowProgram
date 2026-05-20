@@ -719,7 +719,7 @@ def _write_design_source_artifacts(run_root: Path, request: str) -> None:
 
 
 def _copy_runtime_spec(repo_root: Path, run_root: Path, entry_skill: str) -> Path:
-    """为 fixture_host 准备可供 view/lowlevel 生成器消费的 workflow-spec.yaml。"""
+    """为 fixture_host 准备可供 view/maintenance 生成器消费的 workflow-spec.yaml。"""
 
     spec_path = repo_root / "tests" / "spec-fixtures" / "valid-minimal.yaml"
     payload = yaml.safe_load(spec_path.read_text(encoding="utf-8"))
@@ -837,17 +837,17 @@ def _write_design_review_evidence(repo_root: Path, run_root: Path, *, request: s
 
 
 def _generate_design_docs(spec_path: Path, run_root: Path) -> Dict[str, Path]:
-    """基于真实生成器产出 run_root 下的 view / lowlevel。"""
+    """基于真实生成器产出 run_root 下的 view / maintenance。"""
 
     script_root = _repo_root() / ".claude" / "scripts"
     outputs = {
         "workflow_spec": spec_path,
         "workflow_view": run_root / "workflow-view.md",
-        "workflow_lowlevel": run_root / "workflow-lowlevel.md",
+        "workflow_maintenance": run_root / "workflow-maintenance.md",
     }
     for script_name, out_path in (
         ("generate-workflow-view.py", outputs["workflow_view"]),
-        ("generate-workflow-lowlevel.py", outputs["workflow_lowlevel"]),
+        ("generate-workflow-maintenance.py", outputs["workflow_maintenance"]),
     ):
         completed = subprocess.run(
             [
@@ -1305,7 +1305,7 @@ def _invoke_fixture_host(
         for source_name, target_name in (
             ("workflow_spec", "workflow-spec.yaml"),
             ("workflow_view", "workflow-view.md"),
-            ("workflow_lowlevel", "workflow-lowlevel.md"),
+            ("workflow_maintenance", "workflow-maintenance.md"),
         ):
             shutil.copy2(design_docs[source_name], candidate_design_root / target_name)
         _stage_design_source_archive(run_root, spec_path, candidate_root)

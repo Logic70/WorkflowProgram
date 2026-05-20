@@ -17,10 +17,13 @@ from lib.yaml_utils import try_load_yaml_mapping
 PUBLISH_DIR = "outputs/stages/publish"
 REQUIRED_TARGET_FILES = [
     ".workflowprogram/design/workflow-spec.yaml",
-    ".workflowprogram/design/workflow-lowlevel.md",
+    ".workflowprogram/design/workflow-maintenance.md",
     ".workflowprogram/runtime/runtime-manifest.json",
     ".workflowprogram/managed-files.json",
 ]
+LEGACY_TARGET_FILE_ALIASES = {
+    ".workflowprogram/design/workflow-maintenance.md": [".workflowprogram/design/workflow-lowlevel.md"],
+}
 REQUIRED_DEVELOP_EVIDENCE = [
     "state.json",
     "events.jsonl",
@@ -130,11 +133,19 @@ def validate_eligibility(
 
     observed_files: List[Dict[str, str]] = []
     for rel_path in REQUIRED_TARGET_FILES:
-        path = target_root / rel_path
-        exists = path.exists()
-        check(f"required_target_file:{rel_path}", exists, f"{rel_path} {'exists' if exists else 'is missing'}")
-        if exists and path.is_file():
-            observed_files.append({"path": rel_path, "sha256": sha256_file(path)})
+        candidate_paths = [rel_path, *LEGACY_TARGET_FILE_ALIASES.get(rel_path, [])]
+        existing_rel_path = next((candidate for candidate in candidate_paths if (target_root / candidate).exists()), "")
+        exists = bool(existing_rel_path)
+        detail = (
+            f"{existing_rel_path} exists"
+            if existing_rel_path
+            else f"{rel_path} is missing; accepted legacy aliases={LEGACY_TARGET_FILE_ALIASES.get(rel_path, []) or ['<none>']}"
+        )
+        check(f"required_target_file:{rel_path}", exists, detail)
+        if existing_rel_path:
+            path = target_root / existing_rel_path
+            if path.is_file():
+                observed_files.append({"path": existing_rel_path, "canonical_path": rel_path, "sha256": sha256_file(path)})
 
     target_spec = try_load_yaml_mapping(target_root / ".workflowprogram" / "design" / "workflow-spec.yaml")
     target_design_refs = resolve_target_design_refs(target_spec)

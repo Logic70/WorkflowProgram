@@ -206,7 +206,7 @@ CI=true /develop "设计一个用于审计 Markdown 链接有效性的工作流"
    - 用途：人工审查、快速浏览、设计讨论
    - 可编辑：❌ 禁止直接编辑，从 YAML 单向生成
 
-3. **`workflow-lowlevel.md`** —— 维护与迭代指导（生成文件）
+3. **`workflow-maintenance.md`** —— 维护与迭代指导（生成文件）
    - 包含：真源层级、阶段契约、证据归属、持久化设计资产规则、维护方法
    - 格式：自然语言 Markdown
    - 用途：后续 audit / iterate / 人工维护时快速理解当前工作流
@@ -221,14 +221,14 @@ workflow-design.md（设计决策，人工审查）
 workflow-spec.yaml（机器编排，单点真实）
          ├───────────────┐
          ↓               ↓
-workflow-view.md     workflow-lowlevel.md
+workflow-view.md     workflow-maintenance.md
 （只读视图）           （维护指导）
 ```
 
 **编辑规则**：
 - 如需修改设计 → 编辑 `workflow-spec.yaml`
 - 重新生成视图 → 运行 `workflowprogram-python ${CLAUDE_PLUGIN_ROOT}/scripts/generate-workflow-view.py --spec <RUN_ROOT>/workflow-spec.yaml --out <RUN_ROOT>/workflow-view.md`
-- 重新生成维护指导 → 运行 `workflowprogram-python ${CLAUDE_PLUGIN_ROOT}/scripts/generate-workflow-lowlevel.py --spec <RUN_ROOT>/workflow-spec.yaml --out <RUN_ROOT>/workflow-lowlevel.md`
+- 重新生成维护指导 → 运行 `workflowprogram-python ${CLAUDE_PLUGIN_ROOT}/scripts/generate-workflow-maintenance.py --spec <RUN_ROOT>/workflow-spec.yaml --out <RUN_ROOT>/workflow-maintenance.md`
 
 ### S3 Design Review Gate
 
@@ -242,8 +242,8 @@ workflow-view.md     workflow-lowlevel.md
 6. 只有 `gate-validation.json.status=PASS` 才能进入 S4；accepted risk 必须记录 residual risk，允许继续但由 S5 作为 INFO 证据保留。
 - 结构校验规格 → 运行 `workflowprogram-python ${CLAUDE_PLUGIN_ROOT}/scripts/validate-workflow-spec.py --spec <RUN_ROOT>/workflow-spec.yaml`
 - 需要先推荐宿主能力时 → 运行 `workflowprogram-python ${CLAUDE_PLUGIN_ROOT}/scripts/discover-host-capabilities.py --spec <RUN_ROOT>/workflow-spec.yaml --target-root <TARGET_ROOT> --run-root <RUN_ROOT> --request "<原始需求>"`
-- 禁止直接编辑 `workflow-view.md` 与 `workflow-lowlevel.md`（会被覆盖）
-- develop 成功后，`workflow-spec.yaml`、`workflow-view.md`、`workflow-lowlevel.md` 必须持久化到 `TARGET_ROOT/.workflowprogram/design/`
+- 禁止直接编辑 `workflow-view.md` 与 `workflow-maintenance.md`（会被覆盖）
+- develop 成功后，`workflow-spec.yaml`、`workflow-view.md`、`workflow-maintenance.md` 必须持久化到 `TARGET_ROOT/.workflowprogram/design/`
 - develop 成功后，还必须把目标侧 runtime 资产持久化到 `TARGET_ROOT/.workflowprogram/runtime/`
 
 **On failure**：把设计失误写入 `lessons.md`。
@@ -305,14 +305,14 @@ workflow-view.md     workflow-lowlevel.md
 
 5. `.claude/rules/constraints.md`（如需要，从 YAML `constraints` 提取）
 6. 生成 `workflow-view.md`（从 YAML 单向渲染，只读）
-7. 生成 `workflow-lowlevel.md`（从 YAML 单向渲染，只作维护指导）
+7. 生成 `workflow-maintenance.md`（从 YAML 单向渲染，只作维护指导）
 8. 生成目标侧 deterministic runtime 资产：`.workflowprogram/runtime/{workflow-entry.py,workflow-runner.py,validate-run-state.py,runtime-manifest.json}`
 9. 更新 `CLAUDE.md`（如需要）
 10. 候选资产生成或应用前，必须已有 `outputs/stages/design-review/{design-review-packet.json,issues.json,closure.json,gate-validation.json}`，且 gate status 为 `PASS`。
 11. 候选资产生成完成后，必须调用确定性脚本入口：
    - `workflowprogram-python ${CLAUDE_PLUGIN_ROOT}/scripts/workflow-entry.py run --spec <RUN_ROOT>/workflow-spec.yaml --run-root <RUN_ROOT> --target-root <TARGET_ROOT> --entry-skill workflowprogram-develop --request "$ARGUMENTS" [--auto-approve|--approval-status approved]`
-   - 该脚本负责按固定顺序执行 `validate-workflow-spec.py -> generate-workflow-view.py -> generate-workflow-lowlevel.py -> validate-design-review-gate.py -> generate-target-runtime.py -> managed-assets.py -> discover-host-capabilities.py -> probe-host-capabilities.py -> apply-host-bootstrap.py -> generate-environment-remediation.py -> workflow-runner.py -> validate-run-state.py`
-   - 它会把 `RUN_ROOT/workflow-spec.yaml`、`RUN_ROOT/workflow-view.md`、`RUN_ROOT/workflow-lowlevel.md` 复制到 `RUN_ROOT/outputs/candidate/.workflowprogram/design/`，并把目标侧 runtime 资产写入 `RUN_ROOT/outputs/candidate/.workflowprogram/runtime/`，再与 `.claude/*` 一起走 managed apply
+   - 该脚本负责按固定顺序执行 `validate-workflow-spec.py -> generate-workflow-view.py -> generate-workflow-maintenance.py -> validate-design-review-gate.py -> generate-target-runtime.py -> managed-assets.py -> discover-host-capabilities.py -> probe-host-capabilities.py -> apply-host-bootstrap.py -> generate-environment-remediation.py -> workflow-runner.py -> validate-run-state.py`
+   - 它会把 `RUN_ROOT/workflow-spec.yaml`、`RUN_ROOT/workflow-view.md`、`RUN_ROOT/workflow-maintenance.md` 复制到 `RUN_ROOT/outputs/candidate/.workflowprogram/design/`，并把目标侧 runtime 资产写入 `RUN_ROOT/outputs/candidate/.workflowprogram/runtime/`，再与 `.claude/*` 一起走 managed apply
    - 若 `managed-assets.py` 发现冲突，脚本必须停在 S4，并输出 `RUN_ROOT/outputs/stages/entry-orchestration-summary.json`
 12. 交由 `workflowprogram-validate` 形成 S5 主判定与运行态证据：
    - `workflowprogram-validate` 是 S5 主 judge，负责消费 `test_contract`

@@ -1706,26 +1706,26 @@ def build_checks(
                         f"Persistent workflow-view.md {'exists and points back to workflow-spec.yaml' if view_exists else 'is missing'} at {target_view_path}",
                         "TARGET_ROOT/.workflowprogram/design/workflow-view.md",
                     )
-                if text == ".workflowprogram/design/workflow-lowlevel.md":
+                if text in {".workflowprogram/design/workflow-maintenance.md", ".workflowprogram/design/workflow-lowlevel.md"}:
                     target_spec_path = target_root / ".workflowprogram" / "design" / "workflow-spec.yaml"
-                    target_lowlevel_path = target_root / ".workflowprogram" / "design" / "workflow-lowlevel.md"
-                    lowlevel_validation = run_validator(
-                        "validate-workflow-lowlevel.py",
+                    target_maintenance_path = target_root / ".workflowprogram" / "design" / Path(text).name
+                    maintenance_validation = run_validator(
+                        "validate-workflow-maintenance.py",
                         "--spec",
                         str(target_spec_path),
-                        "--lowlevel",
-                        str(target_lowlevel_path),
+                        "--maintenance",
+                        str(target_maintenance_path),
                     )
-                    lowlevel_errors = [str(item) for item in lowlevel_validation.get("errors", [])]
-                    lowlevel_warnings = [str(item) for item in lowlevel_validation.get("warnings", [])]
+                    maintenance_errors = [str(item) for item in maintenance_validation.get("errors", [])]
+                    maintenance_warnings = [str(item) for item in maintenance_validation.get("warnings", [])]
                     add_check(
                         checks["artifacts"],
-                        "persistent_workflow_lowlevel_valid",
-                        "PASS" if not lowlevel_errors else "FAIL",
-                        "workflow-lowlevel.md passed deterministic validation."
-                        if not lowlevel_errors
-                        else "; ".join([*lowlevel_errors, *lowlevel_warnings[:3]]),
-                        "TARGET_ROOT/.workflowprogram/design/workflow-lowlevel.md",
+                        "persistent_workflow_maintenance_valid",
+                        "PASS" if not maintenance_errors else "FAIL",
+                        "workflow-maintenance.md passed deterministic validation."
+                        if not maintenance_errors
+                        else "; ".join([*maintenance_errors, *maintenance_warnings[:3]]),
+                        f"TARGET_ROOT/{text}",
                     )
         generated_runtime_contract = spec.get("generated_runtime_contract", {}) if isinstance(spec, dict) else {}
         runtime_root_rel = str(generated_runtime_contract.get("runtime_root", "")).strip() if isinstance(generated_runtime_contract, dict) else ""

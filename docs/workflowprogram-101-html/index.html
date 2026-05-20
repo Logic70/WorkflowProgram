@@ -630,9 +630,9 @@
               <h3>当前实现里的设计层与执行层命令</h3>
               <pre style="background:rgba(0,0,0,.04);padding:12px;border-radius:12px;overflow-x:auto;font-family:var(--mono);font-size:.88em"><code>python3 .claude/scripts/validate-workflow.py
 python3 .claude/scripts/validate-workflow-spec.py --spec &lt;workflow-spec.yaml&gt;
-python3 .claude/scripts/validate-workflow-lowlevel.py \
+python3 .claude/scripts/validate-workflow-maintenance.py \
   --spec &lt;workflow-spec.yaml&gt; \
-  --lowlevel &lt;workflow-lowlevel.md&gt;
+  --maintenance &lt;workflow-maintenance.md&gt;
 python3 .claude/scripts/validate-target-design-governance.py --run-root &lt;RUN_ROOT&gt;
 python3 .claude/scripts/validate-run-state.py --state &lt;RUN_ROOT&gt;/state.json</code></pre>
             </div>
@@ -703,7 +703,7 @@ python3 tools/runtime_smoke_matrix.py --json</code></pre>
 
           <div class="note-strip">
             <strong>目标设计源不要和派生视图混淆：</strong>
-            <span><code>workflow-spec.yaml</code> 是机器控制面；<code>workflow-view.md</code> / <code>workflow-lowlevel.md</code> 是派生视图；<code>design/source/**</code> 下的 <code>target-design-overview.md</code>、<code>target-design-detail.md</code>、<code>target-acceptance-tests.yaml</code>、<code>target-traceability-matrix.json</code> 才记录目标 workflow 的设计理由、验收和 traceability。</span>
+            <span><code>workflow-spec.yaml</code> 是机器控制面；<code>workflow-view.md</code> / <code>workflow-maintenance.md</code> 是派生视图；<code>design/source/**</code> 下的 <code>target-design-overview.md</code>、<code>target-design-detail.md</code>、<code>target-acceptance-tests.yaml</code>、<code>target-traceability-matrix.json</code> 才记录目标 workflow 的设计理由、验收和 traceability。</span>
           </div>
 
           <div class="note-strip">

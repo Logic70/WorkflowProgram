@@ -15,7 +15,7 @@ OpenCode v2 design work clarified a better split:
 - Keep WorkflowProgram's own S0-S6 lifecycle unchanged.
 - Add a target-workflow graph contract to `workflow-spec.yaml`.
 - Make `workflow-spec.md` the accepted human readback for the graph and write plan.
-- Keep `workflow-view.md` and `workflow-lowlevel.md` as derived reports.
+- Keep `workflow-view.md` and `workflow-maintenance.md` as derived reports.
 - Require target assets to be declared before generation.
 - Add validation that graph nodes, transitions, registry entries, outputs, and evidence agree.
 - Strengthen managed apply with rollback/recover evidence.

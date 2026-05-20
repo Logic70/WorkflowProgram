@@ -74,7 +74,7 @@ def seed_target(target: Path, *, missing_reference: bool = False) -> None:
         "loop_policy:\n"
         "  prompt_package: .workflowprogram/loops/report-render.md\n",
     )
-    write_text(target / ".workflowprogram" / "design" / "workflow-lowlevel.md", "# Lowlevel\n")
+    write_text(target / ".workflowprogram" / "design" / "workflow-maintenance.md", "# Maintenance Guide\n")
     write_json(
         target / ".workflowprogram" / "runtime" / "runtime-manifest.json",
         {

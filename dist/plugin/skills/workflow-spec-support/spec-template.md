@@ -4,7 +4,7 @@
 
 > **Note**: 本模板用于自然语言设计文档。
 > 对于机器可读的编排配置，请使用 `yaml-spec-template.md`。
-> 两者关系：`spec-template.md` → target design source → `workflow-spec.yaml` target runtime map → 生成 `workflow-view.md` / `workflow-lowlevel.md` derived target views。
+> 两者关系：`spec-template.md` → target design source → `workflow-spec.yaml` target runtime map → 生成 `workflow-view.md` / `workflow-maintenance.md` derived target views。
 > `workflow-spec.yaml` 是机器语义真源与运行态地图；完整目标工作流设计推理应保留在 `target-design-overview.md` / `target-design-detail.md` / 条件性 `target-node-designs/**` 中。
 
 ## Workflow Identity

@@ -228,7 +228,7 @@ function buildCover() {
   addBulletList(slide, 0.95, 2.55, 11.5, [
     "WorkflowProgram-CN 是一个为 Claude Code 生态设计和维护工作流的元工作流仓库。",
     "它产出的核心不是业务代码，而是一套可交付到目标项目的 `.claude/` 工作流资产与验证链。",
-    "当前能力已经扩展到：workflow-lowlevel 持久化、阶段进展追踪、运行宿主抽象、矩阵化 smoke 与文档真源治理。",
+    "当前能力已经扩展到：workflow-maintenance 维护说明持久化、阶段进展追踪、运行宿主抽象、矩阵化 smoke 与文档真源治理。",
   ], { fontSize: 13, gap: 0.42 });
   slide.addText("WorkflowProgram-CN", {
     x: 10.8,
@@ -339,7 +339,7 @@ function buildPhilosophy() {
     color: C.ink,
     fontSize: 14,
   });
-  addBox(slide, "workflow-lowlevel.md\n维护/迭代指导，不覆盖 YAML 语义", 4.05, 3.87, 2.5, 0.84, {
+  addBox(slide, "workflow-maintenance.md\n维护/迭代指导，不覆盖 YAML 语义", 4.05, 3.87, 2.5, 0.84, {
     fill: C.white,
     line: C.redLine,
     color: C.ink,
@@ -414,7 +414,7 @@ function buildQuickUse() {
   addBulletList(slide, 1.05, 3.92, 5.45, [
     "RUN_ROOT/workflow-spec.yaml",
     "RUN_ROOT/workflow-view.md",
-    "RUN_ROOT/workflow-lowlevel.md",
+    "RUN_ROOT/workflow-maintenance.md",
     "RUN_ROOT/outputs/candidate/.claude/",
     "TARGET_ROOT/.workflowprogram/design/",
   ], { fontSize: 12, gap: 0.34 });
@@ -451,7 +451,7 @@ function buildStructure() {
   addBox(slide, "目标项目落盘结构", 6.0, 1.45, 1.65, 0.42, { fill: C.slateFill, line: C.line, fontSize: 12 });
   addBox(
     slide,
-    "TARGET_ROOT/\n├── .claude/\n└── .workflowprogram/\n    ├── managed-files.json\n    ├── design/\n    │   ├── workflow-spec.yaml\n    │   ├── workflow-view.md\n    │   └── workflow-lowlevel.md\n    └── runs/<run-id>/",
+    "TARGET_ROOT/\n├── .claude/\n└── .workflowprogram/\n    ├── managed-files.json\n    ├── design/\n    │   ├── workflow-spec.yaml\n    │   ├── workflow-view.md\n    │   └── workflow-maintenance.md\n    └── runs/<run-id>/",
     6.0,
     1.92,
     5.7,
@@ -463,7 +463,7 @@ function buildStructure() {
   addBulletList(slide, 1.05, 5.62, 11.2, [
     "workflow-spec.yaml：机器真源，决定执行语义、边界、intent_flows、runtime/test contract。",
     "workflow-view.md：从 YAML 渲染的只读概览，方便审查，不作为执行真源。",
-    "workflow-lowlevel.md：从 YAML 渲染的维护指导，不允许覆盖 YAML 语义。",
+    "workflow-maintenance.md：从 YAML 渲染的维护指导，不允许覆盖 YAML 语义。",
     "managed-files.json：记录哪些目标资产由 WorkflowProgram 托管更新。",
   ], { fontSize: 12, gap: 0.32 });
   finalize(slide);
@@ -488,7 +488,7 @@ function buildRuntimeFlow() {
 
   addBox(slide, "脚本链内部顺序", 0.9, 4.7, 1.55, 0.42, { fill: C.slateFill, line: C.line, fontSize: 12 });
   addBulletList(slide, 1.0, 5.15, 11.3, [
-    "validate-workflow-spec.py -> generate-workflow-view.py -> generate-workflow-lowlevel.py",
+    "validate-workflow-spec.py -> generate-workflow-view.py -> generate-workflow-maintenance.py",
     "managed-assets.py plan/apply-staged -> workflow-runner.py run -> validate-run-state.py",
     "若 managed apply 冲突，流程停在 S4，不进入 runner，不覆盖目标资产。",
     "真正的 workflow 级 verdict 在 S5 judge，而不是 runner。",
@@ -562,14 +562,14 @@ function buildMaintenance() {
   addBulletList(slide, 6.55, 1.92, 5.35, [
     "改执行语义：先改 workflow-spec.yaml。",
     "改人类视图：重生成 workflow-view.md。",
-    "改维护说明：重生成 workflow-lowlevel.md。",
+    "改维护说明：重生成 workflow-maintenance.md。",
     "不要只改 view / lowlevel / README 试图改变真实执行语义。",
   ], { fontSize: 12, gap: 0.32 });
 
   addBox(slide, "常用维护命令", 0.9, 4.0, 1.25, 0.42, { fill: C.slateFill, line: C.line, fontSize: 12 });
   addBox(
     slide,
-    "python3 .claude/scripts/validate-workflow.py\npython3 tools/build_plugin.py\npython3 .claude/scripts/validate-workflow-spec.py --spec <spec>\npython3 .claude/scripts/validate-workflow-lowlevel.py --spec <spec> --lowlevel <lowlevel>\npython3 tools/runtime_smoke_matrix.py --json",
+    "python3 .claude/scripts/validate-workflow.py\npython3 tools/build_plugin.py\npython3 .claude/scripts/validate-workflow-spec.py --spec <spec>\npython3 .claude/scripts/validate-workflow-maintenance.py --spec <spec> --maintenance <maintenance>\npython3 tools/runtime_smoke_matrix.py --json",
     0.9,
     4.45,
     6.15,
