@@ -1,25 +1,25 @@
 {
   "manifest_version": 1,
-  "generated_at": "2026-05-22T01:18:23Z",
+  "generated_at": "2026-05-22T02:11:41Z",
   "builder": "tools/build_plugin.py",
   "plugin_name": "workflowprogram-cn",
-  "plugin_version": "0.1.11",
-  "source_commit": "c403788ff0f4b47229e88744554b7307e1f76e1f",
+  "plugin_version": "0.1.12",
+  "source_commit": "eed10d99af03da9f312e3508864facb7397b8d1b",
   "source_dirty": true,
   "files": [
     {
       "path": ".claude-plugin/README.md",
-      "sha256": "ec1b71764e86aacc85e5463e6d8838c138903a4039e92bbf15a80b15bfcfa708",
+      "sha256": "0af7f09a6875aebe89bc65e7669102aebc4dbf67d51318990b336e20696e9fa5",
       "size": 7665
     },
     {
       "path": ".claude-plugin/marketplace.json",
-      "sha256": "f289051bcb35e699387d0f77708601e761c6d85b79e8ee87bdeb3969634be4c7",
+      "sha256": "8152ea7bbf0e5e6ac3e98ae561e6621f8818df89d4dd02e28e2dfcf76a7c4a49",
       "size": 1180
     },
     {
       "path": ".claude-plugin/plugin.json",
-      "sha256": "a0743e7321317c383687dcc406de6e7a0112b8c0a4bf93975ea149df42d2521e",
+      "sha256": "61b78b47e91a216d3a28cdb002c35276dab7eb8b7e54daf743a58cedb8e81685",
       "size": 607
     },
     {
