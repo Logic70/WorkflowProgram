@@ -114,6 +114,7 @@ def render_entry_wrapper(
     *,
     team_enabled_flag: bool,
     capability_discovery_enabled_flag: bool,
+    target_managed_runtime_flag: bool,
 ) -> str:
     return f"""#!/usr/bin/env python3
 from __future__ import annotations
@@ -142,6 +143,7 @@ RUNTIME_CAPABILITIES = {contract["runtime_capabilities"]!r}
 CAPABILITY_DISCOVERY_ENABLED = {capability_discovery_enabled_flag!r}
 TEAM_ORCHESTRATION_ENABLED = {team_enabled_flag!r}
 NODE_LOOP_EXECUTION_ENABLED = {"node_loop_execution" in contract["runtime_capabilities"]!r}
+TARGET_MANAGED_RUNTIME_ENABLED = {target_managed_runtime_flag!r}
 
 
 def utc_run_id() -> str:
@@ -425,7 +427,7 @@ def main() -> int:
         sys.executable,
         str(target_root / STATE_VALIDATOR_SCRIPT_REL),
         "--state",
-        str(run_root / "state.json"),
+        str(run_root / "target-state.json"),
         "--plugin-root",
         str(plugin_root),
         "--json",
@@ -539,7 +541,7 @@ def run_command(cmd: List[str]) -> Tuple[int, Dict[str, Any], str]:
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Generated workflow runner wrapper")
+    parser = argparse.ArgumentParser(description="Generated target workflow managed-runtime runner wrapper")
     sub = parser.add_subparsers(dest="command", required=True)
 
     run = sub.add_parser("run", help="Run generated workflow control plane")
@@ -569,7 +571,7 @@ def main() -> int:
     plugin_root = resolve_plugin_root(getattr(args, "plugin_root", ""))
     cmd = [
         str(plugin_python(plugin_root)),
-        str(plugin_root / "scripts" / "workflow-runner.py"),
+        str(plugin_root / "scripts" / "target-workflow-runner.py"),
         args.command,
     ]
     if args.command == "run":
@@ -671,7 +673,7 @@ def run_command(cmd: List[str]) -> Tuple[int, Dict[str, Any], str]:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Generated workflow state validator wrapper")
+    parser = argparse.ArgumentParser(description="Generated target workflow managed-runtime state validator wrapper")
     parser.add_argument("--state", required=True)
     parser.add_argument("--plugin-root", default="")
     parser.add_argument("--json", action="store_true")
@@ -680,7 +682,7 @@ def main() -> int:
     plugin_root = resolve_plugin_root(args.plugin_root)
     cmd = [
         str(plugin_python(plugin_root)),
-        str(plugin_root / "scripts" / "validate-run-state.py"),
+        str(plugin_root / "scripts" / "validate-target-runtime-state.py"),
         "--state",
         str(Path(args.state).resolve()),
         "--json",
@@ -706,6 +708,10 @@ def manifest_payload(
 ) -> Dict[str, Any]:
     capability_discovery = capability_discovery_from_spec(spec)
     declared_host_capabilities = host_capabilities_from_spec(spec)
+    target_runtime_policy = spec.get("target_runtime_policy", {})
+    if not isinstance(target_runtime_policy, dict):
+        target_runtime_policy = {}
+    managed_runtime = str(target_runtime_policy.get("mode", "")).strip() == "managed_runtime"
     host_global_adapter_declared = any(
         str(item.get("bootstrap", {}).get("scope", "")).strip() == "host_global" and bool(host_global_adapter(item))
         for item in declared_host_capabilities
@@ -713,9 +719,12 @@ def manifest_payload(
     )
     return {
         "manifest_version": 1,
+        "runtime_schema_version": 2,
         "generated_at": iso_now(),
         "runtime_mode": contract["mode"],
         "runtime_capabilities": contract["runtime_capabilities"],
+        "managed_runtime": managed_runtime,
+        "target_runtime_policy_mode": str(target_runtime_policy.get("mode", "")).strip(),
         "runtime_root": contract["runtime_root"],
         "design_spec_path": contract["design_spec_path"],
         "entry_script": contract["entry_script"],
@@ -733,12 +742,12 @@ def manifest_payload(
         "node_loop_enabled": node_loop_enabled(spec),
         "shared_plugin_dependency": True,
         "shared_scripts": [
+            "target-workflow-runner.py",
+            "validate-target-runtime-state.py",
             "discover-host-capabilities.py",
             "apply-host-bootstrap.py",
             "probe-host-capabilities.py",
             "validate-workflow-spec.py",
-            "workflow-runner.py",
-            "validate-run-state.py",
         ],
     }
 
@@ -761,6 +770,8 @@ def main() -> int:
         main_entry = default_entry_skill(spec)
         team_enabled_flag = agent_team_enabled(agent_team_contract_from_spec(spec))
         capability_discovery_enabled_flag = bool(capability_discovery_from_spec(spec).get("enabled", False))
+        target_runtime_policy = spec.get("target_runtime_policy", {})
+        target_managed_runtime_flag = isinstance(target_runtime_policy, dict) and str(target_runtime_policy.get("mode", "")).strip() == "managed_runtime"
 
         entry_path = out_root / Path(contract["entry_script"]).name
         runner_path = out_root / Path(contract["runner_script"]).name
@@ -774,6 +785,7 @@ def main() -> int:
                 main_entry,
                 team_enabled_flag=team_enabled_flag,
                 capability_discovery_enabled_flag=capability_discovery_enabled_flag,
+                target_managed_runtime_flag=target_managed_runtime_flag,
             ),
             encoding="utf-8",
             newline="\n",

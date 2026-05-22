@@ -11,6 +11,7 @@ VALID_RUNTIME_CAPABILITIES = {
     "capability_discovery",
     "team_orchestration",
     "node_loop_execution",
+    "target_managed_runtime",
 }
 VALID_HOST_CAPABILITY_KINDS = {
     "mcp_server",

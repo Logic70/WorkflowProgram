@@ -432,6 +432,7 @@ ref: runtime_contract.<field>
    - `host_capability_probe`
    - `team_orchestration`
    - `node_loop_execution`
+   - `target_managed_runtime`
 3. `runtime_capabilities` 必须始终包含：
    - `state_transitions`
    - `run_state_validation`
@@ -439,7 +440,39 @@ ref: runtime_contract.<field>
 5. 当声明 `host_capabilities` 时，`runtime_capabilities` 必须包含 `host_capability_probe`。
 6. 当声明 `agent_team_contract.enabled=true` 时，`runtime_capabilities` 必须包含 `team_orchestration`。
 7. 当任一 `workflow_graph.nodes[*].loop_policy.enabled=true` 时，`runtime_capabilities` 必须包含 `node_loop_execution`。
-8. 目标工作流 runtime 通过 wrapper 调共享控制面脚本，不复制一套独立 runner。
+8. 当声明 `target_runtime_policy.mode=managed_runtime` 时，`runtime_capabilities` 必须包含 `target_managed_runtime`。
+9. 目标工作流 runtime 通过 wrapper 调共享控制面脚本；目标业务图执行由 `target-workflow-runner.py` 负责，不复用 WorkflowProgram 产品 `workflow-runner.py`。
+
+#### 2.5.5B `target_runtime_policy`（目标业务图受控运行策略）
+
+`workflow-spec.yaml.target_runtime_policy` 是目标工作流运行时的执行约束。新生成工作流默认使用：
+
+```yaml
+target_runtime_policy:
+  mode: managed_runtime
+  entry_mode: wrapper_only
+  graph_source: workflow_graph
+  lifecycle_events_required: true
+  owner_resolution_failure: terminal
+  output_contract_failure: retry_then_terminal
+  max_retries_per_node: 3
+  artifact_provenance_required: true
+  immutable_during_run:
+    - .claude/**
+    - .workflowprogram/design/**
+    - .workflowprogram/runtime/**
+    - config/scripts/**
+```
+
+固定约束：
+
+1. `mode` 当前只允许 `managed_runtime`。
+2. `entry_mode` 当前只允许 `wrapper_only`；注册的主 command 必须调用 `.workflowprogram/runtime/workflow-entry.py`，不得承载完整 stage prompt。
+3. `graph_source` 必须是 `workflow_graph`，且 `workflow_graph.nodes` 必须存在。
+4. `owner_resolution_failure=terminal`；owner 缺失不得由模型 fallback 继续。
+5. `output_contract_failure` 只能是 `retry_then_terminal` 或 `terminal`。
+6. `artifact_provenance_required=true` 时，`target-state.json` PASS 必须能追溯每个 graph output 的 owner/node/provenance。
+7. `immutable_during_run` 中的路径不得被 `workflow_graph.nodes[*].output_refs` 声明为运行态输出。
 
 #### 2.5.5A `workflow_graph`（目标工作流业务图契约）
 
@@ -1048,8 +1081,9 @@ WorkflowProgram 自身必须按原子能力组织，每个 Stage 必须可拆分
 20. 若声明 `agent_team_contract.enabled=true`，则 `generated_runtime_contract.runtime_capabilities` 必须包含 `team_orchestration`。
 21. 若声明 `workflow_graph`，validator 必须校验 graph entrypoints、nodes、transitions、templates_used、可达性与目标资产声明。
 22. 若声明 `workflow_graph.nodes[*].loop_policy.enabled=true`，则 validator 必须校验 loop policy、要求 `node_loop_execution` runtime capability，并确保 loop evidence 路径位于 `outputs/stages/loops/<node_id>/**`。
-23. `design-review-packet.json`、`issues.json`、`closure.json` 与 `gate-validation.json` 必须存在；`gate-validation.json.status` 必须为 `PASS`。
-24. `closure.json.artifact_fingerprints` 必须覆盖当前 packet 中记录的 S1/S2/S3/YAML 输入，且不得存在 stale artifact。
+23. 若声明 `target_runtime_policy.mode=managed_runtime`，则 validator 必须要求 `target_managed_runtime` capability，并拒绝 graph outputs 与 immutable paths 冲突。
+24. `design-review-packet.json`、`issues.json`、`closure.json` 与 `gate-validation.json` 必须存在；`gate-validation.json.status` 必须为 `PASS`。
+25. `closure.json.artifact_fingerprints` 必须覆盖当前 packet 中记录的 S1/S2/S3/YAML 输入，且不得存在 stale artifact。
 
 ### 实现方案
 

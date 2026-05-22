@@ -201,7 +201,7 @@ workflow_graph:
       input_refs:
         - outputs/target-workflow/intake-summary.md
       output_refs:
-        - .claude/skills/example/SKILL.md
+        - outputs/target-workflow/implementation-summary.md
       gate: user_approval
       owner: example-skill
   transitions:
@@ -331,6 +331,22 @@ generated_runtime_contract:
   runtime_capabilities:
     - state_transitions
     - run_state_validation
+    - target_managed_runtime
+
+target_runtime_policy:
+  mode: managed_runtime
+  entry_mode: wrapper_only
+  graph_source: workflow_graph
+  lifecycle_events_required: true
+  owner_resolution_failure: terminal
+  output_contract_failure: retry_then_terminal
+  max_retries_per_node: 3
+  artifact_provenance_required: true
+  immutable_during_run:
+    - .claude/**
+    - .workflowprogram/design/**
+    - .workflowprogram/runtime/**
+    - config/scripts/**
 
 # 测试契约（支撑基础运行测试判定；引用 runtime_contract，不复制执行约束）
 test_contract:

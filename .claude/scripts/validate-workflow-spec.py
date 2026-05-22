@@ -56,6 +56,7 @@ OPTIONAL_TOP_KEYS = {
     "host_capabilities",
     "agent_team_contract",
     "workflow_graph",
+    "target_runtime_policy",
 }
 
 REQUIRED_META_KEYS = {
@@ -99,6 +100,11 @@ VALID_LOOP_GOAL_SOURCES = {"user", "model_subgoal"}
 VALID_LOOP_FEEDBACK_KINDS = {"validator", "verifier", "test"}
 VALID_LOOP_FAILURE_EFFECTS = {"feedback", "gate", "hard_fail"}
 VALID_LOOP_MAX_ITERATION_EFFECTS = {"fail", "warn"}
+VALID_TARGET_RUNTIME_MODES = {"managed_runtime"}
+VALID_TARGET_RUNTIME_ENTRY_MODES = {"wrapper_only"}
+VALID_TARGET_RUNTIME_GRAPH_SOURCES = {"workflow_graph"}
+VALID_TARGET_RUNTIME_OWNER_FAILURE = {"terminal"}
+VALID_TARGET_RUNTIME_OUTPUT_FAILURE = {"retry_then_terminal", "terminal"}
 REQUIRED_FAILURE_KINDS = {"none", "design", "implementation", "environment", "conflict"}
 VALID_ENV_SKIP_CHECKS = {
     "runtime_host_available",
@@ -643,6 +649,108 @@ def workflow_graph_loop_nodes(workflow_graph: Dict[str, Any]) -> List[Dict[str, 
         if isinstance(loop_policy, dict) and loop_policy.get("enabled") is True:
             enabled.append(raw_node)
     return enabled
+
+
+def workflow_graph_output_refs(workflow_graph: Dict[str, Any]) -> List[str]:
+    """Return normalized output refs declared by target workflow graph nodes."""
+
+    if not isinstance(workflow_graph, dict):
+        return []
+    refs: List[str] = []
+    nodes = workflow_graph.get("nodes", [])
+    if not isinstance(nodes, list):
+        return refs
+    for raw_node in nodes:
+        if not isinstance(raw_node, dict):
+            continue
+        for item in raw_node.get("output_refs", []):
+            text = str(item).strip().replace("\\", "/")
+            if text:
+                refs.append(text)
+    return refs
+
+
+def validate_target_runtime_policy(
+    target_runtime_policy: Dict[str, Any],
+    workflow_graph: Dict[str, Any],
+    generated_runtime_contract: Dict[str, Any],
+    errors: List[str],
+    warnings: List[str],
+) -> None:
+    """Validate generated target workflow managed-runtime policy."""
+
+    if not target_runtime_policy:
+        if workflow_graph:
+            add_warn(warnings, "target_runtime_policy is not declared; generated target workflow runtime remains legacy/advisory")
+        return
+
+    mode = str(target_runtime_policy.get("mode", "")).strip()
+    if mode not in VALID_TARGET_RUNTIME_MODES:
+        add_error(errors, f"target_runtime_policy.mode must be one of {sorted(VALID_TARGET_RUNTIME_MODES)}")
+
+    entry_mode = str(target_runtime_policy.get("entry_mode", "")).strip()
+    if entry_mode not in VALID_TARGET_RUNTIME_ENTRY_MODES:
+        add_error(errors, f"target_runtime_policy.entry_mode must be one of {sorted(VALID_TARGET_RUNTIME_ENTRY_MODES)}")
+
+    graph_source = str(target_runtime_policy.get("graph_source", "")).strip()
+    if graph_source not in VALID_TARGET_RUNTIME_GRAPH_SOURCES:
+        add_error(errors, f"target_runtime_policy.graph_source must be one of {sorted(VALID_TARGET_RUNTIME_GRAPH_SOURCES)}")
+    if graph_source == "workflow_graph" and not workflow_graph:
+        add_error(errors, "target_runtime_policy.graph_source=workflow_graph requires workflow_graph")
+
+    for field in ("lifecycle_events_required", "artifact_provenance_required"):
+        if not isinstance(target_runtime_policy.get(field), bool):
+            add_error(errors, f"target_runtime_policy.{field} must be boolean")
+
+    owner_failure = str(target_runtime_policy.get("owner_resolution_failure", "")).strip()
+    if owner_failure not in VALID_TARGET_RUNTIME_OWNER_FAILURE:
+        add_error(
+            errors,
+            f"target_runtime_policy.owner_resolution_failure must be one of {sorted(VALID_TARGET_RUNTIME_OWNER_FAILURE)}",
+        )
+
+    output_failure = str(target_runtime_policy.get("output_contract_failure", "")).strip()
+    if output_failure not in VALID_TARGET_RUNTIME_OUTPUT_FAILURE:
+        add_error(
+            errors,
+            f"target_runtime_policy.output_contract_failure must be one of {sorted(VALID_TARGET_RUNTIME_OUTPUT_FAILURE)}",
+        )
+
+    max_retries = target_runtime_policy.get("max_retries_per_node")
+    if not isinstance(max_retries, int) or max_retries < 0:
+        add_error(errors, "target_runtime_policy.max_retries_per_node must be a non-negative integer")
+
+    immutable_patterns = target_runtime_policy.get("immutable_during_run", [])
+    if not isinstance(immutable_patterns, list):
+        add_error(errors, "target_runtime_policy.immutable_during_run must be a list")
+        immutable_patterns = []
+    normalized_patterns: List[str] = []
+    for idx, raw_pattern in enumerate(immutable_patterns):
+        pattern = str(raw_pattern).strip().replace("\\", "/")
+        if not pattern:
+            add_error(errors, f"target_runtime_policy.immutable_during_run[{idx}] must not be empty")
+            continue
+        # Allow glob syntax while still rejecting absolute paths and parent traversal.
+        safe_probe = pattern.replace("**", "x").replace("*", "x")
+        if pattern.startswith("/") or not SAFE_RELATIVE_PATH_RE.match(safe_probe):
+            add_error(errors, f"target_runtime_policy.immutable_during_run[{idx}] must be a safe relative glob")
+            continue
+        normalized_patterns.append(pattern)
+
+    if mode == "managed_runtime":
+        capabilities = set(runtime_capabilities_from_contract(generated_runtime_contract))
+        if "target_managed_runtime" not in capabilities:
+            add_error(
+                errors,
+                "generated_runtime_contract.runtime_capabilities must include target_managed_runtime when target_runtime_policy.mode=managed_runtime",
+            )
+        for output_ref in workflow_graph_output_refs(workflow_graph):
+            for pattern in normalized_patterns:
+                if fnmatch.fnmatch(output_ref, pattern):
+                    add_error(
+                        errors,
+                        f"workflow_graph output_ref conflicts with target_runtime_policy.immutable_during_run: {output_ref} matches {pattern}",
+                    )
 
 
 def validate_node_loop_policy(
@@ -1777,6 +1885,12 @@ def validate_spec(spec: Dict[str, Any]) -> Dict[str, Any]:
         errors,
         warnings,
     )
+    target_runtime_policy = (
+        require_mapping(spec.get("target_runtime_policy", {}), "target_runtime_policy", errors)
+        if "target_runtime_policy" in spec
+        else {}
+    )
+    validate_target_runtime_policy(target_runtime_policy, workflow_graph, generated_runtime_contract, errors, warnings)
 
     test_contract = require_mapping(spec.get("test_contract", {}), "test_contract", errors)
     validate_test_contract(test_contract, runtime_contract, stage_ids, slot_map, intent_flows, registered_entries, errors, warnings)

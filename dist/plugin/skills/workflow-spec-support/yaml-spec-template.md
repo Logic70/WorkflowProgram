@@ -217,7 +217,7 @@ workflow_graph:
       input_refs:
         - outputs/target-workflow/intake-summary.md
       output_refs:
-        - .claude/skills/example/SKILL.md
+        - outputs/target-workflow/result.md
       gate: user_approval
       owner: example-skill
       # Ralph-style loop 只用于目标工作流业务节点，不替换 WorkflowProgram 自身 S1-S6。
@@ -375,10 +375,26 @@ generated_runtime_contract:
   runtime_capabilities:
     - state_transitions
     - run_state_validation
+    - target_managed_runtime
     # - capability_discovery
     # - host_capability_probe
     # - team_orchestration
     # - node_loop_execution
+
+target_runtime_policy:
+  mode: managed_runtime
+  entry_mode: wrapper_only
+  graph_source: workflow_graph
+  lifecycle_events_required: true
+  owner_resolution_failure: terminal
+  output_contract_failure: retry_then_terminal
+  max_retries_per_node: 3
+  artifact_provenance_required: true
+  immutable_during_run:
+    - .claude/**
+    - .workflowprogram/design/**
+    - .workflowprogram/runtime/**
+    - config/scripts/**
 
 # 可选能力搜索与推荐契约
 # capability_discovery:

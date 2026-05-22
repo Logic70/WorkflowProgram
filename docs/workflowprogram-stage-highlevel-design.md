@@ -19,7 +19,7 @@
 - 入口能力由 `workflowprogram-*` skills 承载。
 - 自然语言自动触发策略仅开放 `workflowprogram-orchestrate`，并通过 `route-intent.py` 提供确定性路由（strict 模式可硬阻断歧义）。
 - 主产品入口的确定性脚本链为 `workflow-entry.py -> (validate spec/view/lowlevel/target-runtime, managed-assets, probe/apply bootstrap) -> workflow-runner.py -> validate-run-state.py`；叶子 skill 不应只靠提示词顺序隐式串联这些脚本。
-- 生成后的目标工作流也必须交付自己的 `.workflowprogram/runtime/` 控制面包装层；当前固定模式为 `shared-control-plane-wrapper`，即目标侧 wrapper 调共享脚本，而不是复制一套独立引擎。
+- 生成后的目标工作流也必须交付自己的 `.workflowprogram/runtime/` 控制面包装层；当前固定模式为 `shared-control-plane-wrapper`，但目标业务图执行必须由 `target_runtime_policy.mode=managed_runtime` 下的 `target-workflow-runner.py` 消费 `workflow_graph.nodes`，不得只靠 command prompt 口头顺序。
 - 目标项目写入采用 staged candidate + managed apply 流程。
 - 运行证据统一写入 `TARGET_ROOT/.workflowprogram/runs/<run-id>/`。
 - 若工作流启用 `capability_discovery`，则在 `host_capabilities` 最终定稿前，必须先生成候选能力推荐与结构化人工指引。
@@ -226,6 +226,7 @@ TARGET_ROOT/
   - 当声明 `host_capabilities` 时，`generated_runtime_contract.runtime_capabilities` 必须包含 `host_capability_probe`。
   - 当声明 `agent_team_contract.enabled=true` 时，`generated_runtime_contract.runtime_capabilities` 必须包含 `team_orchestration`。
   - 当任一 `workflow_graph.nodes[*].loop_policy.enabled=true` 时，`generated_runtime_contract.runtime_capabilities` 必须包含 `node_loop_execution`。
+  - 新生成的目标工作流必须声明 `target_runtime_policy.mode=managed_runtime`，且 `generated_runtime_contract.runtime_capabilities` 必须包含 `target_managed_runtime`。
   - 领域画像可选地推荐默认 `agent_team_contract`，但推荐值必须保持可编辑，且不得覆盖用户显式选择。
   - `workflow-spec.md` 是用户回读确认材料；完整设计推理落在 S3 设计源；真正进入脚本、validator、runner、judge 的执行语义必须投影到 `workflow-spec.yaml`。
   - 若存在 `workflow_graph`，S3 readback 必须列出 graph summary、目标资产清单、启用/关闭能力与 managed apply policy。
@@ -307,6 +308,8 @@ TARGET_ROOT/
   - 基础运行测试判定：`entry / boundary / flow / artifacts / failure`
 - `generated_runtime_contract`
   - 目标工作流 deterministic runtime 的机器契约；当前模式固定为 `shared-control-plane-wrapper`
+- 可选 `target_runtime_policy`
+  - 目标工作流业务图的受控执行策略；新生成工作流默认 `mode=managed_runtime`，要求 command wrapper-only、node lifecycle 事件、owner 解析、output contract、immutable path 和 artifact provenance 由代码校验
 - 可选 `capability_discovery`
   - 目标能力发现与推荐契约，用于在 `host_capabilities` 最终定稿前生成候选 `skill / MCP / CLI` 清单
 - 可选 `host_capabilities`
@@ -351,8 +354,7 @@ TARGET_ROOT/
   - `workflow-runner.py run`
   - `validate-run-state.py`
 - 编排结果必须落盘到 `RUN_ROOT/outputs/stages/entry-orchestration-summary.json`。
-- 目标工作流自己的 deterministic runtime 入口是 `TARGET_ROOT/.workflowprogram/runtime/workflow-entry.py`，并沿用同样的 shared-control-plane-wrapper 顺序：`probe/apply-bootstrap -> environment-remediation -> workflow-runner -> validate-run-state`。
-- 若声明 `capability_discovery`，则该顺序应扩展为 `discover -> probe/apply-bootstrap -> environment-remediation -> workflow-runner -> validate-run-state`。
+- 目标工作流自己的 deterministic runtime 入口是 `TARGET_ROOT/.workflowprogram/runtime/workflow-entry.py`，并沿用 shared-control-plane-wrapper：`discover(optional) -> probe/apply-bootstrap -> environment-remediation -> target-workflow-runner -> validate-target-runtime-state`。
 
 ## 5D. 目标工作流发布环节
 

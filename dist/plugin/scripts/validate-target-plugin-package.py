@@ -76,6 +76,8 @@ def clean_ref_token(token: str) -> str:
 def should_ignore_reference(ref: str) -> bool:
     if not ref or ref in {".claude/", ".workflowprogram/"}:
         return True
+    if ref.endswith("/"):
+        return True
     if ref in {".workflowprogram/runs", ".workflowprogram/archive", ".workflowprogram/publish-run"}:
         return True
     if any(ref.startswith(prefix) for prefix in IGNORED_REF_PREFIXES):

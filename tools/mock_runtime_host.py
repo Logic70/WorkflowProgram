@@ -38,6 +38,29 @@ def write_text(path: Path, content: str) -> None:
     path.write_text(content, encoding="utf-8", newline="\n")
 
 
+def managed_runtime_command_text() -> str:
+    """Return the wrapper-only command body required by target managed runtime."""
+
+    return "\n".join(
+        [
+            "## Usage",
+            "",
+            "```text",
+            "/example <request>",
+            "```",
+            "",
+            "This command is a thin wrapper for the generated WorkflowProgram target runtime.",
+            "",
+            "Run:",
+            "",
+            "```bash",
+            "python3 .workflowprogram/runtime/workflow-entry.py run --request \"$ARGUMENTS\"",
+            "```",
+            "",
+        ]
+    )
+
+
 def append_jsonl(path: Path, payload: Dict[str, Any]) -> None:
     """向 JSONL 流追加一条 JSON 记录。"""
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -432,6 +455,16 @@ def copy_runtime_spec(
     generated_runtime_contract = payload.get("generated_runtime_contract", {})
     if runtime_capabilities is not None and isinstance(generated_runtime_contract, dict):
         generated_runtime_contract["runtime_capabilities"] = runtime_capabilities
+    target_runtime_policy = payload.get("target_runtime_policy", {})
+    if (
+        isinstance(target_runtime_policy, dict)
+        and str(target_runtime_policy.get("mode", "")).strip() == "managed_runtime"
+        and isinstance(generated_runtime_contract, dict)
+    ):
+        caps = generated_runtime_contract.get("runtime_capabilities", [])
+        if isinstance(caps, list) and "target_managed_runtime" not in caps:
+            caps.append("target_managed_runtime")
+            generated_runtime_contract["runtime_capabilities"] = caps
     if host_capabilities is not None:
         payload["host_capabilities"] = host_capabilities
         if isinstance(generated_runtime_contract, dict):
@@ -1568,12 +1601,14 @@ def write_managed_outputs(run_root: Path, target_root: Path, conflict: bool) -> 
     write_text(candidate_source, '{\n  "commands": ["example"],\n  "managed": true\n}\n')
     rules_source = run_root / "outputs" / "candidate" / ".claude" / "rules" / "constraints.md"
     command_source = run_root / "outputs" / "candidate" / ".claude" / "commands" / "example.md"
+    skill_source = run_root / "outputs" / "candidate" / ".claude" / "skills" / "example" / "SKILL.md"
     design_spec_source = run_root / "outputs" / "candidate" / ".workflowprogram" / "design" / "workflow-spec.yaml"
     design_view_source = run_root / "outputs" / "candidate" / ".workflowprogram" / "design" / "workflow-view.md"
     design_maintenance_source = run_root / "outputs" / "candidate" / ".workflowprogram" / "design" / "workflow-maintenance.md"
     runtime_root = run_root / "outputs" / "candidate" / ".workflowprogram" / "runtime"
     write_text(rules_source, "# Constraints\n\n- Keep workflow assets managed.\n")
-    write_text(command_source, "## Usage\n\n1. Goal\n2. Verify\n")
+    write_text(command_source, managed_runtime_command_text())
+    write_text(skill_source, "---\nname: example-skill\ndescription: Example skill declared by fixture workflow-spec\n---\n")
     design_spec_source.parent.mkdir(parents=True, exist_ok=True)
     for source_path, run_path in (
         (design_spec_source, run_root / "workflow-spec.yaml"),
@@ -1868,8 +1903,11 @@ def create_target_outputs(run_root: Path, target_root: Path, *, include_claude_a
         write_text(constraints_path, "# Constraints\n\n- Keep workflow assets managed.\n")
         files.append(".claude/rules/constraints.md")
         command_path = target_root / ".claude" / "commands" / "example.md"
-        write_text(command_path, "## Usage\n\n1. Goal\n2. Verify\n")
+        write_text(command_path, managed_runtime_command_text())
         files.append(".claude/commands/example.md")
+        skill_path = target_root / ".claude" / "skills" / "example" / "SKILL.md"
+        write_text(skill_path, "---\nname: example-skill\ndescription: Example skill declared by fixture workflow-spec\n---\n")
+        files.append(".claude/skills/example/SKILL.md")
     design_root = target_root / ".workflowprogram" / "design"
     design_root.mkdir(parents=True, exist_ok=True)
     for name in ("workflow-spec.yaml", "workflow-view.md", "workflow-maintenance.md"):
@@ -1889,6 +1927,20 @@ def create_target_outputs(run_root: Path, target_root: Path, *, include_claude_a
             ".workflowprogram/runtime/runtime-manifest.json",
         ]
     )
+    return files
+
+
+def ensure_target_runtime_reference_assets(target_root: Path) -> List[str]:
+    """补齐 managed runtime 校验需要的目标入口引用，不覆盖已有 managed 文件。"""
+    files: List[str] = []
+    command_path = target_root / ".claude" / "commands" / "example.md"
+    if not command_path.exists():
+        write_text(command_path, managed_runtime_command_text())
+        files.append(".claude/commands/example.md")
+    skill_path = target_root / ".claude" / "skills" / "example" / "SKILL.md"
+    if not skill_path.exists():
+        write_text(skill_path, "---\nname: example-skill\ndescription: Example skill declared by fixture workflow-spec\n---\n")
+        files.append(".claude/skills/example/SKILL.md")
     return files
 
 
@@ -2099,7 +2151,7 @@ def main() -> int:
             design_docs = generate_design_docs(repo_root, run_root)
             candidate_root = run_root / "outputs" / "candidate"
             write_text(candidate_root / ".claude" / "rules" / "constraints.md", "# Constraints\n\n- Keep workflow assets managed.\n")
-            write_text(candidate_root / ".claude" / "commands" / "example.md", "## Usage\n\n1. Goal\n2. Verify\n")
+            write_text(candidate_root / ".claude" / "commands" / "example.md", managed_runtime_command_text())
             for source_name, target_name in (
                 ("workflow_spec", "workflow-spec.yaml"),
                 ("workflow_view", "workflow-view.md"),
@@ -2176,7 +2228,7 @@ def main() -> int:
             design_docs = generate_design_docs(repo_root, run_root)
             candidate_root = run_root / "outputs" / "candidate"
             write_text(candidate_root / ".claude" / "rules" / "constraints.md", "# Constraints\n\n- Keep workflow assets managed.\n")
-            write_text(candidate_root / ".claude" / "commands" / "example.md", "## Usage\n\n1. Goal\n2. Verify\n")
+            write_text(candidate_root / ".claude" / "commands" / "example.md", managed_runtime_command_text())
             for source_name, target_name in (
                 ("workflow_spec", "workflow-spec.yaml"),
                 ("workflow_view", "workflow-view.md"),
@@ -2232,7 +2284,7 @@ def main() -> int:
             design_docs = generate_design_docs(repo_root, run_root)
             candidate_root = run_root / "outputs" / "candidate"
             write_text(candidate_root / ".claude" / "rules" / "constraints.md", "# Constraints\n\n- Keep workflow assets managed.\n")
-            write_text(candidate_root / ".claude" / "commands" / "example.md", "## Usage\n\n1. Goal\n2. Verify\n")
+            write_text(candidate_root / ".claude" / "commands" / "example.md", managed_runtime_command_text())
             for source_name, target_name in (
                 ("workflow_spec", "workflow-spec.yaml"),
                 ("workflow_view", "workflow-view.md"),
@@ -2282,7 +2334,7 @@ def main() -> int:
             design_docs = generate_design_docs(repo_root, run_root)
             candidate_root = run_root / "outputs" / "candidate"
             write_text(candidate_root / ".claude" / "rules" / "constraints.md", "# Constraints\n\n- Keep workflow assets managed.\n")
-            write_text(candidate_root / ".claude" / "commands" / "example.md", "## Usage\n\n1. Goal\n2. Verify\n")
+            write_text(candidate_root / ".claude" / "commands" / "example.md", managed_runtime_command_text())
             for source_name, target_name in (
                 ("workflow_spec", "workflow-spec.yaml"),
                 ("workflow_view", "workflow-view.md"),
@@ -2337,7 +2389,7 @@ def main() -> int:
             design_docs = generate_design_docs(repo_root, run_root)
             candidate_root = run_root / "outputs" / "candidate"
             write_text(candidate_root / ".claude" / "rules" / "constraints.md", "# Constraints\n\n- Keep workflow assets managed.\n")
-            write_text(candidate_root / ".claude" / "commands" / "example.md", "## Usage\n\n1. Goal\n2. Verify\n")
+            write_text(candidate_root / ".claude" / "commands" / "example.md", managed_runtime_command_text())
             for source_name, target_name in (
                 ("workflow_spec", "workflow-spec.yaml"),
                 ("workflow_view", "workflow-view.md"),
@@ -2401,6 +2453,7 @@ def main() -> int:
             )
             generate_design_docs(repo_root, run_root)
             generated_files = create_target_outputs(run_root, target_root, include_claude_assets=False)
+            generated_files.extend(ensure_target_runtime_reference_assets(target_root))
             host_outputs = write_host_capability_outputs(repo_root, run_root, target_root, apply_project_local=False)
             write_validation_report(
                 target_root,
@@ -2446,7 +2499,7 @@ def main() -> int:
                 runtime_capabilities=["state_transitions", "run_state_validation", "host_capability_probe"],
             )
             generate_design_docs(repo_root, run_root)
-            generated_files = create_target_outputs(run_root, target_root, include_claude_assets=False)
+            generated_files = create_target_outputs(run_root, target_root)
             write_managed_outputs(run_root, target_root, conflict=False)
             host_outputs = write_host_capability_outputs(repo_root, run_root, target_root, apply_project_local=False)
             seed_prior_host_capability_failure(target_root, host_outputs.get("report", {}))
@@ -2491,7 +2544,7 @@ def main() -> int:
             design_docs = generate_design_docs(repo_root, run_root)
             candidate_root = run_root / "outputs" / "candidate"
             write_text(candidate_root / ".claude" / "rules" / "constraints.md", "# Constraints\n\n- Keep workflow assets managed.\n")
-            write_text(candidate_root / ".claude" / "commands" / "example.md", "## Usage\n\n1. Goal\n2. Verify\n")
+            write_text(candidate_root / ".claude" / "commands" / "example.md", managed_runtime_command_text())
             for source_name, target_name in (
                 ("workflow_spec", "workflow-spec.yaml"),
                 ("workflow_view", "workflow-view.md"),
@@ -2534,7 +2587,7 @@ def main() -> int:
             design_docs = generate_design_docs(repo_root, run_root)
             candidate_root = run_root / "outputs" / "candidate"
             write_text(candidate_root / ".claude" / "rules" / "constraints.md", "# Constraints\n\n- Keep workflow assets managed.\n")
-            write_text(candidate_root / ".claude" / "commands" / "example.md", "## Usage\n\n1. Goal\n2. Verify\n")
+            write_text(candidate_root / ".claude" / "commands" / "example.md", managed_runtime_command_text())
             for source_name, target_name in (
                 ("workflow_spec", "workflow-spec.yaml"),
                 ("workflow_view", "workflow-view.md"),
@@ -2581,6 +2634,7 @@ def main() -> int:
             )
             generate_design_docs(repo_root, run_root)
             generated_files = create_target_outputs(run_root, target_root, include_claude_assets=False)
+            generated_files.extend(ensure_target_runtime_reference_assets(target_root))
             write_team_evidence(run_root, team_contract, overflow=False, join_satisfied=True)
             write_validation_report(
                 target_root,
@@ -2621,7 +2675,7 @@ def main() -> int:
             design_docs = generate_design_docs(repo_root, run_root)
             candidate_root = run_root / "outputs" / "candidate"
             write_text(candidate_root / ".claude" / "rules" / "constraints.md", "# Constraints\n\n- Loop success requires verifier evidence.\n")
-            write_text(candidate_root / ".claude" / "commands" / "example.md", "## Usage\n\n1. Goal\n2. Iterate until verified\n")
+            write_text(candidate_root / ".claude" / "commands" / "example.md", managed_runtime_command_text())
             for source_name, target_name in (
                 ("workflow_spec", "workflow-spec.yaml"),
                 ("workflow_view", "workflow-view.md"),
@@ -2664,7 +2718,7 @@ def main() -> int:
             design_docs = generate_design_docs(repo_root, run_root)
             candidate_root = run_root / "outputs" / "candidate"
             write_text(candidate_root / ".claude" / "rules" / "constraints.md", "# Constraints\n\n- Stop loop at max_iterations.\n")
-            write_text(candidate_root / ".claude" / "commands" / "example.md", "## Usage\n\n1. Goal\n2. Iterate until verified\n")
+            write_text(candidate_root / ".claude" / "commands" / "example.md", managed_runtime_command_text())
             for source_name, target_name in (
                 ("workflow_spec", "workflow-spec.yaml"),
                 ("workflow_view", "workflow-view.md"),
@@ -2711,7 +2765,7 @@ def main() -> int:
             design_docs = generate_design_docs(repo_root, run_root)
             candidate_root = run_root / "outputs" / "candidate"
             write_text(candidate_root / ".claude" / "rules" / "constraints.md", "# Constraints\n\n- Keep workflow assets managed.\n")
-            write_text(candidate_root / ".claude" / "commands" / "example.md", "## Usage\n\n1. Goal\n2. Verify\n")
+            write_text(candidate_root / ".claude" / "commands" / "example.md", managed_runtime_command_text())
             for source_name, target_name in (
                 ("workflow_spec", "workflow-spec.yaml"),
                 ("workflow_view", "workflow-view.md"),
@@ -2885,7 +2939,7 @@ def main() -> int:
             design_docs = generate_design_docs(repo_root, run_root)
             candidate_root = run_root / "outputs" / "candidate"
             write_text(candidate_root / ".claude" / "rules" / "constraints.md", "# Constraints\n\n- Keep workflow assets managed.\n")
-            write_text(candidate_root / ".claude" / "commands" / "example.md", "## Usage\n\n1. Goal\n2. Verify\n")
+            write_text(candidate_root / ".claude" / "commands" / "example.md", managed_runtime_command_text())
             for source_name, target_name in (
                 ("workflow_spec", "workflow-spec.yaml"),
                 ("workflow_view", "workflow-view.md"),

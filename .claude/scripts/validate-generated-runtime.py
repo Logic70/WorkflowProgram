@@ -86,6 +86,10 @@ def validate_generated_runtime(spec_path: Path, target_root: Path) -> Dict[str, 
         )
         declared_agent_team = agent_team_contract_from_spec(spec)
         declared_node_loop_enabled = node_loop_enabled(spec)
+        target_runtime_policy = spec.get("target_runtime_policy", {})
+        if not isinstance(target_runtime_policy, dict):
+            target_runtime_policy = {}
+        managed_runtime = str(target_runtime_policy.get("mode", "")).strip() == "managed_runtime"
         main_entry = (
             str(spec.get("test_contract", {}).get("entry", {}).get("main_entry", "")).strip()
             if isinstance(spec.get("test_contract", {}), dict)
@@ -132,6 +136,8 @@ def validate_generated_runtime(spec_path: Path, target_root: Path) -> Dict[str, 
                 "run_root_dir": normalized.get("run_root_dir", ""),
                 "runtime_mode": normalized.get("mode", ""),
                 "runtime_capabilities": expected_runtime_capabilities,
+                "managed_runtime": managed_runtime,
+                "target_runtime_policy_mode": str(target_runtime_policy.get("mode", "")).strip(),
                 "default_entry_skill": main_entry,
                 "capability_discovery_enabled": bool(capability_discovery.get("enabled", False)),
                 "capability_discovery_domains": capability_discovery.get("domains", []) if isinstance(capability_discovery.get("domains", []), list) else [],
@@ -177,18 +183,51 @@ def validate_generated_runtime(spec_path: Path, target_root: Path) -> Dict[str, 
                 errors.append("entry wrapper is missing TEAM_ORCHESTRATION_ENABLED marker")
             if declared_node_loop_enabled and "NODE_LOOP_EXECUTION_ENABLED = True" not in entry_text:
                 errors.append("entry wrapper is missing NODE_LOOP_EXECUTION_ENABLED marker")
+            if managed_runtime and "TARGET_MANAGED_RUNTIME_ENABLED = True" not in entry_text:
+                errors.append("entry wrapper is missing TARGET_MANAGED_RUNTIME_ENABLED marker")
 
         if runner_path.exists():
             runner_text = runner_path.read_text(encoding="utf-8")
-            for needle in ("workflow-runner.py", "--entry-skill", "--intent", "workflowprogram-python"):
+            expected_runner_marker = "target-workflow-runner.py" if managed_runtime else "workflow-runner.py"
+            for needle in (expected_runner_marker, "--entry-skill", "--intent", "workflowprogram-python"):
                 if needle not in runner_text:
                     errors.append(f"runner wrapper is missing expected marker: {needle}")
+            if managed_runtime and 'scripts" / "workflow-runner.py"' in runner_text:
+                errors.append("managed-runtime runner wrapper must not delegate to product workflow-runner.py")
 
         if validator_path.exists():
             validator_text = validator_path.read_text(encoding="utf-8")
-            for needle in ("validate-run-state.py", "workflowprogram-python"):
+            expected_validator_marker = "validate-target-runtime-state.py" if managed_runtime else "validate-run-state.py"
+            for needle in (expected_validator_marker, "workflowprogram-python"):
                 if needle not in validator_text:
                     errors.append(f"state validator wrapper is missing expected marker: {needle}")
+            if managed_runtime and "validate-run-state.py" in validator_text:
+                errors.append("managed-runtime state validator wrapper must not delegate to product validate-run-state.py")
+
+        if managed_runtime and main_entry:
+            registry = spec.get("registry", {}) if isinstance(spec.get("registry", {}), dict) else {}
+            command_file = ""
+            commands = registry.get("commands", []) if isinstance(registry.get("commands", []), list) else []
+            for raw_command in commands:
+                if not isinstance(raw_command, dict):
+                    continue
+                if str(raw_command.get("name", "")).strip() == main_entry:
+                    command_file = str(raw_command.get("file", "")).strip()
+                    break
+            if not command_file:
+                errors.append("managed-runtime workflow main_entry must resolve to registry.commands")
+            else:
+                command_path = target_root / command_file
+                if not command_path.exists():
+                    errors.append(f"managed-runtime command wrapper is missing: {command_path}")
+                else:
+                    command_text = command_path.read_text(encoding="utf-8")
+                    if ".workflowprogram/runtime/workflow-entry.py" not in command_text:
+                        errors.append("managed-runtime command must invoke .workflowprogram/runtime/workflow-entry.py")
+                    prompt_heavy_markers = ["### Stage", "按顺序调用每个阶段", "不要跳过", "主控模型不得手写"]
+                    matched = [marker for marker in prompt_heavy_markers if marker in command_text]
+                    if matched:
+                        errors.append(f"managed-runtime command must be wrapper-only; prompt-heavy markers found: {matched}")
     except Exception as exc:
         errors.append(str(exc))
 

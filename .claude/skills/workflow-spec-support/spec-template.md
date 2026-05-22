@@ -5,6 +5,7 @@
 > 两者关系：`spec-template.md` → target design source → `workflow-spec.yaml` target runtime map → 生成 `workflow-view.md` / `workflow-maintenance.md` derived target views。
 > `workflow-spec.yaml` 是机器语义真源与运行态地图；完整目标工作流设计推理应保留在 `target-design-overview.md` / `target-design-detail.md` / 条件性 `target-node-designs/**` 中。
 > 复杂、loop、工具重、逆向、安全或多下游节点的 node-design 必须参考 `target-node-design-template.md`，并能通过 `validate-target-node-design.py`。
+> 新生成目标工作流默认使用 `target_runtime_policy.mode=managed_runtime`：用户命令只作为 wrapper 启动 `.workflowprogram/runtime/workflow-entry.py`，目标业务节点由 `target-workflow-runner.py` 按 `workflow_graph.nodes` 执行并记录 provenance。
 
 ## Workflow Identity
 
@@ -143,6 +144,9 @@
 - 目标 workflow_graph 入口与转移：
 - 每个 graph 节点的输入、输出、gate、owner：
 - 每个 graph 节点的执行模型（skill / agent / script / team / loop）：
+- 目标 runtime policy：`managed_runtime` / 例外理由
+- command 是否 wrapper-only 调用 `.workflowprogram/runtime/workflow-entry.py`：
+- 运行态 immutable paths（通常为 `.claude/**`、`.workflowprogram/design/**`、`.workflowprogram/runtime/**`、`config/scripts/**`）：
 - 哪些 node 需要独立 agent，原因是什么：
 - 哪些 node 不需要独立 agent，原因是什么：
 - 复杂 node-design 输出路径：
