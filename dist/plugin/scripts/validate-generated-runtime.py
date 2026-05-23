@@ -90,6 +90,9 @@ def validate_generated_runtime(spec_path: Path, target_root: Path) -> Dict[str, 
         target_runtime_policy = spec.get("target_runtime_policy", {})
         if not isinstance(target_runtime_policy, dict):
             target_runtime_policy = {}
+        target_executor_policy = spec.get("target_executor_policy", {})
+        if not isinstance(target_executor_policy, dict):
+            target_executor_policy = {}
         managed_runtime = str(target_runtime_policy.get("mode", "")).strip() == "managed_runtime"
         target_publish_policy = spec.get("target_publish_policy", {})
         if not isinstance(target_publish_policy, dict):
@@ -143,6 +146,7 @@ def validate_generated_runtime(spec_path: Path, target_root: Path) -> Dict[str, 
                 "runtime_capabilities": expected_runtime_capabilities,
                 "managed_runtime": managed_runtime,
                 "target_runtime_policy_mode": str(target_runtime_policy.get("mode", "")).strip(),
+                "target_executor_policy": target_executor_policy,
                 "target_publish_policy_enabled": target_publish_enabled,
                 "default_entry_skill": main_entry,
                 "capability_discovery_enabled": bool(capability_discovery.get("enabled", False)),
@@ -162,6 +166,11 @@ def validate_generated_runtime(spec_path: Path, target_root: Path) -> Dict[str, 
                 if isinstance(expected, bool):
                     observed = observed_value if isinstance(observed_value, bool) else None
                     if observed is not expected:
+                        errors.append(f"runtime manifest field '{key}' mismatch: expected '{expected}', got '{observed}'")
+                    continue
+                if isinstance(expected, dict):
+                    observed = observed_value if isinstance(observed_value, dict) else None
+                    if observed != expected:
                         errors.append(f"runtime manifest field '{key}' mismatch: expected '{expected}', got '{observed}'")
                     continue
                 observed = str(observed_value).strip() if observed_value is not None else ""
@@ -200,6 +209,10 @@ def validate_generated_runtime(spec_path: Path, target_root: Path) -> Dict[str, 
                     errors.append(
                         "generated_runtime_contract.runtime_capabilities must include target_atomic_publish when target_publish_policy.enabled=true"
                     )
+            forbidden_executor_markers = ["claude_cli", "[args.claude_bin, \"-p\"", "Claude binary for claude_cli"]
+            matched_forbidden = [marker for marker in forbidden_executor_markers if marker in entry_text]
+            if matched_forbidden:
+                errors.append(f"entry wrapper must not hard-code Claude CLI executor markers: {matched_forbidden}")
 
         if runner_path.exists():
             runner_text = runner_path.read_text(encoding="utf-8")
@@ -209,6 +222,10 @@ def validate_generated_runtime(spec_path: Path, target_root: Path) -> Dict[str, 
                     errors.append(f"runner wrapper is missing expected marker: {needle}")
             if managed_runtime and 'scripts" / "workflow-runner.py"' in runner_text:
                 errors.append("managed-runtime runner wrapper must not delegate to product workflow-runner.py")
+            forbidden_executor_markers = ["claude_cli", "[args.claude_bin, \"-p\"", "Claude binary for claude_cli"]
+            matched_forbidden = [marker for marker in forbidden_executor_markers if marker in runner_text]
+            if matched_forbidden:
+                errors.append(f"runner wrapper must not hard-code Claude CLI executor markers: {matched_forbidden}")
 
         if validator_path.exists():
             validator_text = validator_path.read_text(encoding="utf-8")
@@ -246,6 +263,7 @@ def validate_generated_runtime(spec_path: Path, target_root: Path) -> Dict[str, 
                     if ".workflowprogram/runtime/workflow-entry.py" not in command_text:
                         errors.append("managed-runtime command must invoke .workflowprogram/runtime/workflow-entry.py")
                     prompt_heavy_markers = ["### Stage", "按顺序调用每个阶段", "不要跳过", "主控模型不得手写"]
+                    prompt_heavy_markers.extend(["outputs/stride-audit", "手写报告", "逐节点手写", "直接生成报告"])
                     matched = [marker for marker in prompt_heavy_markers if marker in command_text]
                     if matched:
                         errors.append(f"managed-runtime command must be wrapper-only; prompt-heavy markers found: {matched}")

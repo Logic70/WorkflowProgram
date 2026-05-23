@@ -17,6 +17,9 @@ from lib.io_utils import write_json
 from lib.yaml_utils import load_yaml_mapping
 
 
+MANUAL_EXECUTOR_PROVIDERS = {"current_agent", "manual"}
+
+
 def utc_now() -> str:
     return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
 
@@ -94,6 +97,9 @@ def mark_state_failed(state_path: Path, reason: str, *, failure_kind: str = "imp
 
 def mark_state_published(state_path: Path, manifest_path: str) -> None:
     state = load_json(state_path)
+    state["status"] = "PASS"
+    state["failure_kind"] = "none"
+    state["failure_reason"] = ""
     state["finalizer_status"] = "PASS"
     state["published"] = True
     state["publish_manifest"] = manifest_path
@@ -112,7 +118,10 @@ def verify_run_artifacts(run_root: Path, state: Dict[str, Any], policy: Dict[str
         if not (run_root / rel).exists():
             errors.append(f"missing required run artifact: {rel}")
 
-    if str(state.get("status", "")).strip() != "PASS":
+    state_status = str(state.get("status", "")).strip()
+    provider = str(state.get("executor_provider", state.get("provider", ""))).strip()
+    manual_evidence_mode = provider in MANUAL_EXECUTOR_PROVIDERS and state_status == "BLOCKED"
+    if state_status != "PASS" and not manual_evidence_mode:
         errors.append(f"target-state status must be PASS before publish, got {state.get('status')}")
     if str(state.get("failure_kind", "")).strip() != "none":
         errors.append(f"target-state failure_kind must be none before publish, got {state.get('failure_kind')}")
@@ -143,7 +152,52 @@ def verify_run_artifacts(run_root: Path, state: Dict[str, Any], policy: Dict[str
         expected_digest = str(raw_artifact.get("sha256", "")).strip()
         if source.is_file() and expected_digest and sha256_file(source) != expected_digest:
             errors.append(f"artifact digest mismatch: {rel}")
+    if manual_evidence_mode:
+        errors.extend(verify_manual_executor_evidence(run_root, nodes, artifacts, provider))
     return [item for item in artifacts if isinstance(item, dict)], errors
+
+
+def verify_manual_executor_evidence(
+    run_root: Path,
+    nodes: List[Any],
+    artifacts: List[Any],
+    provider: str,
+) -> List[str]:
+    errors: List[str] = []
+    artifact_paths = {str(item.get("path", "")).strip() for item in artifacts if isinstance(item, dict)}
+    for idx, raw_node in enumerate(nodes):
+        if not isinstance(raw_node, dict):
+            continue
+        node_id = str(raw_node.get("node_id", "")).strip()
+        evidence_rel = str(raw_node.get("executor_evidence_path", "")).strip()
+        if not evidence_rel:
+            errors.append(f"manual executor node missing executor_evidence_path: {node_id or idx}")
+            continue
+        evidence = load_json(run_root / safe_rel(evidence_rel))
+        if int(evidence.get("schema_version", 0) or 0) != 1:
+            errors.append(f"executor evidence schema_version must be 1: {evidence_rel}")
+        if str(evidence.get("node_id", "")).strip() != node_id:
+            errors.append(f"executor evidence node_id mismatch: {evidence_rel}")
+        if str(evidence.get("provider", "")).strip() != provider:
+            errors.append(f"executor evidence provider mismatch: {evidence_rel}")
+        if str(evidence.get("status", "")).strip() != "PASS":
+            errors.append(f"executor evidence status must be PASS: {evidence_rel}")
+        for field in ("operator", "started_at", "completed_at"):
+            if not str(evidence.get(field, "")).strip():
+                errors.append(f"executor evidence {field} is required: {evidence_rel}")
+        if not isinstance(evidence.get("input_refs", []), list):
+            errors.append(f"executor evidence input_refs must be a list: {evidence_rel}")
+        if not isinstance(evidence.get("output_refs", []), list):
+            errors.append(f"executor evidence output_refs must be a list: {evidence_rel}")
+        outputs = evidence.get("outputs", [])
+        if not isinstance(outputs, list) or not outputs:
+            errors.append(f"executor evidence outputs must be a non-empty list: {evidence_rel}")
+            continue
+        for output in outputs:
+            path = safe_rel(str(output.get("path", "") if isinstance(output, dict) else output))
+            if path not in artifact_paths:
+                errors.append(f"executor evidence output lacks provenance: {path}")
+    return errors
 
 
 def verify_required_reports(run_root: Path, policy: Dict[str, Any]) -> List[str]:

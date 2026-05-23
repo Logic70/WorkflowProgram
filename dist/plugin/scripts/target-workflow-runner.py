@@ -20,7 +20,19 @@ from lib.yaml_utils import load_yaml_mapping
 
 
 TERMINALS = {"abort", "end", "done", "complete", "stop", "finish", "success", "failure"}
-DETERMINISTIC_PROVIDERS = {"fixture_host", "command_adapter"}
+AUTO_EXECUTOR_PROVIDERS = {"fixture_host", "command_adapter"}
+MANUAL_EXECUTOR_PROVIDERS = {"current_agent", "manual"}
+SUPPORTED_EXECUTOR_PROVIDERS = AUTO_EXECUTOR_PROVIDERS | MANUAL_EXECUTOR_PROVIDERS
+PROVIDER_ALIASES = {
+    "current-agent": "current_agent",
+    "current_agent_manual": "current_agent",
+}
+DEFAULT_EXECUTOR_POLICY = {
+    "default_provider": "current_agent",
+    "allowed_providers": ["fixture_host", "command_adapter", "current_agent", "manual"],
+    "evidence_dir": "outputs/stages/executor-evidence",
+    "unsupported_provider_verdict": "FAIL",
+}
 
 
 def utc_now() -> str:
@@ -41,7 +53,7 @@ def parse_args() -> argparse.Namespace:
     run.add_argument("--entry-skill", required=True)
     run.add_argument("--runtime-provider", default="")
     run.add_argument("--provider-command", default="")
-    run.add_argument("--claude-bin", default="claude")
+    run.add_argument("--claude-bin", default="", help="Deprecated no-op; target runtime does not invoke Claude CLI")
     run.add_argument("--auto-approve", action="store_true")
     run.add_argument("--approval-status", default="")
     run.add_argument("--json", action="store_true")
@@ -199,6 +211,150 @@ def materialize_output(output_root: Path, run_root: Path, node: Dict[str, Any], 
     }
 
 
+def load_json_object(path: Path) -> Dict[str, Any]:
+    if not path.exists():
+        return {}
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+    return payload if isinstance(payload, dict) else {}
+
+
+def executor_policy(spec: Dict[str, Any]) -> Dict[str, Any]:
+    policy = dict(DEFAULT_EXECUTOR_POLICY)
+    declared = spec.get("target_executor_policy", {})
+    if isinstance(declared, dict):
+        policy.update(declared)
+    allowed = policy.get("allowed_providers", DEFAULT_EXECUTOR_POLICY["allowed_providers"])
+    if not isinstance(allowed, list) or not allowed:
+        allowed = DEFAULT_EXECUTOR_POLICY["allowed_providers"]
+    policy["allowed_providers"] = [normalize_provider_name(str(item)) for item in allowed if str(item).strip()]
+    policy["default_provider"] = normalize_provider_name(str(policy.get("default_provider", "current_agent")))
+    policy["evidence_dir"] = safe_rel(str(policy.get("evidence_dir", DEFAULT_EXECUTOR_POLICY["evidence_dir"])))
+    return policy
+
+
+def normalize_provider_name(provider: str) -> str:
+    value = provider.strip()
+    return PROVIDER_ALIASES.get(value, value)
+
+
+def resolve_executor_provider(args: argparse.Namespace, spec: Dict[str, Any]) -> Tuple[str, str]:
+    policy = executor_policy(spec)
+    raw_provider = str(args.runtime_provider or os.environ.get("WORKFLOWPROGRAM_TARGET_EXECUTOR_PROVIDER", "")).strip()
+    provider = normalize_provider_name(raw_provider or str(policy.get("default_provider", "current_agent")))
+    if provider not in SUPPORTED_EXECUTOR_PROVIDERS:
+        return provider, f"unsupported executor provider: {provider or '<empty>'}"
+    allowed = set(policy.get("allowed_providers", []))
+    if allowed and provider not in allowed:
+        return provider, f"executor provider not allowed by target_executor_policy: {provider}"
+    return provider, ""
+
+
+def executor_evidence_path(run_root: Path, spec: Dict[str, Any], node_id: str) -> Path:
+    policy = executor_policy(spec)
+    return run_root / safe_rel(str(policy.get("evidence_dir", DEFAULT_EXECUTOR_POLICY["evidence_dir"]))) / f"{safe_rel(node_id)}.json"
+
+
+def normalize_evidence_output(raw_output: Any) -> Dict[str, str]:
+    if isinstance(raw_output, dict):
+        return {
+            "path": safe_rel(str(raw_output.get("path", ""))),
+            "sha256": str(raw_output.get("sha256", "")).strip(),
+        }
+    return {"path": safe_rel(str(raw_output)), "sha256": ""}
+
+
+def validate_manual_executor_evidence(
+    run_root: Path,
+    output_root: Path,
+    spec: Dict[str, Any],
+    node: Dict[str, Any],
+    owner: Dict[str, str],
+    provider: str,
+    attempt: int,
+) -> Tuple[bool, str, List[Dict[str, Any]], str]:
+    """Validate evidence produced by the current ClaudeCode session or a manual operator."""
+
+    node_id = str(node.get("id", "")).strip()
+    evidence_path = executor_evidence_path(run_root, spec, node_id)
+    evidence = load_json_object(evidence_path)
+    if not evidence:
+        return False, f"manual/current-agent executor evidence missing: {evidence_path}", [], evidence_path.relative_to(run_root).as_posix()
+    errors: List[str] = []
+    if int(evidence.get("schema_version", 0) or 0) != 1:
+        errors.append("schema_version must be 1")
+    if str(evidence.get("node_id", "")).strip() != node_id:
+        errors.append("node_id mismatch")
+    evidence_provider = normalize_provider_name(str(evidence.get("provider", provider)))
+    if evidence_provider != provider:
+        errors.append(f"provider mismatch: expected {provider}, got {evidence_provider}")
+    if str(evidence.get("status", "")).strip() != "PASS":
+        errors.append("status must be PASS")
+    for field in ("operator", "started_at", "completed_at"):
+        if not str(evidence.get(field, "")).strip():
+            errors.append(f"{field} is required")
+    input_refs = evidence.get("input_refs", [])
+    output_refs = evidence.get("output_refs", [])
+    if not isinstance(input_refs, list):
+        errors.append("input_refs must be a list")
+        input_refs = []
+    if not isinstance(output_refs, list):
+        errors.append("output_refs must be a list")
+        output_refs = []
+    declared_inputs = [str(item).strip() for item in node.get("input_refs", []) if str(item).strip()]
+    declared_outputs = [safe_rel(str(item)) for item in node.get("output_refs", []) if str(item).strip() and not is_logical_ref(str(item))]
+    if [str(item).strip() for item in input_refs if str(item).strip()] != declared_inputs:
+        errors.append("input_refs must exactly match workflow_graph node input_refs")
+    if [safe_rel(str(item)) for item in output_refs if str(item).strip() and not is_logical_ref(str(item))] != declared_outputs:
+        errors.append("output_refs must exactly match workflow_graph node output_refs")
+    raw_outputs = evidence.get("outputs", [])
+    if not isinstance(raw_outputs, list) or not raw_outputs:
+        errors.append("outputs must be a non-empty list")
+        raw_outputs = []
+    output_records = [normalize_evidence_output(item) for item in raw_outputs]
+    output_paths = {item["path"] for item in output_records if item.get("path")}
+    missing_declared = sorted(path for path in declared_outputs if path not in output_paths)
+    if missing_declared:
+        errors.append(f"outputs missing declared refs: {missing_declared}")
+    provenance: List[Dict[str, Any]] = []
+    for output in output_records:
+        rel = output.get("path", "")
+        if not rel:
+            errors.append("outputs[].path is required")
+            continue
+        if rel not in declared_outputs:
+            errors.append(f"outputs[].path is not declared by node output_refs: {rel}")
+            continue
+        path = output_root / rel
+        if not path.exists():
+            errors.append(f"declared output file missing: {rel}")
+            continue
+        digest = sha256_file(path) if path.is_file() else ""
+        expected_digest = output.get("sha256", "")
+        if expected_digest and digest and digest != expected_digest:
+            errors.append(f"output sha256 mismatch: {rel}")
+        provenance.append(
+            {
+                "path": rel,
+                "kind": "file" if path.is_file() else "dir",
+                "node_id": node_id,
+                "owner": owner.get("name", ""),
+                "owner_kind": owner.get("kind", ""),
+                "attempt": attempt,
+                "sha256": digest,
+                "generated_at": str(evidence.get("completed_at", "")).strip(),
+                "producer": f"target-workflow-runner.py:{provider}",
+                "executor_evidence_path": evidence_path.relative_to(run_root).as_posix(),
+                "operator": str(evidence.get("operator", "")).strip(),
+            }
+        )
+    if errors:
+        return False, "; ".join(errors), [], evidence_path.relative_to(run_root).as_posix()
+    return True, f"{provider} executor evidence accepted: {evidence_path}", provenance, evidence_path.relative_to(run_root).as_posix()
+
+
 def execute_script_owner(target_root: Path, run_root: Path, output_root: Path, owner: Dict[str, str], node: Dict[str, Any], request: str) -> Tuple[bool, str]:
     rel = safe_rel(owner.get("file", ""))
     path = target_root / rel
@@ -211,32 +367,6 @@ def execute_script_owner(target_root: Path, run_root: Path, output_root: Path, o
             "WORKFLOWPROGRAM_RUN_ROOT": str(run_root),
             "WORKFLOWPROGRAM_OUTPUT_ROOT": str(output_root),
         },
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    text = completed.stdout.strip() or completed.stderr.strip()
-    return completed.returncode == 0, text
-
-
-def execute_claude_owner(args: argparse.Namespace, target_root: Path, run_root: Path, output_root: Path, owner: Dict[str, str], node: Dict[str, Any]) -> Tuple[bool, str]:
-    prompt = "\n".join(
-        [
-            "Execute one WorkflowProgram managed-runtime target node.",
-            f"Node id: {node['id']}",
-            f"Owner: {owner.get('name', '')}",
-            f"Owner kind: {owner.get('kind', '')}",
-            f"Required outputs: {', '.join(str(item) for item in node.get('output_refs', []))}",
-            f"Target root: {target_root}",
-            f"Run root: {run_root}",
-            f"Output root for declared outputs: {output_root}",
-            "Write declared outputs under the output root. Do not write final published outputs directly.",
-            "Do not modify runtime/design/config scripts.",
-        ]
-    )
-    completed = subprocess.run(
-        [args.claude_bin, "-p", prompt],
-        cwd=target_root,
         capture_output=True,
         text=True,
         check=False,
@@ -349,7 +479,9 @@ def run_graph(args: argparse.Namespace) -> Dict[str, Any]:
     if not isinstance(max_retries, int) or max_retries < 0:
         max_retries = 0
     immutable_patterns = [safe_rel(str(item)) for item in policy.get("immutable_during_run", []) if str(item).strip()] if isinstance(policy.get("immutable_during_run", []), list) else []
-    provider = str(args.runtime_provider or "claude_cli").strip()
+    provider, provider_error = resolve_executor_provider(args, spec)
+    if provider_error:
+        raise RuntimeError(provider_error)
     output_root = output_base_root(target_root, run_root, spec)
     input_search_roots = [output_root]
     if target_root not in input_search_roots:
@@ -361,6 +493,7 @@ def run_graph(args: argparse.Namespace) -> Dict[str, Any]:
     status = "PASS"
     failure_kind = "none"
     failure_reason = ""
+    manual_finalizer_required = provider in MANUAL_EXECUTOR_PROVIDERS
 
     append_event(run_root, "TargetRuntimeStarted", status="running", entry_skill=args.entry_skill, provider=provider)
     for node in ordered_nodes(graph, args.entry_skill):
@@ -385,28 +518,65 @@ def run_graph(args: argparse.Namespace) -> Dict[str, Any]:
             append_event(run_root, "OwnerResolved", node_id=node_id, owner=owner_name, owner_kind=owner.get("kind", ""), attempt=attempt)
 
             before = existing_file_snapshot(target_root, immutable_patterns)
-            if owner.get("kind") == "script":
+            executor_evidence_rel = ""
+            if provider in MANUAL_EXECUTOR_PROVIDERS:
+                owner_success, owner_message, manual_provenance, executor_evidence_rel = validate_manual_executor_evidence(
+                    run_root,
+                    output_root,
+                    spec,
+                    node,
+                    owner,
+                    provider,
+                    attempt,
+                )
+                if owner_success:
+                    provenance.extend(manual_provenance)
+                    append_event(
+                        run_root,
+                        "ExecutorEvidenceAccepted",
+                        node_id=node_id,
+                        provider=provider,
+                        evidence_path=executor_evidence_rel,
+                        attempt=attempt,
+                    )
+                else:
+                    append_event(
+                        run_root,
+                        "ExecutorEvidenceRejected",
+                        node_id=node_id,
+                        provider=provider,
+                        evidence_path=executor_evidence_rel,
+                        reason=owner_message,
+                        attempt=attempt,
+                    )
+            elif owner.get("kind") == "script":
                 owner_success, owner_message = execute_script_owner(target_root, run_root, output_root, owner, node, args.request)
-            elif provider in DETERMINISTIC_PROVIDERS:
+            elif provider in AUTO_EXECUTOR_PROVIDERS:
                 owner_success, owner_message = True, "deterministic provider materialized declared outputs"
                 for output_ref in node.get("output_refs", []):
                     ref = str(output_ref).strip()
                     if not is_logical_ref(ref):
                         provenance.append(materialize_output(output_root, run_root, node, ref, owner, attempt))
             else:
-                owner_success, owner_message = execute_claude_owner(args, target_root, run_root, output_root, owner, node)
+                owner_success, owner_message = False, f"executor provider is not executable: {provider}"
             after = existing_file_snapshot(target_root, immutable_patterns)
             changes = immutable_changes(before, after)
             missing_outputs = check_outputs(output_root, node)
             if not owner_success:
                 attempts.append({"attempt": attempt, "status": "FAIL", "reason": "owner_failed", "message": owner_message})
+                failure_reason = owner_message
             elif changes:
                 attempts.append({"attempt": attempt, "status": "FAIL", "reason": "immutable_changed", "changes": changes})
+                failure_reason = f"node {node_id} modified immutable paths: {changes}"
             elif missing_outputs:
                 attempts.append({"attempt": attempt, "status": "FAIL", "reason": "missing_outputs", "missing_outputs": missing_outputs})
+                failure_reason = f"node {node_id} missing outputs: {missing_outputs}"
             else:
                 node_status = "PASS"
-                attempts.append({"attempt": attempt, "status": "PASS", "message": owner_message})
+                attempt_record = {"attempt": attempt, "status": "PASS", "message": owner_message}
+                if executor_evidence_rel:
+                    attempt_record["executor_evidence_path"] = executor_evidence_rel
+                attempts.append(attempt_record)
                 append_event(run_root, "OwnerCompleted", node_id=node_id, owner=owner_name, attempt=attempt, status="PASS")
                 append_event(run_root, "NodeGatePassed", node_id=node_id, gate=str(node.get("gate", "none")).strip() or "none")
                 break
@@ -420,6 +590,9 @@ def run_graph(args: argparse.Namespace) -> Dict[str, Any]:
             "attempts": attempts,
             "outputs": [safe_rel(str(item)) for item in node.get("output_refs", []) if str(item).strip()],
         }
+        if attempts and attempts[-1].get("executor_evidence_path"):
+            node_result["executor_evidence_path"] = attempts[-1]["executor_evidence_path"]
+            node_result["executor_provider"] = provider
         node_results.append(node_result)
         if node_status != "PASS":
             status = "FAIL"
@@ -429,6 +602,11 @@ def run_graph(args: argparse.Namespace) -> Dict[str, Any]:
             append_event(run_root, "NodeGateFailed", node_id=node_id, owner=owner_name, reason=failure_reason or "node_failed")
             break
 
+    if status == "PASS" and manual_finalizer_required:
+        status = "BLOCKED"
+        failure_kind = "none"
+        failure_reason = "current-agent/manual executor evidence requires finalizer verification"
+        append_event(run_root, "ManualExecutorAwaitingFinalizer", status=status, provider=provider)
     append_event(run_root, "TargetRuntimeCompleted", status=status, failure_kind=failure_kind, reason=failure_reason)
     state = {
         "schema_version": 1,
@@ -441,6 +619,9 @@ def run_graph(args: argparse.Namespace) -> Dict[str, Any]:
         "spec": str(spec_path),
         "entry_skill": args.entry_skill,
         "provider": provider,
+        "executor_provider": provider,
+        "executor_mode": "manual_evidence" if manual_finalizer_required else "automatic",
+        "manual_finalizer_required": manual_finalizer_required,
         "node_results_path": "node-results.json",
         "events_path": "target-events.jsonl",
         "artifact_provenance_path": "artifact-provenance.json",
@@ -457,6 +638,9 @@ def run_graph(args: argparse.Namespace) -> Dict[str, Any]:
         "run_root": str(run_root),
         "target_root": str(target_root),
         "output_root": str(output_root),
+        "executor_provider": provider,
+        "executor_mode": "manual_evidence" if manual_finalizer_required else "automatic",
+        "manual_finalizer_required": manual_finalizer_required,
         "node_count": len(node_results),
         "artifact_count": len(provenance),
     }
@@ -470,6 +654,7 @@ def write_failure_evidence(args: argparse.Namespace, error: str) -> Dict[str, An
     run_root = Path(getattr(args, "run_root", ".")).resolve()
     target_root = Path(getattr(args, "target_root", ".")).resolve()
     spec_path = Path(getattr(args, "spec", "") or ".").resolve()
+    failure_kind = "environment" if "executor provider" in error else "implementation"
     run_root.mkdir(parents=True, exist_ok=True)
     (run_root / "outputs" / "stages").mkdir(parents=True, exist_ok=True)
     if not (run_root / "target-events.jsonl").exists():
@@ -480,7 +665,7 @@ def write_failure_evidence(args: argparse.Namespace, error: str) -> Dict[str, An
             entry_skill=str(getattr(args, "entry_skill", "")),
             provider=str(getattr(args, "runtime_provider", "") or "unknown"),
         )
-    append_event(run_root, "TargetRuntimeCompleted", status="FAIL", failure_kind="implementation", reason=error)
+    append_event(run_root, "TargetRuntimeCompleted", status="FAIL", failure_kind=failure_kind, reason=error)
     write_json(run_root / "node-results.json", {"schema_version": 1, "nodes": []})
     write_json(run_root / "artifact-provenance.json", {"schema_version": 1, "artifacts": []})
     state = {
@@ -488,12 +673,15 @@ def write_failure_evidence(args: argparse.Namespace, error: str) -> Dict[str, An
         "schema_name": "target-workflow-runtime-state",
         "run_id": run_root.name,
         "status": "FAIL",
-        "failure_kind": "implementation",
+        "failure_kind": failure_kind,
         "failure_reason": error,
         "target_root": str(target_root),
         "spec": str(spec_path),
         "entry_skill": str(getattr(args, "entry_skill", "")),
         "provider": str(getattr(args, "runtime_provider", "") or "unknown"),
+        "executor_provider": str(getattr(args, "runtime_provider", "") or "unknown"),
+        "executor_mode": "unavailable",
+        "manual_finalizer_required": False,
         "node_results_path": "node-results.json",
         "events_path": "target-events.jsonl",
         "artifact_provenance_path": "artifact-provenance.json",
@@ -503,7 +691,7 @@ def write_failure_evidence(args: argparse.Namespace, error: str) -> Dict[str, An
     summary = {
         "schema_version": 1,
         "status": "FAIL",
-        "failure_kind": "implementation",
+        "failure_kind": failure_kind,
         "failure_reason": error,
         "run_root": str(run_root),
         "target_root": str(target_root),
@@ -546,7 +734,13 @@ def main() -> int:
         print(json.dumps(summary, ensure_ascii=False, indent=2))
     else:
         print(f"[{summary['status']}] target runtime run_root={summary['run_root']}")
-    return 0 if summary["status"] == "PASS" else 1
+    if summary["status"] == "PASS":
+        return 0
+    if summary["status"] == "BLOCKED":
+        return 2
+    if summary["status"] == "ENVIRONMENT-SKIP":
+        return 3
+    return 1
 
 
 if __name__ == "__main__":

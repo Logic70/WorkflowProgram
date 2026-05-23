@@ -397,6 +397,17 @@ target_runtime_policy:
     - .workflowprogram/runtime/**
     - config/scripts/**
 
+target_executor_policy:
+  # 不假设本机存在可用的 claude -p。ClaudeCode 当前会话/第三方模型场景默认走 current_agent 证据模式。
+  default_provider: current_agent
+  allowed_providers:
+    - fixture_host
+    - command_adapter
+    - current_agent
+    - manual
+  evidence_dir: outputs/stages/executor-evidence
+  unsupported_provider_verdict: FAIL
+
 target_publish_policy:
   enabled: true
   run_scoped_outputs_required: true
@@ -413,6 +424,7 @@ target_publish_policy:
       status_field: status
       pass_values:
         - PASS
+        - BLOCKED
   publish_artifacts: []
 
 # 可选能力搜索与推荐契约

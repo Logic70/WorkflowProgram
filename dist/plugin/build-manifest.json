@@ -1,25 +1,25 @@
 {
   "manifest_version": 1,
-  "generated_at": "2026-05-23T05:17:30Z",
+  "generated_at": "2026-05-23T17:37:44Z",
   "builder": "tools/build_plugin.py",
   "plugin_name": "workflowprogram-cn",
-  "plugin_version": "0.1.13",
-  "source_commit": "85b0ae36a560b7a8b0a4160178d37c0492131190",
+  "plugin_version": "0.1.14",
+  "source_commit": "7f6db72bca2b4ef681312ac819dab8ac3b5356a7",
   "source_dirty": true,
   "files": [
     {
       "path": ".claude-plugin/README.md",
-      "sha256": "a09e986234793f3e3756e9b0adcf52822e71fd9d55aa01a431ffeda1119fb2a0",
+      "sha256": "8c0e056007f5368c490e8e060f4375dc5b1f835589b2523ad14d28ffc02c1ddd",
       "size": 7665
     },
     {
       "path": ".claude-plugin/marketplace.json",
-      "sha256": "45c07a6606b77f1547cf63cf2a7ea7c2a8f61ff510d9d46e1e402e72d69c84d8",
+      "sha256": "eb0df5cf8ed3e3a0c6b980c4cac2638ab8feee777b1851a23c12a3da123be786",
       "size": 1180
     },
     {
       "path": ".claude-plugin/plugin.json",
-      "sha256": "1d0a333d40bafc8d75854ad088d261ba4a00956721796ff578bf1a2d698faa12",
+      "sha256": "a7c252d1ebe3ec19bbeb2b55d8ad247b9e5189fbe1597be21a52bab57fa84384",
       "size": 607
     },
     {
@@ -184,8 +184,8 @@
     },
     {
       "path": "scripts/generate-target-runtime.py",
-      "sha256": "5f04a7add86f692d560230358167154d3ff50a2099a6bbce64129130233f8197",
-      "size": 32400
+      "sha256": "395c5a3eb77cfdcb574176c8751e7dc18870d2a4f7606ebf17cf27ff1b82fdea",
+      "size": 32883
     },
     {
       "path": "scripts/generate-workflow-lowlevel.py",
@@ -319,13 +319,13 @@
     },
     {
       "path": "scripts/target-runtime-finalizer.py",
-      "sha256": "a996fe54b52f3008c48e046d0189d1046edc725e241a731f1007ffe18abe385b",
-      "size": 14592
+      "sha256": "dcd31ebc4aeba52ee08fa5e4bfb4e25b9c0cba4698041a821c57524d8e4a16b4",
+      "size": 17449
     },
     {
       "path": "scripts/target-workflow-runner.py",
-      "sha256": "5e6acd6df95cf69f86312b5108c72345866ccea763273970a23ae6e149aeeade",
-      "size": 23245
+      "sha256": "41abfb0df4efa13a735bcb1ac10fb8590ad1705e9ba48bfb01b6439b0489a3af",
+      "size": 32797
     },
     {
       "path": "scripts/validate-change-policy.py",
@@ -339,8 +339,8 @@
     },
     {
       "path": "scripts/validate-generated-runtime.py",
-      "sha256": "d3a86115d3dc28a93430728d0fc9104d30c4ac3761c669918e2a3ed3e3cf200a",
-      "size": 14806
+      "sha256": "353b25d55cda26e4ed4a9d2a520585129b62efb3bdd1e9438a8841ce3e136701",
+      "size": 16254
     },
     {
       "path": "scripts/validate-lessons-delta.py",
@@ -374,8 +374,8 @@
     },
     {
       "path": "scripts/validate-target-runtime-state.py",
-      "sha256": "eaa6929b5e059e35a00639cdf13ab4eaf17c9915d7f8317ac8eb66b57bce56c9",
-      "size": 5861
+      "sha256": "816c30c1321064e416ada9317e8f9a69fa71e4ff84be2016587f8cd1167be274",
+      "size": 9410
     },
     {
       "path": "scripts/validate-workflow-draft.py",
@@ -394,8 +394,8 @@
     },
     {
       "path": "scripts/validate-workflow-spec.py",
-      "sha256": "4b031e1c82c273e9dfedc2629284dff0cf6108972a701cd9fa5b0ca548597cdf",
-      "size": 101701
+      "sha256": "40ee04a5f128bacf6a2e5a62c398378e17c385c670d51904e0cbdc7cda9037f9",
+      "size": 104584
     },
     {
       "path": "scripts/validate-workflow.ps1",
@@ -469,8 +469,8 @@
     },
     {
       "path": "skills/workflow-spec-support/spec-template.md",
-      "sha256": "9e59f737a2edc33c99e84f7cd8b6ff6b5ec5ed700ddc779fb501ae2d1853d189",
-      "size": 7230
+      "sha256": "1760bd32d3ed294c51071858ca8243784ffc4edc09c1230f776267bcbf17dee2",
+      "size": 7806
     },
     {
       "path": "skills/workflow-spec-support/target-node-design-template.md",
@@ -484,8 +484,8 @@
     },
     {
       "path": "skills/workflow-spec-support/yaml-spec-template.md",
-      "sha256": "c6ad0f80a80744a27442cfb2401b8ffe05eee947e971d149ad32741b29949403",
-      "size": 17548
+      "sha256": "ff1a6323fc2a3bb6f1698a436cb9d56a9433c1267bd276fb49028554063c3bc1",
+      "size": 17938
     },
     {
       "path": "skills/workflowprogram-audit/SKILL.md",
@@ -494,8 +494,8 @@
     },
     {
       "path": "skills/workflowprogram-develop/SKILL.md",
-      "sha256": "1fda0f0ffe358c11ff8b406b1d548d47fc4aefb0c3c8b4912ced1cac7964ccf1",
-      "size": 18307
+      "sha256": "213b63c12241a431f5feb0791bff718566533fc3ec7d703b1fd2d30bde810994",
+      "size": 18959
     },
     {
       "path": "skills/workflowprogram-iterate/SKILL.md",

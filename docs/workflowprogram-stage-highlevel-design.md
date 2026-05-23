@@ -20,6 +20,7 @@
 - 自然语言自动触发策略仅开放 `workflowprogram-orchestrate`，并通过 `route-intent.py` 提供确定性路由（strict 模式可硬阻断歧义）。
 - 主产品入口的确定性脚本链为 `workflow-entry.py -> (validate spec/view/lowlevel/target-runtime, managed-assets, probe/apply bootstrap) -> workflow-runner.py -> validate-run-state.py`；叶子 skill 不应只靠提示词顺序隐式串联这些脚本。
 - 生成后的目标工作流也必须交付自己的 `.workflowprogram/runtime/` 控制面包装层；当前固定模式为 `shared-control-plane-wrapper`，但目标业务图执行必须由 `target_runtime_policy.mode=managed_runtime` 下的 `target-workflow-runner.py` 消费 `workflow_graph.nodes`，不得只靠 command prompt 口头顺序。
+- 目标业务图 executor 必须由 `target_executor_policy` 声明；不得硬编码或默认假设 `claude -p` 可用。ClaudeCode 当前会话、第三方 API 模型或人工协作只能走 `current_agent` / `manual` 证据模式，由 finalizer 复核后才能 PASS。
 - 生成后的目标工作流若有最终报告、manifest、latest marker 或长期复用输出，还必须交付 `target_publish_policy` 和 `target-runtime-finalizer.py` 事务层；节点输出先进入 run-scoped workspace，最终 `PASS/COMPLETE` 只能由 finalizer 在校验当前 run 证据后原子发布。
 - 目标项目写入采用 staged candidate + managed apply 流程。
 - 运行证据统一写入 `TARGET_ROOT/.workflowprogram/runs/<run-id>/`。
@@ -228,6 +229,7 @@ TARGET_ROOT/
   - 当声明 `agent_team_contract.enabled=true` 时，`generated_runtime_contract.runtime_capabilities` 必须包含 `team_orchestration`。
   - 当任一 `workflow_graph.nodes[*].loop_policy.enabled=true` 时，`generated_runtime_contract.runtime_capabilities` 必须包含 `node_loop_execution`。
   - 新生成的目标工作流必须声明 `target_runtime_policy.mode=managed_runtime`，且 `generated_runtime_contract.runtime_capabilities` 必须包含 `target_managed_runtime`。
+  - 新生成的目标工作流必须声明 `target_executor_policy`；若 provider 不可自动执行节点，runner 不得直接 PASS，只能在结构化 executor evidence 完整时进入 `BLOCKED`，由 finalizer 校验后提升为 `PASS`。
   - 新生成的目标工作流若声明 `target_publish_policy.enabled=true`，则 `generated_runtime_contract.runtime_capabilities` 必须包含 `target_atomic_publish`，并由 `target-runtime-finalizer.py` 统一发布最终产物。
   - 领域画像可选地推荐默认 `agent_team_contract`，但推荐值必须保持可编辑，且不得覆盖用户显式选择。
   - `workflow-spec.md` 是用户回读确认材料；完整设计推理落在 S3 设计源；真正进入脚本、validator、runner、judge 的执行语义必须投影到 `workflow-spec.yaml`。
@@ -312,6 +314,8 @@ TARGET_ROOT/
   - 目标工作流 deterministic runtime 的机器契约；当前模式固定为 `shared-control-plane-wrapper`
 - 可选 `target_runtime_policy`
   - 目标工作流业务图的受控执行策略；新生成工作流默认 `mode=managed_runtime`，要求 command wrapper-only、node lifecycle 事件、owner 解析、output contract、immutable path 和 artifact provenance 由代码校验
+- 可选 `target_executor_policy`
+  - 目标业务节点 executor provider 契约；声明 `fixture_host` / `command_adapter` 自动执行，或 `current_agent` / `manual` 结构化证据执行，禁止依赖 `claude -p` 超时路径
 - 可选 `capability_discovery`
   - 目标能力发现与推荐契约，用于在 `host_capabilities` 最终定稿前生成候选 `skill / MCP / CLI` 清单
 - 可选 `host_capabilities`

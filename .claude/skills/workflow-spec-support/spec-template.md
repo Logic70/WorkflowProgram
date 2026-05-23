@@ -6,6 +6,7 @@
 > `workflow-spec.yaml` 是机器语义真源与运行态地图；完整目标工作流设计推理应保留在 `target-design-overview.md` / `target-design-detail.md` / 条件性 `target-node-designs/**` 中。
 > 复杂、loop、工具重、逆向、安全或多下游节点的 node-design 必须参考 `target-node-design-template.md`，并能通过 `validate-target-node-design.py`。
 > 新生成目标工作流默认使用 `target_runtime_policy.mode=managed_runtime`：用户命令只作为 wrapper 启动 `.workflowprogram/runtime/workflow-entry.py`，目标业务节点由 `target-workflow-runner.py` 按 `workflow_graph.nodes` 执行并记录 provenance。
+> 目标 runtime 不假设 `claude -p` 可用；执行节点必须通过 `target_executor_policy` 选择 `fixture_host` / `command_adapter` 自动 provider，或通过 `current_agent` / `manual` provider 提交结构化 executor evidence，再由 finalizer 决定能否 PASS。
 > 若目标 workflow 会生成最终报告或可复用输出，默认启用 `target_publish_policy.enabled=true`：节点只能先写 run-scoped outputs，`target-runtime-finalizer.py` 统一校验 state/node/provenance/report 后原子发布，禁止业务节点直接声明 final PASS/COMPLETE。
 
 ## Workflow Identity
@@ -146,6 +147,8 @@
 - 每个 graph 节点的输入、输出、gate、owner：
 - 每个 graph 节点的执行模型（skill / agent / script / team / loop）：
 - 目标 runtime policy：`managed_runtime` / 例外理由
+- 目标 executor policy：默认 provider、允许 provider、manual/current-agent evidence 路径、不可用 provider 的 FAIL 行为
+- 若使用 `current_agent` / `manual` provider，每个 node 的 executor evidence 必须记录哪些输入、输出、operator、时间戳和 output sha256：
 - 目标 publish policy：是否启用 run-scoped outputs + finalizer + atomic publish；最终输出目录、latest marker、manifest 路径
 - command 是否 wrapper-only 调用 `.workflowprogram/runtime/workflow-entry.py`：
 - 运行态 immutable paths（通常为 `.claude/**`、`.workflowprogram/design/**`、`.workflowprogram/runtime/**`、`config/scripts/**`）：

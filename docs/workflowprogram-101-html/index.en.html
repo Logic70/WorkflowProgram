@@ -259,6 +259,10 @@
             <strong>Complex node design:</strong>
             <span>Complex, loop-enabled, tool-heavy, reverse-engineering/security, or multi-downstream nodes need <code>target-node-designs/&lt;node-id&gt;.md</code>. It must align with <code>workflow_graph.nodes[*]</code> owner, template, gate, inputs, outputs, and loop policy, and is checked by <code>validate-target-node-design.py</code> plus S5.</span>
           </div>
+          <div class="note-strip">
+            <strong>Target executor:</strong>
+            <span>The generated target runtime no longer assumes <code>claude -p</code> exists. <code>target_executor_policy</code> chooses an automatic provider, or requires <code>current_agent/manual</code> executor evidence per node before the finalizer can publish.</span>
+          </div>
         </section>
 
         <section class="panel" id="orchestration">
@@ -284,7 +288,7 @@
 
           <div class="note-strip">
             <strong>Current mapping</strong>
-            <span>`workflow-entry.py` sequences the product chain. `workflow-runner.py` governs WorkflowProgram S0-S6. `target-workflow-runner.py` governs generated target `workflow_graph` execution. `target-runtime-finalizer.py` publishes current-run target outputs atomically. `workflowprogram-validate` and `workflow-s5-judge.py` produce the verdict.</span>
+            <span>`workflow-entry.py` sequences the product chain. `workflow-runner.py` governs WorkflowProgram S0-S6. `target-workflow-runner.py` governs generated target `workflow_graph` execution with `target_executor_policy`. `target-runtime-finalizer.py` publishes current-run target outputs atomically. `workflowprogram-validate` and `workflow-s5-judge.py` produce the verdict.</span>
           </div>
 
           <div class="note-strip">

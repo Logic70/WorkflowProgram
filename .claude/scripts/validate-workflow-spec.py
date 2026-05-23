@@ -57,6 +57,7 @@ OPTIONAL_TOP_KEYS = {
     "agent_team_contract",
     "workflow_graph",
     "target_runtime_policy",
+    "target_executor_policy",
     "target_publish_policy",
 }
 
@@ -106,6 +107,8 @@ VALID_TARGET_RUNTIME_ENTRY_MODES = {"wrapper_only"}
 VALID_TARGET_RUNTIME_GRAPH_SOURCES = {"workflow_graph"}
 VALID_TARGET_RUNTIME_OWNER_FAILURE = {"terminal"}
 VALID_TARGET_RUNTIME_OUTPUT_FAILURE = {"retry_then_terminal", "terminal"}
+VALID_TARGET_EXECUTOR_PROVIDERS = {"fixture_host", "command_adapter", "current_agent", "manual"}
+VALID_TARGET_EXECUTOR_UNSUPPORTED_VERDICTS = {"FAIL"}
 FORBIDDEN_TARGET_PUBLISH_PREFIXES = (".claude/", ".workflowprogram/", "config/scripts/")
 REQUIRED_FAILURE_KINDS = {"none", "design", "implementation", "environment", "conflict"}
 VALID_ENV_SKIP_CHECKS = {
@@ -778,6 +781,45 @@ def validate_target_runtime_policy(
                         errors,
                         f"workflow_graph output_ref conflicts with target_runtime_policy.immutable_during_run: {output_ref} matches {pattern}",
                     )
+
+
+def validate_target_executor_policy(
+    target_executor_policy: Dict[str, Any],
+    errors: List[str],
+    warnings: List[str],
+) -> None:
+    """Validate target workflow executor provider policy."""
+
+    if not target_executor_policy:
+        add_warn(warnings, "target_executor_policy is not declared; default provider is current_agent evidence mode")
+        return
+    default_provider = str(target_executor_policy.get("default_provider", "")).strip().replace("-", "_")
+    if default_provider not in VALID_TARGET_EXECUTOR_PROVIDERS:
+        add_error(errors, f"target_executor_policy.default_provider must be one of {sorted(VALID_TARGET_EXECUTOR_PROVIDERS)}")
+    allowed = target_executor_policy.get("allowed_providers", [])
+    if not isinstance(allowed, list) or not allowed:
+        add_error(errors, "target_executor_policy.allowed_providers must be a non-empty list")
+        allowed_values: List[str] = []
+    else:
+        allowed_values = [str(item).strip().replace("-", "_") for item in allowed if str(item).strip()]
+        for idx, value in enumerate(allowed_values):
+            if value not in VALID_TARGET_EXECUTOR_PROVIDERS:
+                add_error(errors, f"target_executor_policy.allowed_providers[{idx}] must be one of {sorted(VALID_TARGET_EXECUTOR_PROVIDERS)}")
+    if default_provider and allowed_values and default_provider not in allowed_values:
+        add_error(errors, "target_executor_policy.default_provider must be listed in allowed_providers")
+    evidence_dir = str(target_executor_policy.get("evidence_dir", "")).strip()
+    if not safe_relative_path(evidence_dir):
+        add_error(errors, "target_executor_policy.evidence_dir must be a safe relative path")
+    elif not path_under(evidence_dir, "outputs/stages"):
+        add_error(errors, "target_executor_policy.evidence_dir must stay under outputs/stages")
+    unsupported = str(target_executor_policy.get("unsupported_provider_verdict", "")).strip()
+    if unsupported not in VALID_TARGET_EXECUTOR_UNSUPPORTED_VERDICTS:
+        add_error(
+            errors,
+            f"target_executor_policy.unsupported_provider_verdict must be one of {sorted(VALID_TARGET_EXECUTOR_UNSUPPORTED_VERDICTS)}",
+        )
+    if any(value in {"manual", "current_agent"} for value in allowed_values) and not evidence_dir:
+        add_error(errors, "target_executor_policy.evidence_dir is required when manual/current_agent providers are allowed")
 
 
 def validate_target_publish_policy(
@@ -2023,6 +2065,13 @@ def validate_spec(spec: Dict[str, Any]) -> Dict[str, Any]:
         else {}
     )
     validate_target_runtime_policy(target_runtime_policy, workflow_graph, generated_runtime_contract, errors, warnings)
+
+    target_executor_policy = (
+        require_mapping(spec.get("target_executor_policy", {}), "target_executor_policy", errors)
+        if "target_executor_policy" in spec
+        else {}
+    )
+    validate_target_executor_policy(target_executor_policy, errors, warnings)
 
     target_publish_policy = (
         require_mapping(spec.get("target_publish_policy", {}), "target_publish_policy", errors)

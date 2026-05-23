@@ -476,7 +476,33 @@ target_runtime_policy:
 6. `artifact_provenance_required=true` 时，`target-state.json` PASS 必须能追溯每个 graph output 的 owner/node/provenance。
 7. `immutable_during_run` 中的路径不得被 `workflow_graph.nodes[*].output_refs` 声明为运行态输出。
 
-#### 2.5.5C `target_publish_policy`（目标最终发布事务策略）
+#### 2.5.5C `target_executor_policy`（目标业务节点 executor 策略）
+
+`workflow-spec.yaml.target_executor_policy` 声明目标业务节点由哪类 provider 执行。它不能假设本机 `claude -p` 可用；ClaudeCode 当前会话使用第三方 API 模型时，应走 `current_agent` 证据模式。
+
+```yaml
+target_executor_policy:
+  default_provider: current_agent
+  allowed_providers:
+    - fixture_host
+    - command_adapter
+    - current_agent
+    - manual
+  evidence_dir: outputs/stages/executor-evidence
+  unsupported_provider_verdict: FAIL
+```
+
+固定约束：
+
+1. provider 只允许 `fixture_host | command_adapter | current_agent | manual`。
+2. `fixture_host` / `command_adapter` 是自动 provider，可由 `target-workflow-runner.py` 直接执行或物化节点输出。
+3. `current_agent` / `manual` 不是自动 executor；runner 必须校验每个 node 的 `executor-evidence/<node-id>.json`，证据完整时只进入 `BLOCKED`，不能直接 `PASS`。
+4. executor evidence 必须包含 `schema_version`、`provider`、`node_id`、`status`、`operator`、`started_at`、`completed_at`、`input_refs`、`output_refs`、`outputs[].path` 与可选 `outputs[].sha256`。
+5. `target-runtime-finalizer.py` 必须重新校验 manual/current-agent evidence、`node-results.json`、`artifact-provenance.json` 与 required reports；全部通过后才可把 `target-state.status` 提升为 `PASS` 并发布。
+6. unsupported provider 或 provider 不在 allowlist 时，运行必须 `FAIL` 且不得 publish。
+7. `claude_cli` / `claude -p` 不属于目标 runtime V1 provider；若未来支持，必须作为显式 provider 插件新增，不得回到硬编码默认。
+
+#### 2.5.5D `target_publish_policy`（目标最终发布事务策略）
 
 `workflow-spec.yaml.target_publish_policy` 用于把目标工作流最终输出从“节点直接写最终目录”改为“run-scoped workspace + finalizer + atomic publish”。新生成的报告类或长期复用输出类 workflow 默认启用：
 
@@ -495,7 +521,7 @@ target_publish_policy:
   required_reports:
     - path: outputs/stages/target-runtime-summary.json
       status_field: status
-      pass_values: [PASS]
+      pass_values: [PASS, BLOCKED]
   publish_artifacts: []
 ```
 
@@ -598,7 +624,7 @@ target_publish_policy:
 6. 若 `goal_source=model_subgoal`，必须声明 `parent_goal_ref`。
 7. 若 `tdd_policy.enabled=true` 且 `test_first_required=true`，S5 必须看到 test-first 证据。
 8. loop 成功不能依赖模型自报；`final-verdict.json.status=PASS` 必须有 verifier/test pass 证据。
-9. 确定性 provider（`fixture_host`、`command_adapter`）缺结构化 loop evidence 必须 `FAIL`；`claude_cli` V1 缺结构化 evidence 只能 `WARN`，不得 clean PASS。
+9. 自动 provider（`fixture_host`、`command_adapter`）缺结构化 loop evidence 必须 `FAIL`；`current_agent` / `manual` 缺结构化 loop evidence 也不得 clean PASS，必须通过 executor evidence 与 loop evidence 后由 finalizer 复核。
 
 #### 2.5.6 `capability_discovery`（能力发现与推荐契约）
 
@@ -704,7 +730,7 @@ target_publish_policy:
 执行策略：
 
 - `fixture_host / command_adapter` 必须执行 full orchestration，并按契约生成 team evidence。
-- `claude_cli` 第一版只校验证据与契约，不承诺强调度；缺结构化 team evidence 时只能降为 `WARN`，不得视作 clean PASS。
+- `current_agent / manual` 不承诺强调度；必须提交结构化 team evidence 与 executor evidence，缺证据时不得视作 clean PASS。
 
 其中：
 
@@ -1117,9 +1143,10 @@ WorkflowProgram 自身必须按原子能力组织，每个 Stage 必须可拆分
 21. 若声明 `workflow_graph`，validator 必须校验 graph entrypoints、nodes、transitions、templates_used、可达性与目标资产声明。
 22. 若声明 `workflow_graph.nodes[*].loop_policy.enabled=true`，则 validator 必须校验 loop policy、要求 `node_loop_execution` runtime capability，并确保 loop evidence 路径位于 `outputs/stages/loops/<node_id>/**`。
 23. 若声明 `target_runtime_policy.mode=managed_runtime`，则 validator 必须要求 `target_managed_runtime` capability，并拒绝 graph outputs 与 immutable paths 冲突。
-24. 若声明 `target_publish_policy.enabled=true`，则 validator 必须要求 `target_atomic_publish` capability，并拒绝 graph outputs 位于 `publish_root` 外。
-25. `design-review-packet.json`、`issues.json`、`closure.json` 与 `gate-validation.json` 必须存在；`gate-validation.json.status` 必须为 `PASS`。
-26. `closure.json.artifact_fingerprints` 必须覆盖当前 packet 中记录的 S1/S2/S3/YAML 输入，且不得存在 stale artifact。
+24. 若声明 `target_executor_policy`，validator 必须拒绝 unsupported provider、缺 evidence_dir、默认 provider 不在 allowlist，以及任何隐式 `claude_cli` executor 假设。
+25. 若声明 `target_publish_policy.enabled=true`，则 validator 必须要求 `target_atomic_publish` capability，并拒绝 graph outputs 位于 `publish_root` 外。
+26. `design-review-packet.json`、`issues.json`、`closure.json` 与 `gate-validation.json` 必须存在；`gate-validation.json.status` 必须为 `PASS`。
+27. `closure.json.artifact_fingerprints` 必须覆盖当前 packet 中记录的 S1/S2/S3/YAML 输入，且不得存在 stale artifact。
 
 ### 实现方案
 
@@ -1310,8 +1337,8 @@ WorkflowProgram 自身必须按原子能力组织，每个 Stage 必须可拆分
 10. 若声明 `capability_discovery`，则 `host-capability-candidates.json` 与 `host-bootstrap-instructions.md` 必须被 S5 消费。
 11. 若声明 `host_capabilities`，则 `host-capability-report.json` 必须被 S5 消费；required 缺失应判为 `FAIL/environment`，optional 缺失只记 `INFO`。
 12. 若声明 `host_capabilities`，则 `environment-remediation-report.json` 与 `environment-remediation-guide.md` 也必须被 S5 消费；`validate/audit` 必须让 unresolved manual steps 对用户可见。
-13. 若声明 `agent_team_contract.enabled=true`，则确定性 provider 缺 team evidence 必须 `FAIL`；`claude_cli` 缺结构化 team evidence 只能 `WARN`。
-14. 若声明 `workflow_graph.nodes[*].loop_policy.enabled=true`，则确定性 provider 缺 loop evidence、超过 `max_iterations`、PASS 缺 verifier、模型子目标缺 `parent_goal_ref`、TDD 缺 test-first 证据都必须由 S5 判定为失败；`claude_cli` 缺结构化 loop evidence 只能 `WARN`。
+13. 若声明 `agent_team_contract.enabled=true`，则自动 provider 缺 team evidence 必须 `FAIL`；`current_agent` / `manual` 缺结构化 team evidence 不得 clean PASS。
+14. 若声明 `workflow_graph.nodes[*].loop_policy.enabled=true`，则自动 provider 缺 loop evidence、超过 `max_iterations`、PASS 缺 verifier、模型子目标缺 `parent_goal_ref`、TDD 缺 test-first 证据都必须由 S5 判定为失败；`current_agent` / `manual` 缺结构化 loop evidence 不得 clean PASS。
 
 ### 实现方案
 

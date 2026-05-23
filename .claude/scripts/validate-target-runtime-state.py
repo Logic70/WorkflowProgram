@@ -13,6 +13,7 @@ from typing import Any, Dict, List
 REQUIRED_EVENTS = {"TargetRuntimeStarted", "TargetRuntimeCompleted"}
 VALID_STATUS = {"PASS", "WARN", "FAIL", "BLOCKED", "ENVIRONMENT-SKIP"}
 VALID_FAILURE_KIND = {"none", "design", "implementation", "environment", "conflict"}
+MANUAL_EXECUTOR_PROVIDERS = {"current_agent", "manual"}
 
 
 def parse_args() -> argparse.Namespace:
@@ -57,6 +58,65 @@ def load_events(path: Path, errors: List[str]) -> List[Dict[str, Any]]:
     return events
 
 
+def safe_rel(path_text: str) -> str:
+    cleaned = path_text.strip().replace("\\", "/")
+    while cleaned.startswith("./"):
+        cleaned = cleaned[2:]
+    if not cleaned or cleaned.startswith("/") or ".." in cleaned.split("/"):
+        raise ValueError(f"unsafe relative path: {path_text}")
+    return cleaned
+
+
+def validate_executor_evidence(
+    run_root: Path,
+    node: Dict[str, Any],
+    provider: str,
+    provenance_paths: set[str],
+    errors: List[str],
+) -> None:
+    node_id = str(node.get("node_id", "")).strip()
+    evidence_rel = str(node.get("executor_evidence_path", "")).strip()
+    if not evidence_rel:
+        errors.append(f"manual/current-agent node missing executor_evidence_path: {node_id}")
+        return
+    try:
+        evidence_path = run_root / safe_rel(evidence_rel)
+    except ValueError as exc:
+        errors.append(str(exc))
+        return
+    evidence = load_json(evidence_path, errors)
+    if not evidence:
+        return
+    if int(evidence.get("schema_version", 0) or 0) != 1:
+        errors.append(f"executor evidence schema_version must be 1: {evidence_rel}")
+    if str(evidence.get("node_id", "")).strip() != node_id:
+        errors.append(f"executor evidence node_id mismatch: {evidence_rel}")
+    if str(evidence.get("provider", "")).strip() != provider:
+        errors.append(f"executor evidence provider mismatch: {evidence_rel}")
+    if str(evidence.get("status", "")).strip() != "PASS":
+        errors.append(f"executor evidence status must be PASS: {evidence_rel}")
+    for field in ("operator", "started_at", "completed_at"):
+        if not str(evidence.get(field, "")).strip():
+            errors.append(f"executor evidence {field} is required: {evidence_rel}")
+    if not isinstance(evidence.get("input_refs", []), list):
+        errors.append(f"executor evidence input_refs must be a list: {evidence_rel}")
+    if not isinstance(evidence.get("output_refs", []), list):
+        errors.append(f"executor evidence output_refs must be a list: {evidence_rel}")
+    outputs = evidence.get("outputs", [])
+    if not isinstance(outputs, list) or not outputs:
+        errors.append(f"executor evidence outputs must be a non-empty list: {evidence_rel}")
+        return
+    for output in outputs:
+        output_rel = str(output.get("path", "") if isinstance(output, dict) else output).strip()
+        try:
+            rel = safe_rel(output_rel)
+        except ValueError as exc:
+            errors.append(str(exc))
+            continue
+        if rel not in provenance_paths:
+            errors.append(f"executor evidence output lacks artifact provenance: {rel}")
+
+
 def validate_state(state_path: Path) -> Dict[str, Any]:
     errors: List[str] = []
     warnings: List[str] = []
@@ -90,6 +150,15 @@ def validate_state(state_path: Path) -> Dict[str, Any]:
         errors.append("artifact-provenance.json.artifacts must be a list")
         artifacts = []
     provenance_paths = {str(item.get("path", "")).strip() for item in artifacts if isinstance(item, dict)}
+    provider = str(state.get("executor_provider", state.get("provider", ""))).strip()
+    manual_provider = provider in MANUAL_EXECUTOR_PROVIDERS
+    if status == "BLOCKED":
+        if not manual_provider:
+            errors.append("BLOCKED target state is only allowed for current_agent/manual executor providers")
+        if state.get("manual_finalizer_required") is not True:
+            errors.append("BLOCKED current-agent/manual state requires manual_finalizer_required=true")
+    if status == "PASS" and manual_provider and str(state.get("finalizer_status", "")).strip() != "PASS":
+        errors.append("manual/current-agent target-state PASS requires finalizer_status=PASS")
     for idx, raw_node in enumerate(nodes):
         if not isinstance(raw_node, dict):
             errors.append(f"nodes[{idx}] must be object")
@@ -106,11 +175,13 @@ def validate_state(state_path: Path) -> Dict[str, Any]:
         if not isinstance(outputs, list):
             errors.append(f"nodes[{idx}].outputs must be a list")
             outputs = []
-        if status == "PASS":
+        if status in {"PASS", "BLOCKED"}:
             for output in outputs:
                 rel = str(output).strip()
                 if rel and not rel.startswith("$") and "/" in rel and rel not in provenance_paths:
                     errors.append(f"missing artifact provenance for output: {rel}")
+        if manual_provider and status in {"PASS", "BLOCKED"} and node_status == "PASS":
+            validate_executor_evidence(run_root, raw_node, provider, provenance_paths, errors)
 
     if status == "PASS" and failure_kind != "none":
         errors.append("PASS target state must use failure_kind=none")

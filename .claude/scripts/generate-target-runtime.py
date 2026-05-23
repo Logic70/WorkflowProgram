@@ -336,9 +336,9 @@ def parse_args() -> argparse.Namespace:
     run.add_argument("--request", default="", help="Original request text")
     run.add_argument("--intent", default=DEFAULT_INTENT, help="Logical intent for this invocation")
     run.add_argument("--entry-skill", default=DEFAULT_ENTRY_SKILL, help="Entry name for this generated workflow")
-    run.add_argument("--runtime-provider", default="", help="Runtime host provider override")
+    run.add_argument("--runtime-provider", default="", help="Executor provider override; defaults to target_executor_policy.default_provider")
     run.add_argument("--provider-command", default="", help="Provider command for command_adapter")
-    run.add_argument("--claude-bin", default="claude", help="Claude binary for claude_cli")
+    run.add_argument("--claude-bin", default="", help="Deprecated no-op; target runtime does not invoke Claude CLI")
     run.add_argument("--auto-approve", action="store_true", help="Resolve approval gate automatically")
     run.add_argument("--approve-host-global-bootstrap", action="store_true", help="Deprecated no-op; host-global bootstrap is plan-only")
     run.add_argument("--approval-status", default="", choices=["approved"], help="Resolve approval gate as manually approved")
@@ -420,8 +420,6 @@ def main() -> int:
         args.runtime_provider,
         "--provider-command",
         args.provider_command,
-        "--claude-bin",
-        args.claude_bin,
         "--json",
     ]
     if args.auto_approve:
@@ -490,8 +488,16 @@ def main() -> int:
                 print(payload["error"])
             return 1
 
+    effective_status = str(runner_payload.get("status", "PASS")).strip() or "PASS"
+    if (
+        effective_status == "BLOCKED"
+        and isinstance(target_finalizer, dict)
+        and str(target_finalizer.get("status", "")).strip() == "PASS"
+    ):
+        effective_status = "PASS"
+
     summary = {{
-        "status": str(runner_payload.get("status", "PASS")).strip() or "PASS",
+        "status": effective_status,
         "generated_runtime": True,
         "target_root": str(target_root),
         "run_root": str(run_root),
@@ -597,7 +603,7 @@ def parse_args() -> argparse.Namespace:
     run.add_argument("--entry-skill", required=True)
     run.add_argument("--runtime-provider", default="")
     run.add_argument("--provider-command", default="")
-    run.add_argument("--claude-bin", default="claude")
+    run.add_argument("--claude-bin", default="", help="Deprecated no-op; target runtime does not invoke Claude CLI")
     run.add_argument("--auto-approve", action="store_true")
     run.add_argument("--approval-status", default="", choices=["approved"])
     run.add_argument("--json", action="store_true")
@@ -638,8 +644,6 @@ def main() -> int:
                 args.runtime_provider,
                 "--provider-command",
                 args.provider_command,
-                "--claude-bin",
-                args.claude_bin,
                 "--json",
             ]
         )
@@ -754,6 +758,9 @@ def manifest_payload(
     target_runtime_policy = spec.get("target_runtime_policy", {})
     if not isinstance(target_runtime_policy, dict):
         target_runtime_policy = {}
+    target_executor_policy = spec.get("target_executor_policy", {})
+    if not isinstance(target_executor_policy, dict):
+        target_executor_policy = {}
     managed_runtime = str(target_runtime_policy.get("mode", "")).strip() == "managed_runtime"
     target_publish_policy = spec.get("target_publish_policy", {})
     target_publish_enabled = isinstance(target_publish_policy, dict) and target_publish_policy.get("enabled") is True
@@ -770,6 +777,7 @@ def manifest_payload(
         "runtime_capabilities": contract["runtime_capabilities"],
         "managed_runtime": managed_runtime,
         "target_runtime_policy_mode": str(target_runtime_policy.get("mode", "")).strip(),
+        "target_executor_policy": target_executor_policy,
         "target_publish_policy_enabled": target_publish_enabled,
         "runtime_root": contract["runtime_root"],
         "design_spec_path": contract["design_spec_path"],
