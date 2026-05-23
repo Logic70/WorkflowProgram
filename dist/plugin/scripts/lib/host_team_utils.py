@@ -13,6 +13,7 @@ VALID_RUNTIME_CAPABILITIES = {
     "team_orchestration",
     "node_loop_execution",
     "target_managed_runtime",
+    "target_atomic_publish",
 }
 VALID_HOST_CAPABILITY_KINDS = {
     "mcp_server",

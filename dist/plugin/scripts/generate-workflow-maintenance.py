@@ -203,6 +203,7 @@ def render_stage_guidance(stages: List[Dict[str, Any]]) -> List[str]:
 def render_contract_guide(spec: Dict[str, Any]) -> List[str]:
     runtime_contract = spec.get("runtime_contract", {})
     generated_runtime_contract = spec.get("generated_runtime_contract", {})
+    target_publish_policy = spec.get("target_publish_policy", {})
     test_contract = spec.get("test_contract", {})
     write_boundaries = runtime_contract.get("write_boundaries", {}) if isinstance(runtime_contract, dict) else {}
     required_evidence = runtime_contract.get("required_evidence", []) if isinstance(runtime_contract, dict) else []
@@ -229,6 +230,15 @@ def render_contract_guide(spec: Dict[str, Any]) -> List[str]:
         f"- runtime_capabilities: `{format_value(generated_runtime_contract.get('runtime_capabilities', []))}`",
         "",
         "维护规则：若目标工作流声明了阶段流与 test_contract，则必须同时交付 `.workflowprogram/runtime/` 下的 deterministic runtime 资产，不得只保留命令和设计文档。",
+        "",
+        "## Target Publish Policy",
+        "",
+        f"- enabled: `{format_value(target_publish_policy.get('enabled', False) if isinstance(target_publish_policy, dict) else False)}`",
+        f"- publish_root: `{format_value(target_publish_policy.get('publish_root', '-') if isinstance(target_publish_policy, dict) else '-')}`",
+        f"- latest_marker: `{format_value(target_publish_policy.get('latest_marker', '-') if isinstance(target_publish_policy, dict) else '-')}`",
+        f"- manifest_path: `{format_value(target_publish_policy.get('manifest_path', '-') if isinstance(target_publish_policy, dict) else '-')}`",
+        "",
+        "维护规则：启用 target_publish_policy 后，节点与报告脚本只能写当前 RUN_ROOT；最终输出、latest marker 与 manifest 由 `target-runtime-finalizer.py` 校验当前 run 证据后原子发布。",
         "",
     ]
 

@@ -465,6 +465,16 @@ def copy_runtime_spec(
         if isinstance(caps, list) and "target_managed_runtime" not in caps:
             caps.append("target_managed_runtime")
             generated_runtime_contract["runtime_capabilities"] = caps
+    target_publish_policy = payload.get("target_publish_policy", {})
+    if (
+        isinstance(target_publish_policy, dict)
+        and target_publish_policy.get("enabled") is True
+        and isinstance(generated_runtime_contract, dict)
+    ):
+        caps = generated_runtime_contract.get("runtime_capabilities", [])
+        if isinstance(caps, list) and "target_atomic_publish" not in caps:
+            caps.append("target_atomic_publish")
+            generated_runtime_contract["runtime_capabilities"] = caps
     if host_capabilities is not None:
         payload["host_capabilities"] = host_capabilities
         if isinstance(generated_runtime_contract, dict):

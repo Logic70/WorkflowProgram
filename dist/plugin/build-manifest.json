@@ -1,25 +1,25 @@
 {
   "manifest_version": 1,
-  "generated_at": "2026-05-22T02:11:41Z",
+  "generated_at": "2026-05-23T05:17:30Z",
   "builder": "tools/build_plugin.py",
   "plugin_name": "workflowprogram-cn",
-  "plugin_version": "0.1.12",
-  "source_commit": "eed10d99af03da9f312e3508864facb7397b8d1b",
+  "plugin_version": "0.1.13",
+  "source_commit": "85b0ae36a560b7a8b0a4160178d37c0492131190",
   "source_dirty": true,
   "files": [
     {
       "path": ".claude-plugin/README.md",
-      "sha256": "0af7f09a6875aebe89bc65e7669102aebc4dbf67d51318990b336e20696e9fa5",
+      "sha256": "a09e986234793f3e3756e9b0adcf52822e71fd9d55aa01a431ffeda1119fb2a0",
       "size": 7665
     },
     {
       "path": ".claude-plugin/marketplace.json",
-      "sha256": "8152ea7bbf0e5e6ac3e98ae561e6621f8818df89d4dd02e28e2dfcf76a7c4a49",
+      "sha256": "45c07a6606b77f1547cf63cf2a7ea7c2a8f61ff510d9d46e1e402e72d69c84d8",
       "size": 1180
     },
     {
       "path": ".claude-plugin/plugin.json",
-      "sha256": "61b78b47e91a216d3a28cdb002c35276dab7eb8b7e54daf743a58cedb8e81685",
+      "sha256": "1d0a333d40bafc8d75854ad088d261ba4a00956721796ff578bf1a2d698faa12",
       "size": 607
     },
     {
@@ -184,8 +184,8 @@
     },
     {
       "path": "scripts/generate-target-runtime.py",
-      "sha256": "4d6379981e203a8784e22fde08e484e5fc37f438611bbc0bef8f9c4a3b5dbe5c",
-      "size": 29952
+      "sha256": "5f04a7add86f692d560230358167154d3ff50a2099a6bbce64129130233f8197",
+      "size": 32400
     },
     {
       "path": "scripts/generate-workflow-lowlevel.py",
@@ -194,13 +194,13 @@
     },
     {
       "path": "scripts/generate-workflow-maintenance.py",
-      "sha256": "9e989e42d2c44739ba892bc5ff767ace4f0aec13ec085072e655e95495c3e6c2",
-      "size": 17967
+      "sha256": "449d6bae16806a0a05ddb6f84c6dfa165f61422f9703d8a9a0402a724e3f3960",
+      "size": 18910
     },
     {
       "path": "scripts/generate-workflow-view.py",
-      "sha256": "c3ae7ad8c6e60d0a38ae105b0f1d38044ea880ac92690b81df230d65c2b1d21b",
-      "size": 16031
+      "sha256": "581a8b38e6d88dd824fd05938a7d96dda5a60f767ca7880ca871b881cf74a80a",
+      "size": 16249
     },
     {
       "path": "scripts/github-publish-target-plugin.py",
@@ -244,8 +244,8 @@
     },
     {
       "path": "scripts/lib/host_team_utils.py",
-      "sha256": "7b45f693e70b8816832033d76dc897219c81207f74d06d3d908ce288a12dbeec",
-      "size": 5276
+      "sha256": "540dd7fde15f82ff4ddf6186fdf595e512ddef6ebe7694affc8fc8fea5a8fd06",
+      "size": 5305
     },
     {
       "path": "scripts/lib/io_utils.py",
@@ -284,8 +284,8 @@
     },
     {
       "path": "scripts/package-target-plugin.py",
-      "sha256": "5c9321f8fcbe21d7975dcca0fe075d3705be2428bc899d57f634b172391be3f7",
-      "size": 19764
+      "sha256": "225309b5c02201f64b7009459834c86d69319476e83c95a93f7682375e20fe44",
+      "size": 19908
     },
     {
       "path": "scripts/probe-host-capabilities.py",
@@ -318,9 +318,14 @@
       "size": 13884
     },
     {
+      "path": "scripts/target-runtime-finalizer.py",
+      "sha256": "a996fe54b52f3008c48e046d0189d1046edc725e241a731f1007ffe18abe385b",
+      "size": 14592
+    },
+    {
       "path": "scripts/target-workflow-runner.py",
-      "sha256": "8d9a49fdf857aee05f60df4fe7ebc8a4db96ce128c18c5811d1319eab287b8c1",
-      "size": 21855
+      "sha256": "5e6acd6df95cf69f86312b5108c72345866ccea763273970a23ae6e149aeeade",
+      "size": 23245
     },
     {
       "path": "scripts/validate-change-policy.py",
@@ -334,8 +339,8 @@
     },
     {
       "path": "scripts/validate-generated-runtime.py",
-      "sha256": "df6edf5f1db9f73615438122a9aba8e2782abd9f0c1a6ce0850ef94521b66ff7",
-      "size": 13330
+      "sha256": "d3a86115d3dc28a93430728d0fc9104d30c4ac3761c669918e2a3ed3e3cf200a",
+      "size": 14806
     },
     {
       "path": "scripts/validate-lessons-delta.py",
@@ -364,8 +369,8 @@
     },
     {
       "path": "scripts/validate-target-plugin-package.py",
-      "sha256": "0fc34cdc722df8779f64ff7cfcfa501ff81d0013f98f20ffee4d67a6430343f8",
-      "size": 16527
+      "sha256": "31b5408a87ff8ed778d6c322290de905f0935b0a9013aa144d2615378bd6d5d8",
+      "size": 16683
     },
     {
       "path": "scripts/validate-target-runtime-state.py",
@@ -389,8 +394,8 @@
     },
     {
       "path": "scripts/validate-workflow-spec.py",
-      "sha256": "71f9d5b1ea8060728ad0a67b0d4d76a17435df8ff73a802e1cda35105e97ea05",
-      "size": 94828
+      "sha256": "4b031e1c82c273e9dfedc2629284dff0cf6108972a701cd9fa5b0ca548597cdf",
+      "size": 101701
     },
     {
       "path": "scripts/validate-workflow.ps1",
@@ -399,8 +404,8 @@
     },
     {
       "path": "scripts/validate-workflow.py",
-      "sha256": "ae9f8db01c1fab29ff452e8868a1e456c285176480f4c4e460be8e6852d40c8f",
-      "size": 61193
+      "sha256": "5dd4c63114e06ade699c047871d718ebd363638365821ba97ba2b9dca461d85a",
+      "size": 61311
     },
     {
       "path": "scripts/verify-plugin-load.sh",
@@ -464,8 +469,8 @@
     },
     {
       "path": "skills/workflow-spec-support/spec-template.md",
-      "sha256": "df1ab14af85e182834b69c18b0a12ebdbcfb96df5a0d9e16ae9d225aa3321901",
-      "size": 6789
+      "sha256": "9e59f737a2edc33c99e84f7cd8b6ff6b5ec5ed700ddc779fb501ae2d1853d189",
+      "size": 7230
     },
     {
       "path": "skills/workflow-spec-support/target-node-design-template.md",
@@ -479,8 +484,8 @@
     },
     {
       "path": "skills/workflow-spec-support/yaml-spec-template.md",
-      "sha256": "da91fa906fbb1d72dcce8b68d4f1daaa5aba223a77d4da24a35da0831ed6e954",
-      "size": 16995
+      "sha256": "c6ad0f80a80744a27442cfb2401b8ffe05eee947e971d149ad32741b29949403",
+      "size": 17548
     },
     {
       "path": "skills/workflowprogram-audit/SKILL.md",
@@ -489,8 +494,8 @@
     },
     {
       "path": "skills/workflowprogram-develop/SKILL.md",
-      "sha256": "43cacaa726315d0ac96ec4617bbdc101cee70cb7d9e8ee0497f297c31bddd290",
-      "size": 17524
+      "sha256": "1fda0f0ffe358c11ff8b406b1d548d47fc4aefb0c3c8b4912ced1cac7964ccf1",
+      "size": 18307
     },
     {
       "path": "skills/workflowprogram-iterate/SKILL.md",

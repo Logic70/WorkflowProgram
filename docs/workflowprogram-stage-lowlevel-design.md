@@ -433,6 +433,7 @@ ref: runtime_contract.<field>
    - `team_orchestration`
    - `node_loop_execution`
    - `target_managed_runtime`
+   - `target_atomic_publish`
 3. `runtime_capabilities` 必须始终包含：
    - `state_transitions`
    - `run_state_validation`
@@ -441,7 +442,8 @@ ref: runtime_contract.<field>
 6. 当声明 `agent_team_contract.enabled=true` 时，`runtime_capabilities` 必须包含 `team_orchestration`。
 7. 当任一 `workflow_graph.nodes[*].loop_policy.enabled=true` 时，`runtime_capabilities` 必须包含 `node_loop_execution`。
 8. 当声明 `target_runtime_policy.mode=managed_runtime` 时，`runtime_capabilities` 必须包含 `target_managed_runtime`。
-9. 目标工作流 runtime 通过 wrapper 调共享控制面脚本；目标业务图执行由 `target-workflow-runner.py` 负责，不复用 WorkflowProgram 产品 `workflow-runner.py`。
+9. 当声明 `target_publish_policy.enabled=true` 时，`runtime_capabilities` 必须包含 `target_atomic_publish`。
+10. 目标工作流 runtime 通过 wrapper 调共享控制面脚本；目标业务图执行由 `target-workflow-runner.py` 负责，不复用 WorkflowProgram 产品 `workflow-runner.py`。
 
 #### 2.5.5B `target_runtime_policy`（目标业务图受控运行策略）
 
@@ -473,6 +475,39 @@ target_runtime_policy:
 5. `output_contract_failure` 只能是 `retry_then_terminal` 或 `terminal`。
 6. `artifact_provenance_required=true` 时，`target-state.json` PASS 必须能追溯每个 graph output 的 owner/node/provenance。
 7. `immutable_during_run` 中的路径不得被 `workflow_graph.nodes[*].output_refs` 声明为运行态输出。
+
+#### 2.5.5C `target_publish_policy`（目标最终发布事务策略）
+
+`workflow-spec.yaml.target_publish_policy` 用于把目标工作流最终输出从“节点直接写最终目录”改为“run-scoped workspace + finalizer + atomic publish”。新生成的报告类或长期复用输出类 workflow 默认启用：
+
+```yaml
+target_publish_policy:
+  enabled: true
+  run_scoped_outputs_required: true
+  publish_root: outputs/target-workflow
+  latest_marker: outputs/target-workflow/.workflowprogram-latest.json
+  manifest_path: outputs/target-workflow/run-manifest.json
+  atomic: true
+  required_run_artifacts:
+    - target-state.json
+    - node-results.json
+    - artifact-provenance.json
+  required_reports:
+    - path: outputs/stages/target-runtime-summary.json
+      status_field: status
+      pass_values: [PASS]
+  publish_artifacts: []
+```
+
+固定约束：
+
+1. `enabled=true` 时，`run_scoped_outputs_required` 与 `atomic` 必须为 `true`。
+2. `publish_root`、`latest_marker`、`manifest_path` 必须是安全相对路径，且 marker/manifest 必须位于 `publish_root` 下。
+3. `publish_root` 不得位于 `.claude/**`、`.workflowprogram/**` 或 `config/scripts/**`，避免 finalizer 覆盖控制面。
+4. `workflow_graph.nodes[*].output_refs` 中的文件类输出必须位于 `publish_root` 下；运行时实际先写到 `RUN_ROOT/<output_ref>`。
+5. `target-runtime-finalizer.py` 只消费当前 run 的 `target-state.json`、`node-results.json`、`artifact-provenance.json` 与 `required_reports`；任一不一致时写回 `target-state.status=FAIL`。
+6. 只有 finalizer 可以写最终 `run-manifest.json`、latest marker 和最终发布目录。业务节点、doctor、报告脚本不得自行声明最终 `PASS/COMPLETE`。
+7. `generated_runtime_contract.runtime_capabilities` 必须包含 `target_atomic_publish`。
 
 #### 2.5.5A `workflow_graph`（目标工作流业务图契约）
 
@@ -1082,8 +1117,9 @@ WorkflowProgram 自身必须按原子能力组织，每个 Stage 必须可拆分
 21. 若声明 `workflow_graph`，validator 必须校验 graph entrypoints、nodes、transitions、templates_used、可达性与目标资产声明。
 22. 若声明 `workflow_graph.nodes[*].loop_policy.enabled=true`，则 validator 必须校验 loop policy、要求 `node_loop_execution` runtime capability，并确保 loop evidence 路径位于 `outputs/stages/loops/<node_id>/**`。
 23. 若声明 `target_runtime_policy.mode=managed_runtime`，则 validator 必须要求 `target_managed_runtime` capability，并拒绝 graph outputs 与 immutable paths 冲突。
-24. `design-review-packet.json`、`issues.json`、`closure.json` 与 `gate-validation.json` 必须存在；`gate-validation.json.status` 必须为 `PASS`。
-25. `closure.json.artifact_fingerprints` 必须覆盖当前 packet 中记录的 S1/S2/S3/YAML 输入，且不得存在 stale artifact。
+24. 若声明 `target_publish_policy.enabled=true`，则 validator 必须要求 `target_atomic_publish` capability，并拒绝 graph outputs 位于 `publish_root` 外。
+25. `design-review-packet.json`、`issues.json`、`closure.json` 与 `gate-validation.json` 必须存在；`gate-validation.json.status` 必须为 `PASS`。
+26. `closure.json.artifact_fingerprints` 必须覆盖当前 packet 中记录的 S1/S2/S3/YAML 输入，且不得存在 stale artifact。
 
 ### 实现方案
 

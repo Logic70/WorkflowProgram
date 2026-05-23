@@ -8,6 +8,7 @@ import argparse
 import fnmatch
 import hashlib
 import json
+import os
 import subprocess
 import sys
 from datetime import datetime, timezone
@@ -150,9 +151,9 @@ def resolve_owner(owner: str, registry: Dict[str, Dict[str, str]], target_root: 
     return False, {"name": owner, "kind": "unknown", "file": ""}
 
 
-def materialize_output(target_root: Path, run_root: Path, node: Dict[str, Any], output_ref: str, owner: Dict[str, str], attempt: int) -> Dict[str, Any]:
+def materialize_output(output_root: Path, run_root: Path, node: Dict[str, Any], output_ref: str, owner: Dict[str, str], attempt: int) -> Dict[str, Any]:
     rel = safe_rel(output_ref)
-    path = target_root / rel
+    path = output_root / rel
     if output_ref.endswith("/"):
         path.mkdir(parents=True, exist_ok=True)
         marker = path / ".workflowprogram-output"
@@ -198,12 +199,18 @@ def materialize_output(target_root: Path, run_root: Path, node: Dict[str, Any], 
     }
 
 
-def execute_script_owner(target_root: Path, owner: Dict[str, str], node: Dict[str, Any], request: str) -> Tuple[bool, str]:
+def execute_script_owner(target_root: Path, run_root: Path, output_root: Path, owner: Dict[str, str], node: Dict[str, Any], request: str) -> Tuple[bool, str]:
     rel = safe_rel(owner.get("file", ""))
     path = target_root / rel
     completed = subprocess.run(
         [sys.executable, str(path), "--node-id", str(node["id"]), "--request", request],
         cwd=target_root,
+        env={
+            **dict(os.environ),
+            "WORKFLOWPROGRAM_TARGET_ROOT": str(target_root),
+            "WORKFLOWPROGRAM_RUN_ROOT": str(run_root),
+            "WORKFLOWPROGRAM_OUTPUT_ROOT": str(output_root),
+        },
         capture_output=True,
         text=True,
         check=False,
@@ -212,7 +219,7 @@ def execute_script_owner(target_root: Path, owner: Dict[str, str], node: Dict[st
     return completed.returncode == 0, text
 
 
-def execute_claude_owner(args: argparse.Namespace, target_root: Path, owner: Dict[str, str], node: Dict[str, Any]) -> Tuple[bool, str]:
+def execute_claude_owner(args: argparse.Namespace, target_root: Path, run_root: Path, output_root: Path, owner: Dict[str, str], node: Dict[str, Any]) -> Tuple[bool, str]:
     prompt = "\n".join(
         [
             "Execute one WorkflowProgram managed-runtime target node.",
@@ -220,7 +227,11 @@ def execute_claude_owner(args: argparse.Namespace, target_root: Path, owner: Dic
             f"Owner: {owner.get('name', '')}",
             f"Owner kind: {owner.get('kind', '')}",
             f"Required outputs: {', '.join(str(item) for item in node.get('output_refs', []))}",
-            "Write only the declared outputs. Do not modify runtime/design/config scripts.",
+            f"Target root: {target_root}",
+            f"Run root: {run_root}",
+            f"Output root for declared outputs: {output_root}",
+            "Write declared outputs under the output root. Do not write final published outputs directly.",
+            "Do not modify runtime/design/config scripts.",
         ]
     )
     completed = subprocess.run(
@@ -234,26 +245,40 @@ def execute_claude_owner(args: argparse.Namespace, target_root: Path, owner: Dic
     return completed.returncode == 0, text
 
 
-def check_inputs(target_root: Path, node: Dict[str, Any]) -> List[str]:
+def check_inputs(search_roots: List[Path], node: Dict[str, Any]) -> List[str]:
     missing: List[str] = []
     for raw_ref in node.get("input_refs", []):
         ref = str(raw_ref).strip()
         if is_logical_ref(ref):
             continue
-        if not (target_root / safe_rel(ref)).exists():
+        rel = safe_rel(ref)
+        if not any((root / rel).exists() for root in search_roots):
             missing.append(ref)
     return missing
 
 
-def check_outputs(target_root: Path, node: Dict[str, Any]) -> List[str]:
+def check_outputs(output_root: Path, node: Dict[str, Any]) -> List[str]:
     missing: List[str] = []
     for raw_ref in node.get("output_refs", []):
         ref = str(raw_ref).strip()
         if is_logical_ref(ref):
             continue
-        if not (target_root / safe_rel(ref)).exists():
+        if not (output_root / safe_rel(ref)).exists():
             missing.append(ref)
     return missing
+
+
+def target_publish_policy(spec: Dict[str, Any]) -> Dict[str, Any]:
+    value = spec.get("target_publish_policy", {})
+    return value if isinstance(value, dict) else {}
+
+
+def target_publish_enabled(policy: Dict[str, Any]) -> bool:
+    return bool(policy.get("enabled", False)) and bool(policy.get("run_scoped_outputs_required", False))
+
+
+def output_base_root(target_root: Path, run_root: Path, spec: Dict[str, Any]) -> Path:
+    return run_root if target_publish_enabled(target_publish_policy(spec)) else target_root
 
 
 def transition_map(graph: Dict[str, Any]) -> Dict[str, str]:
@@ -325,6 +350,10 @@ def run_graph(args: argparse.Namespace) -> Dict[str, Any]:
         max_retries = 0
     immutable_patterns = [safe_rel(str(item)) for item in policy.get("immutable_during_run", []) if str(item).strip()] if isinstance(policy.get("immutable_during_run", []), list) else []
     provider = str(args.runtime_provider or "claude_cli").strip()
+    output_root = output_base_root(target_root, run_root, spec)
+    input_search_roots = [output_root]
+    if target_root not in input_search_roots:
+        input_search_roots.append(target_root)
 
     registry = collect_registry(spec)
     node_results: List[Dict[str, Any]] = []
@@ -341,7 +370,7 @@ def run_graph(args: argparse.Namespace) -> Dict[str, Any]:
         node_status = "FAIL"
         for attempt in range(1, max_retries + 2):
             append_event(run_root, "NodeStarted", node_id=node_id, owner=owner_name, attempt=attempt)
-            missing_inputs = check_inputs(target_root, node)
+            missing_inputs = check_inputs(input_search_roots, node)
             if missing_inputs:
                 attempts.append({"attempt": attempt, "status": "FAIL", "reason": "missing_inputs", "missing_inputs": missing_inputs})
                 failure_reason = f"node {node_id} missing inputs: {missing_inputs}"
@@ -357,18 +386,18 @@ def run_graph(args: argparse.Namespace) -> Dict[str, Any]:
 
             before = existing_file_snapshot(target_root, immutable_patterns)
             if owner.get("kind") == "script":
-                owner_success, owner_message = execute_script_owner(target_root, owner, node, args.request)
+                owner_success, owner_message = execute_script_owner(target_root, run_root, output_root, owner, node, args.request)
             elif provider in DETERMINISTIC_PROVIDERS:
                 owner_success, owner_message = True, "deterministic provider materialized declared outputs"
                 for output_ref in node.get("output_refs", []):
                     ref = str(output_ref).strip()
                     if not is_logical_ref(ref):
-                        provenance.append(materialize_output(target_root, run_root, node, ref, owner, attempt))
+                        provenance.append(materialize_output(output_root, run_root, node, ref, owner, attempt))
             else:
-                owner_success, owner_message = execute_claude_owner(args, target_root, owner, node)
+                owner_success, owner_message = execute_claude_owner(args, target_root, run_root, output_root, owner, node)
             after = existing_file_snapshot(target_root, immutable_patterns)
             changes = immutable_changes(before, after)
-            missing_outputs = check_outputs(target_root, node)
+            missing_outputs = check_outputs(output_root, node)
             if not owner_success:
                 attempts.append({"attempt": attempt, "status": "FAIL", "reason": "owner_failed", "message": owner_message})
             elif changes:
@@ -427,6 +456,7 @@ def run_graph(args: argparse.Namespace) -> Dict[str, Any]:
         "failure_reason": failure_reason,
         "run_root": str(run_root),
         "target_root": str(target_root),
+        "output_root": str(output_root),
         "node_count": len(node_results),
         "artifact_count": len(provenance),
     }

@@ -57,6 +57,7 @@ OPTIONAL_TOP_KEYS = {
     "agent_team_contract",
     "workflow_graph",
     "target_runtime_policy",
+    "target_publish_policy",
 }
 
 REQUIRED_META_KEYS = {
@@ -105,6 +106,7 @@ VALID_TARGET_RUNTIME_ENTRY_MODES = {"wrapper_only"}
 VALID_TARGET_RUNTIME_GRAPH_SOURCES = {"workflow_graph"}
 VALID_TARGET_RUNTIME_OWNER_FAILURE = {"terminal"}
 VALID_TARGET_RUNTIME_OUTPUT_FAILURE = {"retry_then_terminal", "terminal"}
+FORBIDDEN_TARGET_PUBLISH_PREFIXES = (".claude/", ".workflowprogram/", "config/scripts/")
 REQUIRED_FAILURE_KINDS = {"none", "design", "implementation", "environment", "conflict"}
 VALID_ENV_SKIP_CHECKS = {
     "runtime_host_available",
@@ -670,6 +672,31 @@ def workflow_graph_output_refs(workflow_graph: Dict[str, Any]) -> List[str]:
     return refs
 
 
+def is_runtime_file_ref(ref: str) -> bool:
+    """Return true for path-like refs that should map to runtime files."""
+
+    text = ref.strip().replace("\\", "/")
+    return bool(text) and not text.startswith("$") and "/" in text
+
+
+def normalize_relative_path(path_text: str) -> str:
+    cleaned = path_text.strip().replace("\\", "/")
+    while cleaned.startswith("./"):
+        cleaned = cleaned[2:]
+    return cleaned
+
+
+def safe_relative_path(path_text: str) -> bool:
+    cleaned = normalize_relative_path(path_text)
+    return bool(cleaned) and not cleaned.startswith("/") and bool(SAFE_RELATIVE_PATH_RE.match(cleaned))
+
+
+def path_under(path_text: str, parent_text: str) -> bool:
+    path = normalize_relative_path(path_text).rstrip("/")
+    parent = normalize_relative_path(parent_text).rstrip("/")
+    return bool(path and parent) and (path == parent or path.startswith(parent + "/"))
+
+
 def validate_target_runtime_policy(
     target_runtime_policy: Dict[str, Any],
     workflow_graph: Dict[str, Any],
@@ -751,6 +778,111 @@ def validate_target_runtime_policy(
                         errors,
                         f"workflow_graph output_ref conflicts with target_runtime_policy.immutable_during_run: {output_ref} matches {pattern}",
                     )
+
+
+def validate_target_publish_policy(
+    target_publish_policy: Dict[str, Any],
+    workflow_graph: Dict[str, Any],
+    generated_runtime_contract: Dict[str, Any],
+    errors: List[str],
+    warnings: List[str],
+) -> None:
+    """Validate target workflow finalizer and atomic publish policy."""
+
+    if not target_publish_policy:
+        return
+    enabled = target_publish_policy.get("enabled")
+    if not isinstance(enabled, bool):
+        add_error(errors, "target_publish_policy.enabled must be boolean")
+        return
+    if enabled is False:
+        return
+
+    if target_publish_policy.get("run_scoped_outputs_required") is not True:
+        add_error(errors, "target_publish_policy.run_scoped_outputs_required must be true when enabled=true")
+    if target_publish_policy.get("atomic") is not True:
+        add_error(errors, "target_publish_policy.atomic must be true when enabled=true")
+
+    publish_root = normalize_relative_path(str(target_publish_policy.get("publish_root", "")))
+    latest_marker = normalize_relative_path(str(target_publish_policy.get("latest_marker", "")))
+    manifest_path = normalize_relative_path(str(target_publish_policy.get("manifest_path", "")))
+    for field, value in (
+        ("publish_root", publish_root),
+        ("latest_marker", latest_marker),
+        ("manifest_path", manifest_path),
+    ):
+        if not safe_relative_path(value):
+            add_error(errors, f"target_publish_policy.{field} must be a safe relative path")
+    if publish_root:
+        if any(path_under(publish_root, prefix.rstrip("/")) for prefix in FORBIDDEN_TARGET_PUBLISH_PREFIXES):
+            add_error(
+                errors,
+                "target_publish_policy.publish_root must not be under .claude/, .workflowprogram/, or config/scripts/",
+            )
+        for field, value in (("latest_marker", latest_marker), ("manifest_path", manifest_path)):
+            if value and not path_under(value, publish_root):
+                add_error(errors, f"target_publish_policy.{field} must stay under target_publish_policy.publish_root")
+
+    required_run_artifacts = target_publish_policy.get("required_run_artifacts", [])
+    if not isinstance(required_run_artifacts, list) or not required_run_artifacts:
+        add_error(errors, "target_publish_policy.required_run_artifacts must be a non-empty list")
+    else:
+        for idx, raw_path in enumerate(required_run_artifacts):
+            value = str(raw_path).strip()
+            if not safe_relative_path(value):
+                add_error(errors, f"target_publish_policy.required_run_artifacts[{idx}] must be a safe relative path")
+
+    required_reports = target_publish_policy.get("required_reports", [])
+    if not isinstance(required_reports, list):
+        add_error(errors, "target_publish_policy.required_reports must be a list")
+    else:
+        for idx, raw_report in enumerate(required_reports):
+            prefix = f"target_publish_policy.required_reports[{idx}]"
+            report = require_mapping(raw_report, prefix, errors)
+            path = str(report.get("path", "")).strip()
+            status_field = str(report.get("status_field", "")).strip()
+            pass_values = report.get("pass_values", [])
+            if not safe_relative_path(path):
+                add_error(errors, f"{prefix}.path must be a safe relative path")
+            if not status_field:
+                add_error(errors, f"{prefix}.status_field is required")
+            if not isinstance(pass_values, list) or not [str(item).strip() for item in pass_values if str(item).strip()]:
+                add_error(errors, f"{prefix}.pass_values must be a non-empty list")
+
+    publish_artifacts = target_publish_policy.get("publish_artifacts", [])
+    if publish_artifacts is not None and not isinstance(publish_artifacts, list):
+        add_error(errors, "target_publish_policy.publish_artifacts must be a list")
+    elif isinstance(publish_artifacts, list):
+        for idx, raw_item in enumerate(publish_artifacts):
+            prefix = f"target_publish_policy.publish_artifacts[{idx}]"
+            item = require_mapping(raw_item, prefix, errors)
+            source = str(item.get("from", "")).strip()
+            destination = str(item.get("to", source)).strip()
+            if not safe_relative_path(source):
+                add_error(errors, f"{prefix}.from must be a safe relative path")
+            if destination and not safe_relative_path(destination):
+                add_error(errors, f"{prefix}.to must be a safe relative path")
+            if destination and publish_root and not path_under(destination, publish_root):
+                add_error(errors, f"{prefix}.to must stay under target_publish_policy.publish_root")
+
+    capabilities = set(runtime_capabilities_from_contract(generated_runtime_contract))
+    if "target_atomic_publish" not in capabilities:
+        add_error(
+            errors,
+            "generated_runtime_contract.runtime_capabilities must include target_atomic_publish when target_publish_policy.enabled=true",
+        )
+    if publish_root:
+        outside_publish_root = [
+            ref
+            for ref in workflow_graph_output_refs(workflow_graph)
+            if is_runtime_file_ref(ref) and not path_under(ref, publish_root)
+        ]
+        if outside_publish_root:
+            add_error(
+                errors,
+                "workflow_graph output_refs must stay under target_publish_policy.publish_root when target_publish_policy.enabled=true: "
+                + ", ".join(sorted(outside_publish_root)),
+            )
 
 
 def validate_node_loop_policy(
@@ -1891,6 +2023,13 @@ def validate_spec(spec: Dict[str, Any]) -> Dict[str, Any]:
         else {}
     )
     validate_target_runtime_policy(target_runtime_policy, workflow_graph, generated_runtime_contract, errors, warnings)
+
+    target_publish_policy = (
+        require_mapping(spec.get("target_publish_policy", {}), "target_publish_policy", errors)
+        if "target_publish_policy" in spec
+        else {}
+    )
+    validate_target_publish_policy(target_publish_policy, workflow_graph, generated_runtime_contract, errors, warnings)
 
     test_contract = require_mapping(spec.get("test_contract", {}), "test_contract", errors)
     validate_test_contract(test_contract, runtime_contract, stage_ids, slot_map, intent_flows, registered_entries, errors, warnings)

@@ -271,6 +271,7 @@ def render_contracts(spec: Dict[str, Any]) -> List[str]:
     """原样嵌入 runtime/test contract，方便审计时直接比对。"""
     runtime_contract = spec.get("runtime_contract", {})
     generated_runtime_contract = spec.get("generated_runtime_contract", {})
+    target_publish_policy = spec.get("target_publish_policy", {})
     test_contract = spec.get("test_contract", {})
     return [
         "## Runtime Contract",
@@ -280,6 +281,10 @@ def render_contracts(spec: Dict[str, Any]) -> List[str]:
         "## Generated Runtime Contract",
         "",
         f"```json\n{json.dumps(generated_runtime_contract, ensure_ascii=False, indent=2)}\n```",
+        "",
+        "## Target Publish Policy",
+        "",
+        f"```json\n{json.dumps(target_publish_policy, ensure_ascii=False, indent=2)}\n```",
         "",
         "## Test Contract (Judgment Only)",
         "",

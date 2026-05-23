@@ -374,6 +374,7 @@ generated_runtime_contract:
     - state_transitions
     - run_state_validation
     - target_managed_runtime
+    - target_atomic_publish
     # - capability_discovery
     # - host_capability_probe
     # - team_orchestration
@@ -393,6 +394,24 @@ target_runtime_policy:
     - .workflowprogram/design/**
     - .workflowprogram/runtime/**
     - config/scripts/**
+
+target_publish_policy:
+  enabled: true
+  run_scoped_outputs_required: true
+  publish_root: outputs/target-workflow
+  latest_marker: outputs/target-workflow/.workflowprogram-latest.json
+  manifest_path: outputs/target-workflow/run-manifest.json
+  atomic: true
+  required_run_artifacts:
+    - target-state.json
+    - node-results.json
+    - artifact-provenance.json
+  required_reports:
+    - path: outputs/stages/target-runtime-summary.json
+      status_field: status
+      pass_values:
+        - PASS
+  publish_artifacts: []
 
 # 可选能力搜索与推荐契约
 # capability_discovery:

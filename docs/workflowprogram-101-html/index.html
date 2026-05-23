@@ -565,6 +565,7 @@
               <ul class="plain-list">
                 <li><code>workflow-runner.py</code>：WorkflowProgram 自身 S0-S6 执行约束层</li>
                 <li><code>target-workflow-runner.py</code>：生成目标工作流 <code>workflow_graph</code> 执行约束层</li>
+                <li><code>target-runtime-finalizer.py</code>：生成目标工作流最终产物事务发布层</li>
                 <li><code>workflowprogram-validate</code> / <code>workflow-s5-judge.py</code>：结果判定层</li>
                 <li><code>runtime_smoke.py</code>：动态补证据层</li>
               </ul>
@@ -577,6 +578,7 @@
                 <li>运行 transcript</li>
                 <li>验证报告</li>
                 <li>机器可读判定摘要</li>
+                <li>目标 workflow finalizer 摘要、latest marker 与 run manifest</li>
                 <li>外部能力 / Team 的附加证据（如声明）</li>
               </ul>
             </div>

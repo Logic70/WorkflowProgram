@@ -115,6 +115,7 @@ def render_entry_wrapper(
     team_enabled_flag: bool,
     capability_discovery_enabled_flag: bool,
     target_managed_runtime_flag: bool,
+    target_publish_finalizer_enabled_flag: bool,
 ) -> str:
     return f"""#!/usr/bin/env python3
 from __future__ import annotations
@@ -139,11 +140,13 @@ DISCOVER_HOST_SCRIPT = "discover-host-capabilities.py"
 PROBE_HOST_SCRIPT = "probe-host-capabilities.py"
 APPLY_HOST_BOOTSTRAP_SCRIPT = "apply-host-bootstrap.py"
 ENVIRONMENT_REMEDIATION_SCRIPT = "generate-environment-remediation.py"
+TARGET_FINALIZER_SCRIPT = "target-runtime-finalizer.py"
 RUNTIME_CAPABILITIES = {contract["runtime_capabilities"]!r}
 CAPABILITY_DISCOVERY_ENABLED = {capability_discovery_enabled_flag!r}
 TEAM_ORCHESTRATION_ENABLED = {team_enabled_flag!r}
 NODE_LOOP_EXECUTION_ENABLED = {"node_loop_execution" in contract["runtime_capabilities"]!r}
 TARGET_MANAGED_RUNTIME_ENABLED = {target_managed_runtime_flag!r}
+TARGET_PUBLISH_FINALIZER_ENABLED = {target_publish_finalizer_enabled_flag!r}
 
 
 def utc_run_id() -> str:
@@ -305,6 +308,24 @@ def generate_environment_remediation(plugin_root: Path, spec_path: Path, target_
     return report
 
 
+def finalize_target_runtime(plugin_root: Path, spec_path: Path, target_root: Path, run_root: Path) -> Tuple[int, Dict[str, Any], str]:
+    return run_command(
+        [
+            str(plugin_python(plugin_root)),
+            str(plugin_root / "scripts" / TARGET_FINALIZER_SCRIPT),
+            "--spec",
+            str(spec_path),
+            "--run-root",
+            str(run_root),
+            "--target-root",
+            str(target_root),
+            "--state",
+            str(run_root / "target-state.json"),
+            "--json",
+        ],
+    )
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run generated workflow deterministic entry wrapper")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -448,6 +469,28 @@ def main() -> int:
             print(payload["error"])
         return 1
 
+    target_finalizer = None
+    if TARGET_PUBLISH_FINALIZER_ENABLED:
+        finalizer_code, finalizer_payload, finalizer_text = finalize_target_runtime(plugin_root, spec_path, target_root, run_root)
+        target_finalizer = finalizer_payload or {{"status": "FAIL", "error": finalizer_text or "target runtime finalizer failed"}}
+        if finalizer_code != 0 or target_finalizer.get("status") != "PASS":
+            payload = {{
+                "status": "FAIL",
+                "failure_kind": "implementation",
+                "error": finalizer_text or "generated workflow finalizer failed",
+                "run_root": str(run_root),
+                "target_root": str(target_root),
+                "spec": str(spec_path),
+                "runner": runner_payload,
+                "state_validation": state_payload,
+                "target_finalizer": target_finalizer,
+            }}
+            if args.json:
+                print(json.dumps(payload, ensure_ascii=False, indent=2))
+            else:
+                print(payload["error"])
+            return 1
+
     summary = {{
         "status": str(runner_payload.get("status", "PASS")).strip() or "PASS",
         "generated_runtime": True,
@@ -464,6 +507,7 @@ def main() -> int:
         "team_orchestration_enabled": TEAM_ORCHESTRATION_ENABLED,
         "runner": runner_payload,
         "state_validation": state_payload,
+        "target_finalizer": target_finalizer,
     }}
     if required_host_missing(host_report):
         summary["status"] = "FAIL"
@@ -712,6 +756,8 @@ def manifest_payload(
     if not isinstance(target_runtime_policy, dict):
         target_runtime_policy = {}
     managed_runtime = str(target_runtime_policy.get("mode", "")).strip() == "managed_runtime"
+    target_publish_policy = spec.get("target_publish_policy", {})
+    target_publish_enabled = isinstance(target_publish_policy, dict) and target_publish_policy.get("enabled") is True
     host_global_adapter_declared = any(
         str(item.get("bootstrap", {}).get("scope", "")).strip() == "host_global" and bool(host_global_adapter(item))
         for item in declared_host_capabilities
@@ -725,6 +771,7 @@ def manifest_payload(
         "runtime_capabilities": contract["runtime_capabilities"],
         "managed_runtime": managed_runtime,
         "target_runtime_policy_mode": str(target_runtime_policy.get("mode", "")).strip(),
+        "target_publish_policy_enabled": target_publish_enabled,
         "runtime_root": contract["runtime_root"],
         "design_spec_path": contract["design_spec_path"],
         "entry_script": contract["entry_script"],
@@ -744,6 +791,7 @@ def manifest_payload(
         "shared_scripts": [
             "target-workflow-runner.py",
             "validate-target-runtime-state.py",
+            "target-runtime-finalizer.py",
             "discover-host-capabilities.py",
             "apply-host-bootstrap.py",
             "probe-host-capabilities.py",
@@ -772,6 +820,8 @@ def main() -> int:
         capability_discovery_enabled_flag = bool(capability_discovery_from_spec(spec).get("enabled", False))
         target_runtime_policy = spec.get("target_runtime_policy", {})
         target_managed_runtime_flag = isinstance(target_runtime_policy, dict) and str(target_runtime_policy.get("mode", "")).strip() == "managed_runtime"
+        target_publish_policy = spec.get("target_publish_policy", {})
+        target_publish_finalizer_enabled_flag = isinstance(target_publish_policy, dict) and target_publish_policy.get("enabled") is True
 
         entry_path = out_root / Path(contract["entry_script"]).name
         runner_path = out_root / Path(contract["runner_script"]).name
@@ -786,6 +836,7 @@ def main() -> int:
                 team_enabled_flag=team_enabled_flag,
                 capability_discovery_enabled_flag=capability_discovery_enabled_flag,
                 target_managed_runtime_flag=target_managed_runtime_flag,
+                target_publish_finalizer_enabled_flag=target_publish_finalizer_enabled_flag,
             ),
             encoding="utf-8",
             newline="\n",

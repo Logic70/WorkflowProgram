@@ -91,6 +91,10 @@ def validate_generated_runtime(spec_path: Path, target_root: Path) -> Dict[str, 
         if not isinstance(target_runtime_policy, dict):
             target_runtime_policy = {}
         managed_runtime = str(target_runtime_policy.get("mode", "")).strip() == "managed_runtime"
+        target_publish_policy = spec.get("target_publish_policy", {})
+        if not isinstance(target_publish_policy, dict):
+            target_publish_policy = {}
+        target_publish_enabled = target_publish_policy.get("enabled") is True
         main_entry = (
             str(spec.get("test_contract", {}).get("entry", {}).get("main_entry", "")).strip()
             if isinstance(spec.get("test_contract", {}), dict)
@@ -139,6 +143,7 @@ def validate_generated_runtime(spec_path: Path, target_root: Path) -> Dict[str, 
                 "runtime_capabilities": expected_runtime_capabilities,
                 "managed_runtime": managed_runtime,
                 "target_runtime_policy_mode": str(target_runtime_policy.get("mode", "")).strip(),
+                "target_publish_policy_enabled": target_publish_enabled,
                 "default_entry_skill": main_entry,
                 "capability_discovery_enabled": bool(capability_discovery.get("enabled", False)),
                 "capability_discovery_domains": capability_discovery.get("domains", []) if isinstance(capability_discovery.get("domains", []), list) else [],
@@ -186,6 +191,15 @@ def validate_generated_runtime(spec_path: Path, target_root: Path) -> Dict[str, 
                 errors.append("entry wrapper is missing NODE_LOOP_EXECUTION_ENABLED marker")
             if managed_runtime and "TARGET_MANAGED_RUNTIME_ENABLED = True" not in entry_text:
                 errors.append("entry wrapper is missing TARGET_MANAGED_RUNTIME_ENABLED marker")
+            if target_publish_enabled:
+                if "TARGET_PUBLISH_FINALIZER_ENABLED = True" not in entry_text:
+                    errors.append("entry wrapper is missing TARGET_PUBLISH_FINALIZER_ENABLED marker")
+                if "target-runtime-finalizer.py" not in entry_text:
+                    errors.append("entry wrapper is missing target-runtime-finalizer.py integration marker")
+                if "target_atomic_publish" not in expected_runtime_capabilities:
+                    errors.append(
+                        "generated_runtime_contract.runtime_capabilities must include target_atomic_publish when target_publish_policy.enabled=true"
+                    )
 
         if runner_path.exists():
             runner_text = runner_path.read_text(encoding="utf-8")
@@ -204,6 +218,12 @@ def validate_generated_runtime(spec_path: Path, target_root: Path) -> Dict[str, 
                     errors.append(f"state validator wrapper is missing expected marker: {needle}")
             if managed_runtime and "validate-run-state.py" in validator_text:
                 errors.append("managed-runtime state validator wrapper must not delegate to product validate-run-state.py")
+
+        if manifest_payload and target_publish_enabled:
+            shared_scripts = manifest_payload.get("shared_scripts", [])
+            shared_script_values = [str(item).strip() for item in shared_scripts] if isinstance(shared_scripts, list) else []
+            if "target-runtime-finalizer.py" not in shared_script_values:
+                errors.append("runtime manifest shared_scripts must include target-runtime-finalizer.py when target_publish_policy.enabled=true")
 
         if managed_runtime and main_entry:
             registry = spec.get("registry", {}) if isinstance(spec.get("registry", {}), dict) else {}

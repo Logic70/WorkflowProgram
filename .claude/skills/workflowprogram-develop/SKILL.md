@@ -44,6 +44,8 @@ disable-model-invocation: true
 - 若目标工作流需要请求特定业务节点图，则 `workflow-spec.yaml` 必须声明 `workflow_graph`；它描述目标工作流自身节点，不要求套用 WorkflowProgram 的 `S1..S6`。
 - 新生成的目标工作流必须声明 `target_runtime_policy.mode=managed_runtime`，并将 `generated_runtime_contract.runtime_capabilities` 同步包含 `target_managed_runtime`；目标命令必须是 wrapper-only，只启动 `.workflowprogram/runtime/workflow-entry.py`，不得把完整 stage 执行逻辑写进 command prompt。
 - 目标 runtime 的受控执行由 `target-workflow-runner.py` 消费 `workflow_graph.nodes[*]`，负责 owner 解析、input/output refs、retry/stop、immutable 路径和 artifact provenance；目标业务节点输出应写到 domain output 路径，不得在运行态生成或修改 `.claude/**`、`.workflowprogram/design/**`、`.workflowprogram/runtime/**` 或 `config/scripts/**`。
+- 新生成的目标工作流若产出最终报告、manifest、latest marker 或长期复用输出，必须声明 `target_publish_policy.enabled=true`，并将 `generated_runtime_contract.runtime_capabilities` 同步包含 `target_atomic_publish`；节点只能先写 `RUN_ROOT` 下的 run-scoped outputs，最终发布由 `target-runtime-finalizer.py` 统一校验 `target-state.json`、`node-results.json`、`artifact-provenance.json` 和 required reports 后原子写入 `publish_root`。
+- 业务节点、报告脚本、doctor 或 manifest 生成脚本不得自行声明最终 `PASS/COMPLETE`；只要 finalizer 的 required report、contract、provenance 或 latest marker 校验失败，目标运行最终状态必须为 `FAIL/implementation`，不得复用旧产物补齐。
 - node 是流程单位，agent 是执行角色；只有专业知识、上下文窗口、失败归因、并行审查或工具权限形成独立边界时，才为 node 指派独立 agent。
 - 若某个目标业务节点需要持续执行直到 verifier/test 通过，应在该 `workflow_graph.nodes[*].loop_policy` 中声明 Ralph-style loop；适用场景包括逆向分析、迁移修复、报告收敛和 TDD 实现，不适用于宿主安装或人工审批。
 - 若 `RUN_ROOT/outputs/stages/change-context.json.change_policy_required=true`，必须先读取既有设计与 managed 状态，生成 `existing-workflow-readback.json`、`change-policy.json` 和 `impact-analysis.json`，再生成候选资产；这些文件是本次修改的运行证据，不得写成 `workflow-spec.yaml` 顶层字段。
