@@ -537,6 +537,48 @@ target_publish_policy:
 8. `validate-target-publish-state.py` 必须能在发布后或审计时复核 final manifest/latest marker/run root/state/provenance/required reports 同属当前 run，且 manifest 必须带 `producer=target-runtime-finalizer.py`；`target-state=FAIL` 但 final manifest 手写 `COMPLETE` 必须失败。
 7. `generated_runtime_contract.runtime_capabilities` 必须包含 `target_atomic_publish`。
 
+#### 2.5.5E `target_claude_guard`（目标项目 CLAUDE.md 防绕过提示层，待实现）
+
+`workflow-spec.yaml.target_claude_guard` 是待实现字段，用于声明是否在目标项目 `CLAUDE.md` 中维护 WorkflowProgram runtime guard block。它解决的是“目标项目上下文中能否持续看到防绕过约束”，不是可信执行边界；可信执行仍由 `target-workflow-runner.py`、`target-runtime-finalizer.py` 与 validators 保证。
+
+```yaml
+target_claude_guard:
+  enabled: true
+  file: CLAUDE.md
+  mode: managed_block
+  block_id: workflowprogram-runtime-guard
+  required_for:
+    - managed_runtime
+    - target_publish_policy
+  merge_policy:
+    if_missing_file: create
+    if_existing_no_block: append_after_title
+    if_existing_block: replace_managed_block
+    if_broken_block: conflict
+  content:
+    runtime_entry: .workflowprogram/runtime/workflow-entry.py
+    allowed_actions: [run, status, resume, diagnose]
+    blocked_behavior: current_node_evidence_only
+    failed_behavior: diagnose_only
+    trusted_publisher: target-runtime-finalizer.py
+    forbidden_operations:
+      - handwrite_final_report
+      - write_final_manifest
+      - write_latest_marker
+      - copy_run_outputs_to_final
+      - continue_after_runtime_fail
+```
+
+计划约束：
+
+1. `mode` 当前只允许 `managed_block`，不得把整份 `CLAUDE.md` 纳入 managed-files 全文件所有权。
+2. `file` 当前只允许 `CLAUDE.md`。
+3. guard block 必须使用 `BEGIN/END WORKFLOWPROGRAM RUNTIME GUARD` marker，并由独立 `claude-guard-manifest.json` 记录 block hash。
+4. 已有用户内容必须保留；缺 block 时只能追加，已有 block 时只能替换 marker 内部内容。
+5. marker 损坏、重复 block 或用户改坏 managed block 时必须输出冲突证据，不得静默覆盖。
+6. `validate-generated-runtime.py` 与 S5 judge 必须检查 managed runtime 目标项目存在 guard block；缺失时不得 clean PASS。
+7. publish 前必须确认发布包中的 `CLAUDE.md` 包含同一 guard block。
+
 #### 2.5.5A `workflow_graph`（目标工作流业务图契约）
 
 `workflow-spec.yaml.workflow_graph` 是可选 top-level section，用于描述生成后的目标工作流自己的业务节点、入口、转移、输出与 gate。它与 WorkflowProgram 自身的 `stages` / `intent_flows` 分层：
