@@ -1474,6 +1474,38 @@ def generate_target_runtime_assets(repo_root: Path, spec_path: Path, out_root: P
     }
 
 
+def apply_target_claude_guard(repo_root: Path, spec_path: Path, target_root: Path, run_root: Path) -> Dict[str, Any]:
+    """Apply the same target CLAUDE.md guard that real develop applies."""
+
+    script_path = repo_root / ".claude" / "scripts" / "apply-target-claude-guard.py"
+    completed = subprocess.run(
+        [
+            sys.executable,
+            str(script_path),
+            "--spec",
+            str(spec_path),
+            "--target-root",
+            str(target_root),
+            "--run-root",
+            str(run_root),
+            "--json",
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    try:
+        payload = json.loads(completed.stdout.strip()) if completed.stdout.strip() else {}
+    except json.JSONDecodeError:
+        payload = {}
+    if completed.returncode != 0:
+        message = completed.stderr.strip() or completed.stdout.strip() or "apply-target-claude-guard.py failed"
+        if isinstance(payload, dict) and payload.get("reason"):
+            message = str(payload.get("reason"))
+        raise RuntimeError(message)
+    return payload if isinstance(payload, dict) else {}
+
+
 def stage_design_source_archive(run_root: Path, spec_path: Path, destination_root: Path) -> Dict[str, str]:
     """Copy target design source files to a managed destination root."""
 
@@ -1937,6 +1969,8 @@ def create_target_outputs(run_root: Path, target_root: Path, *, include_claude_a
             ".workflowprogram/runtime/runtime-manifest.json",
         ]
     )
+    apply_target_claude_guard(Path(__file__).resolve().parents[1], run_root / "workflow-spec.yaml", target_root, run_root)
+    files.extend(["CLAUDE.md", ".workflowprogram/claude-guard-manifest.json"])
     return files
 
 

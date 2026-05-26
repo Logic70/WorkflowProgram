@@ -19,6 +19,7 @@ from lib.host_team_utils import (
     node_loop_enabled,
     runtime_capabilities_from_contract,
 )
+from lib.target_claude_guard import guard_required_by_spec, guard_validation_errors, target_claude_guard_config
 from lib.yaml_utils import load_yaml_mapping
 
 
@@ -97,6 +98,7 @@ def validate_generated_runtime(spec_path: Path, target_root: Path) -> Dict[str, 
         if not isinstance(target_publish_policy, dict):
             target_publish_policy = {}
         target_publish_enabled = target_publish_policy.get("enabled") is True
+        target_claude_guard = target_claude_guard_config(spec)
         main_entry = (
             str(spec.get("test_contract", {}).get("entry", {}).get("main_entry", "")).strip()
             if isinstance(spec.get("test_contract", {}), dict)
@@ -304,6 +306,14 @@ def validate_generated_runtime(spec_path: Path, target_root: Path) -> Dict[str, 
                     matched = [marker for marker in prompt_heavy_markers if marker in command_text]
                     if matched:
                         errors.append(f"managed-runtime command must be wrapper-only; prompt-heavy markers found: {matched}")
+        if managed_runtime or guard_required_by_spec(spec):
+            guard_file = str(target_claude_guard.get("file", "CLAUDE.md")).strip() or "CLAUDE.md"
+            guard_path = target_root / guard_file
+            if not guard_path.exists():
+                errors.append(f"managed-runtime target CLAUDE guard is missing: {guard_file}")
+            else:
+                guard_errors = guard_validation_errors(guard_path.read_text(encoding="utf-8"), spec)
+                errors.extend(f"managed-runtime target CLAUDE guard invalid: {item}" for item in guard_errors)
     except Exception as exc:
         errors.append(str(exc))
 

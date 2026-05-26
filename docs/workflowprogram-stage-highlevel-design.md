@@ -22,7 +22,7 @@
 - 生成后的目标工作流也必须交付自己的 `.workflowprogram/runtime/` 控制面包装层；当前固定模式为 `shared-control-plane-wrapper`，但目标业务图执行必须由 `target_runtime_policy.mode=managed_runtime` 下的 `target-workflow-runner.py` 消费 `workflow_graph.nodes`，不得只靠 command prompt 口头顺序。
 - 目标业务图 executor 必须由 `target_executor_policy` 声明；不得硬编码或默认假设 `claude -p` 可用。ClaudeCode 当前会话、第三方 API 模型或人工协作只能走 `current_agent` / `manual` 证据模式，由 finalizer 复核后才能 PASS。
 - 生成后的目标工作流若有最终报告、manifest、latest marker 或长期复用输出，还必须交付 `target_publish_policy` 和 `target-runtime-finalizer.py` 事务层；节点输出先进入 run-scoped workspace，最终 `PASS/COMPLETE` 只能由 finalizer 在校验当前 run 证据后原子发布。`target_publish_policy.required_reports` 与 `workflow_graph` 节点 refs 不得引用 finalizer 自己生成的 manifest/latest marker，`validate-target-publish-state.py` 负责验证最终目录没有被模型或业务脚本在 runtime 失败后手写伪造成 `COMPLETE`。
-- 待实现方案：新生成的 managed runtime 目标工作流还应维护目标项目 `CLAUDE.md` 中的 WorkflowProgram runtime guard block。该 block 只作为提示层防绕过约束，提醒模型服从 `run/status/resume/diagnose`、`current_agent/manual` evidence 和 finalizer-only publish；可信边界仍由 runner/finalizer/validator/doctor 执行。
+- 已实现能力：新生成的 managed runtime 目标工作流会维护目标项目 `CLAUDE.md` 中的 WorkflowProgram runtime guard block。该 block 只作为提示层防绕过约束，提醒模型服从 `run/status/resume/diagnose`、`current_agent/manual` evidence 和 finalizer-only publish；可信边界仍由 runner/finalizer/validator/doctor 执行。
 - 目标项目写入采用 staged candidate + managed apply 流程。
 - 运行证据统一写入 `TARGET_ROOT/.workflowprogram/runs/<run-id>/`。
 - 若工作流启用 `capability_discovery`，则在 `host_capabilities` 最终定稿前，必须先生成候选能力推荐与结构化人工指引。

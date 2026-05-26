@@ -314,6 +314,7 @@ runtime_contract:
   # 允许写入路径边界（相对各 root）
   write_boundaries:
     target_root_allow:
+      - "CLAUDE.md"
       - ".claude/**"
       - ".workflowprogram/**"
     run_root_allow:
@@ -431,6 +432,37 @@ target_publish_policy:
   # Do not reference manifest_path/latest_marker from workflow_graph node refs.
   # validate-target-publish-state.py rejects hand-written COMPLETE manifests,
   # stale latest markers, and target-state/report/provenance mismatches.
+
+target_claude_guard:
+  # 这是目标项目 CLAUDE.md 的提示层防绕过约束；可信边界仍由 runner/finalizer/validator/doctor 保证。
+  enabled: true
+  file: CLAUDE.md
+  mode: managed_block
+  block_id: workflowprogram-runtime-guard
+  required_for:
+    - managed_runtime
+    - target_publish_policy
+  merge_policy:
+    if_missing_file: create
+    if_existing_no_block: append_after_title
+    if_existing_block: replace_managed_block
+    if_broken_block: conflict
+  content:
+    runtime_entry: .workflowprogram/runtime/workflow-entry.py
+    allowed_actions:
+      - run
+      - status
+      - resume
+      - diagnose
+    blocked_behavior: current_node_evidence_only
+    failed_behavior: diagnose_only
+    trusted_publisher: target-runtime-finalizer.py
+    forbidden_operations:
+      - handwrite_final_report
+      - write_final_manifest
+      - write_latest_marker
+      - copy_run_outputs_to_final
+      - continue_after_runtime_fail
 
 # 可选能力搜索与推荐契约
 # capability_discovery:

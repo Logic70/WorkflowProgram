@@ -40,6 +40,7 @@
 - `stage_slot: S1..S6` 只约束 WorkflowProgram 自身控制面；生成后的目标工作流可通过 `workflow_graph` 声明自己的业务节点图。
 - 产品主入口的确定性脚本链为 `workflow-entry.py -> managed-assets.py -> workflow-runner.py -> validate-run-state.py`。
 - 目标工作流 runtime 的交付模式固定为 `generated_runtime_contract.mode = shared-control-plane-wrapper`。
+- 新生成的 managed runtime 目标工作流必须通过 `target_claude_guard` 维护目标项目 `CLAUDE.md` 中的 WorkflowProgram runtime guard block；该 block 是提示层防绕过约束，硬门禁仍由 runner/finalizer/validator/doctor 执行。
 - S1/S2/S3 的需求转化链为 `target-requirements.yaml -> target-context-findings.yaml -> target-design-overview.md / target-design-detail.md -> workflow-spec.yaml -> target-traceability-matrix.json`。
 - `workflow-spec.md` 是用户回读，`workflow-view.md` 与 `workflow-maintenance.md` 是从 YAML 派生的报告，`target-design-detail.md` 才是目标工作流低层设计源。
 - 复杂目标业务节点应升级为 `outputs/stages/target-node-designs/<node-id>.md`，而不是拆成新的 WorkflowProgram `S1..S6`；node 与 agent 不要求一一对应，且 node-design 必须通过内容校验证明与 `workflow_graph.nodes[*]` 的 owner、template、gate、input/output、loop policy 一致。

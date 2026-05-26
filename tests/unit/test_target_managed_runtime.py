@@ -16,12 +16,14 @@ FINALIZER = ROOT / ".claude" / "scripts" / "target-runtime-finalizer.py"
 GENERATE_RUNTIME = ROOT / ".claude" / "scripts" / "generate-target-runtime.py"
 GENERATED_RUNTIME_VALIDATOR = ROOT / ".claude" / "scripts" / "validate-generated-runtime.py"
 PUBLISH_STATE_VALIDATOR = ROOT / ".claude" / "scripts" / "validate-target-publish-state.py"
+APPLY_CLAUDE_GUARD = ROOT / ".claude" / "scripts" / "apply-target-claude-guard.py"
+SPEC_VALIDATOR = ROOT / ".claude" / "scripts" / "validate-workflow-spec.py"
 SPEC = ROOT / "tests" / "spec-fixtures" / "valid-minimal.yaml"
 
 
 def write_target_fixture(tmp_path: Path, *, include_owner: bool = True) -> Path:
     target = tmp_path / "target"
-    target.mkdir()
+    target.mkdir(parents=True)
     if include_owner:
         skill = target / ".claude" / "skills" / "example" / "SKILL.md"
         skill.parent.mkdir(parents=True)
@@ -53,6 +55,41 @@ def generate_runtime_for_target(target: Path, spec_path: Path) -> None:
         check=False,
     )
     assert completed.returncode == 0, completed.stderr or completed.stdout
+
+
+def write_wrapper_command(target: Path) -> None:
+    command_path = target / ".claude" / "commands" / "example.md"
+    command_path.parent.mkdir(parents=True, exist_ok=True)
+    command_path.write_text(
+        """---
+description: Wrapper-only command
+---
+
+Run `.workflowprogram/runtime/workflow-entry.py run --request "$ARGUMENTS"`.
+""",
+        encoding="utf-8",
+    )
+
+
+def apply_claude_guard(target: Path, spec_path: Path, run_root: Path) -> dict:
+    completed = subprocess.run(
+        [
+            sys.executable,
+            str(APPLY_CLAUDE_GUARD),
+            "--spec",
+            str(spec_path),
+            "--target-root",
+            str(target),
+            "--run-root",
+            str(run_root),
+            "--json",
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert completed.returncode == 0, completed.stderr or completed.stdout
+    return json.loads(completed.stdout)
 
 
 def sha256_file(path: Path) -> str:
@@ -658,6 +695,7 @@ def test_generated_runtime_rejects_prompt_heavy_managed_command(tmp_path: Path) 
     target = write_target_fixture(tmp_path)
     spec_path = write_persistent_spec(target)
     generate_runtime_for_target(target, spec_path)
+    apply_claude_guard(target, spec_path, tmp_path / "guard-run")
     command_path = target / ".claude" / "commands" / "example.md"
     command_path.parent.mkdir(parents=True, exist_ok=True)
     command_path.write_text(
@@ -697,6 +735,8 @@ def test_generated_runtime_rejects_local_shared_control_plane_script(tmp_path: P
     target = write_target_fixture(tmp_path)
     spec_path = write_persistent_spec(target)
     generate_runtime_for_target(target, spec_path)
+    write_wrapper_command(target)
+    apply_claude_guard(target, spec_path, tmp_path / "guard-run")
     stale_runner = target / ".workflowprogram" / "runtime" / "target-workflow-runner.py"
     stale_runner.write_text("# stale local control plane\n", encoding="utf-8")
 
@@ -724,6 +764,8 @@ def test_generated_runtime_requires_publish_state_validation_marker(tmp_path: Pa
     target = write_target_fixture(tmp_path)
     spec_path = write_persistent_spec(target)
     generate_runtime_for_target(target, spec_path)
+    write_wrapper_command(target)
+    apply_claude_guard(target, spec_path, tmp_path / "guard-run")
     entry_path = target / ".workflowprogram" / "runtime" / "workflow-entry.py"
     entry_path.write_text(
         entry_path.read_text(encoding="utf-8").replace("validate_target_publish_state", "skip_publish_state_validation"),
@@ -748,6 +790,119 @@ def test_generated_runtime_requires_publish_state_validation_marker(tmp_path: Pa
     payload = json.loads(completed.stdout)
     assert payload["status"] == "FAIL"
     assert any("validate-target-publish-state.py execution marker" in error for error in payload["errors"])
+
+
+def test_target_claude_guard_create_append_replace_and_conflict(tmp_path: Path) -> None:
+    target = write_target_fixture(tmp_path)
+    spec_path = write_persistent_spec(target)
+
+    created = apply_claude_guard(target, spec_path, tmp_path / "guard-create")
+    assert created["status"] == "PASS"
+    assert created["action"] == "create"
+    assert "WorkflowProgram Runtime Guard" in (target / "CLAUDE.md").read_text(encoding="utf-8")
+    assert (target / ".workflowprogram" / "claude-guard-manifest.json").exists()
+
+    target2 = write_target_fixture(tmp_path / "append")
+    spec_path2 = write_persistent_spec(target2)
+    (target2 / "CLAUDE.md").write_text("# Existing Project\n\nKeep this project rule.\n", encoding="utf-8")
+    appended = apply_claude_guard(target2, spec_path2, tmp_path / "guard-append")
+    text2 = (target2 / "CLAUDE.md").read_text(encoding="utf-8")
+    assert appended["action"] == "append"
+    assert "Keep this project rule." in text2
+    assert "WorkflowProgram Runtime Guard" in text2
+
+    replaced = apply_claude_guard(target2, spec_path2, tmp_path / "guard-replace")
+    assert replaced["action"] == "replace"
+
+    target3 = write_target_fixture(tmp_path / "conflict")
+    spec_path3 = write_persistent_spec(target3)
+    (target3 / "CLAUDE.md").write_text("<!-- BEGIN WORKFLOWPROGRAM RUNTIME GUARD: workflowprogram-runtime-guard -->\n", encoding="utf-8")
+    conflicted = subprocess.run(
+        [
+            sys.executable,
+            str(APPLY_CLAUDE_GUARD),
+            "--spec",
+            str(spec_path3),
+            "--target-root",
+            str(target3),
+            "--run-root",
+            str(tmp_path / "guard-conflict"),
+            "--json",
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert conflicted.returncode == 2
+    assert json.loads(conflicted.stdout)["status"] == "CONFLICT"
+
+
+def test_validate_workflow_spec_rejects_invalid_target_claude_guard(tmp_path: Path) -> None:
+    payload = yaml.safe_load(SPEC.read_text(encoding="utf-8"))
+    payload["target_claude_guard"]["file"] = "docs/CLAUDE.md"
+    invalid = tmp_path / "invalid-claude-guard.yaml"
+    invalid.write_text(yaml.safe_dump(payload, allow_unicode=True, sort_keys=False), encoding="utf-8")
+
+    completed = subprocess.run(
+        [sys.executable, str(SPEC_VALIDATOR), "--spec", str(invalid), "--json"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert completed.returncode == 1
+    result = json.loads(completed.stdout)
+    assert result["status"] == "FAIL"
+    assert any("target_claude_guard.file" in error for error in result["errors"])
+
+
+def test_generated_runtime_requires_target_claude_guard(tmp_path: Path) -> None:
+    target = write_target_fixture(tmp_path)
+    spec_path = write_persistent_spec(target)
+    generate_runtime_for_target(target, spec_path)
+    write_wrapper_command(target)
+
+    completed = subprocess.run(
+        [
+            sys.executable,
+            str(GENERATED_RUNTIME_VALIDATOR),
+            "--spec",
+            str(spec_path),
+            "--target-root",
+            str(target),
+            "--json",
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert completed.returncode == 1
+    payload = json.loads(completed.stdout)
+    assert any("target CLAUDE guard is missing" in error for error in payload["errors"])
+
+
+def test_generated_runtime_accepts_target_claude_guard(tmp_path: Path) -> None:
+    target = write_target_fixture(tmp_path)
+    spec_path = write_persistent_spec(target)
+    generate_runtime_for_target(target, spec_path)
+    write_wrapper_command(target)
+    apply_claude_guard(target, spec_path, tmp_path / "guard-run")
+
+    completed = subprocess.run(
+        [
+            sys.executable,
+            str(GENERATED_RUNTIME_VALIDATOR),
+            "--spec",
+            str(spec_path),
+            "--target-root",
+            str(target),
+            "--json",
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert completed.returncode == 0, completed.stdout
+    assert json.loads(completed.stdout)["status"] == "PASS"
 
 
 def test_publish_state_validator_rejects_forged_complete_manifest(tmp_path: Path) -> None:

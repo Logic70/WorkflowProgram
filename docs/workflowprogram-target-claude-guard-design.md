@@ -4,7 +4,7 @@
 
 用户目标：让 WorkflowProgram 生成的目标项目也能在 `CLAUDE.md` 中获得明确的防绕过控制面约束，降低 ClaudeCode 在上下文变长、runtime 失败或用户要求“继续完成”时绕过 runtime/finalizer 的概率。
 
-实现状态：本文是待实现设计与实施计划，当前代码尚未生成或合并目标项目 `CLAUDE.md` guard block。
+实现状态：已实现。`workflowprogram-develop` 会在 managed apply 后写入目标项目 `CLAUDE.md` guard block，validators、S5 judge 与 publish eligibility 会检查该 block 是否存在且内容有效。
 
 范围边界：
 

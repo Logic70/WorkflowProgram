@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any, Dict, List
 
 from lib.io_utils import iso_now, write_json
+from lib.target_claude_guard import guard_required_by_spec, guard_validation_errors, target_claude_guard_config
 from lib.target_design_refs import PERSISTENT_DEFAULTS, resolve_target_design_refs
 from lib.yaml_utils import try_load_yaml_mapping
 
@@ -148,6 +149,18 @@ def validate_eligibility(
                 observed_files.append({"path": existing_rel_path, "canonical_path": rel_path, "sha256": sha256_file(path)})
 
     target_spec = try_load_yaml_mapping(target_root / ".workflowprogram" / "design" / "workflow-spec.yaml")
+    if target_spec and guard_required_by_spec(target_spec):
+        guard_config = target_claude_guard_config(target_spec)
+        guard_rel = str(guard_config.get("file", "CLAUDE.md")).strip() or "CLAUDE.md"
+        guard_path = target_root / guard_rel
+        check("target_claude_guard_file_present", guard_path.exists(), f"{guard_rel} {'exists' if guard_path.exists() else 'is missing'}")
+        if guard_path.exists() and guard_path.is_file():
+            guard_errors = guard_validation_errors(guard_path.read_text(encoding="utf-8"), target_spec)
+            check(
+                "target_claude_guard_valid",
+                not guard_errors,
+                "target CLAUDE guard valid" if not guard_errors else "; ".join(guard_errors),
+            )
     target_design_refs = resolve_target_design_refs(target_spec)
     target_design_governed = target_design_refs.canonical or bool(target_design_refs.persistent_refs)
     if target_design_governed:

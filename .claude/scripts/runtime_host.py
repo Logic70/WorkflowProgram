@@ -897,6 +897,38 @@ def _generate_target_runtime_assets(spec_path: Path, out_root: Path) -> Dict[str
     }
 
 
+def _apply_target_claude_guard(spec_path: Path, target_root: Path, run_root: Path) -> Dict[str, Any]:
+    """Apply the same target CLAUDE.md runtime guard used by the real develop entry."""
+
+    script_root = _repo_root() / ".claude" / "scripts"
+    completed = subprocess.run(
+        [
+            sys.executable,
+            str(script_root / "apply-target-claude-guard.py"),
+            "--spec",
+            str(spec_path),
+            "--target-root",
+            str(target_root),
+            "--run-root",
+            str(run_root),
+            "--json",
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    try:
+        payload = json.loads(completed.stdout.strip()) if completed.stdout.strip() else {}
+    except json.JSONDecodeError:
+        payload = {}
+    if completed.returncode not in {0}:
+        message = completed.stderr.strip() or completed.stdout.strip() or "apply-target-claude-guard.py failed"
+        if isinstance(payload, dict) and payload.get("reason"):
+            message = str(payload.get("reason"))
+        raise RuntimeError(message)
+    return payload if isinstance(payload, dict) else {}
+
+
 def _write_lessons_delta(run_root: Path, entry_skill: str, request: str, failure_kind: str) -> None:
     """为 fixture_host 运行生成确定性的 S6 lessons delta。"""
 
@@ -1409,6 +1441,42 @@ def _invoke_fixture_host(
         if fixture == "external-write":
             external_path = target_root / "external-write.txt"
             _write_text(external_path, "external write\n")
+        try:
+            guard_payload = _apply_target_claude_guard(spec_path, target_root, run_root)
+        except RuntimeError as exc:
+            _write_runner_evidence(
+                run_root,
+                target_root,
+                entry_skill,
+                ["requirement", "context", "design", "generate"],
+                "FAIL",
+                "CONFLICT_FAILURE",
+            )
+            _write_progress_artifacts(
+                run_root,
+                ["requirement", "context", "design", "generate"],
+                "FAIL",
+                "resolve target CLAUDE.md runtime guard conflict and rerun",
+                current_stage="generate",
+            )
+            return RuntimeHostInvocation(
+                provider=config.provider,
+                result="FAIL",
+                failure_code="CONFLICT_FAILURE",
+                message=str(exc),
+                is_error=True,
+                command=cmd,
+                returncode=2,
+                stdout=completed.stdout,
+                stderr=completed.stderr,
+                parsed=payload,
+                stage_history=["requirement", "context", "design", "generate"],
+                current_stage="generate",
+                stage_status="failed",
+                next_action="resolve target CLAUDE.md runtime guard conflict and rerun",
+                next_stage_on_failure="generate",
+                metadata={"applied": applied, "conflicts": conflicts},
+            )
         _write_runner_evidence(
             run_root,
             target_root,
@@ -1441,7 +1509,7 @@ def _invoke_fixture_host(
             stage_status="done",
             next_action="complete",
             next_stage_on_failure="",
-            metadata={"applied": applied, "conflicts": conflicts},
+            metadata={"applied": applied, "conflicts": conflicts, "target_claude_guard": guard_payload},
         )
 
     if entry_skill == "workflowprogram-publish":

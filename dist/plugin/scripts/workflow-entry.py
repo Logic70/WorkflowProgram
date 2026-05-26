@@ -664,6 +664,29 @@ def apply_host_bootstrap(spec_path: Path, target_root: Path, run_root: Path) -> 
     return payload
 
 
+def apply_target_claude_guard(spec_path: Path, target_root: Path, run_root: Path) -> Tuple[Dict[str, Any], bool]:
+    """Apply target project CLAUDE.md runtime guard and report whether it conflicted."""
+
+    code, payload, text = run_command(
+        [
+            sys.executable,
+            str(script_dir() / "apply-target-claude-guard.py"),
+            "--spec",
+            str(spec_path),
+            "--target-root",
+            str(target_root),
+            "--run-root",
+            str(run_root),
+            "--json",
+        ]
+    )
+    if code not in {0, 2}:
+        raise RuntimeError(f"apply-target-claude-guard.py failed: {text}")
+    if not payload:
+        raise RuntimeError("apply-target-claude-guard.py did not return JSON output")
+    return payload, code == 2 or str(payload.get("status", "")).strip() == "CONFLICT"
+
+
 def generate_environment_remediation(spec_path: Path, target_root: Path, run_root: Path) -> Dict[str, Any]:
     """根据当前 host 证据和历史运行生成环境修复提案。"""
 
@@ -741,6 +764,7 @@ def command_run(args: argparse.Namespace) -> int:
     host_capability_report: Dict[str, Any] | None = None
     host_bootstrap_result: Dict[str, Any] | None = None
     environment_remediation_report: Dict[str, Any] | None = None
+    target_claude_guard_result: Dict[str, Any] | None = None
     runner_code: int | None = None
     runner_summary: Dict[str, Any] | None = None
     state_validation: Dict[str, Any] | None = None
@@ -812,6 +836,11 @@ def command_run(args: argparse.Namespace) -> int:
             if conflicts:
                 stopped_before_runner = True
                 final_status = "CONFLICT"
+            else:
+                target_claude_guard_result, guard_conflict = apply_target_claude_guard(spec_path, target_root, run_root)
+                if guard_conflict:
+                    stopped_before_runner = True
+                    final_status = "CONFLICT"
         if final_status not in {"CONFLICT", "BLOCKED"}:
             capability_discovery_report = discover_host_capabilities(spec_path, target_root, run_root, args.request)
             host_capability_report = probe_host_capabilities(spec_path, target_root, run_root)
@@ -939,6 +968,7 @@ def command_run(args: argparse.Namespace) -> int:
         "host_capability_report": host_capability_report,
         "host_bootstrap_result": host_bootstrap_result,
         "environment_remediation_report": environment_remediation_report,
+        "target_claude_guard_result": target_claude_guard_result,
         "required_host_capability_missing": required_host_missing,
         "runner_status_code": runner_code,
         "runner_summary": runner_summary,

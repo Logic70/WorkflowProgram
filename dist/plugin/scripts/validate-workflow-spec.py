@@ -29,6 +29,16 @@ from lib.host_team_utils import (
     string_list,
 )
 from lib.spec_utils import stage_slot_id_map
+from lib.target_claude_guard import (
+    DEFAULT_ALLOWED_ACTIONS,
+    DEFAULT_FORBIDDEN_OPERATIONS,
+    DEFAULT_RUNTIME_ENTRY,
+    VALID_BLOCKED_BEHAVIOR,
+    VALID_FAILED_BEHAVIOR,
+    VALID_MERGE_VALUES,
+    VALID_REQUIRED_FOR,
+    guard_required_by_spec,
+)
 from lib.target_design_refs import (
     ALLOWED_DESIGN_REF_FIELDS,
     CANONICAL_RUN_DEFAULTS,
@@ -60,6 +70,7 @@ OPTIONAL_TOP_KEYS = {
     "target_runtime_policy",
     "target_executor_policy",
     "target_publish_policy",
+    "target_claude_guard",
 }
 
 REQUIRED_META_KEYS = {
@@ -111,6 +122,7 @@ VALID_TARGET_RUNTIME_OUTPUT_FAILURE = {"retry_then_terminal", "terminal"}
 VALID_TARGET_EXECUTOR_PROVIDERS = {"fixture_host", "command_adapter", "current_agent", "manual"}
 VALID_TARGET_EXECUTOR_UNSUPPORTED_VERDICTS = {"FAIL"}
 FORBIDDEN_TARGET_PUBLISH_PREFIXES = (".claude/", ".workflowprogram/", "config/scripts/")
+VALID_TARGET_CLAUDE_GUARD_MODES = {"managed_block"}
 REQUIRED_FAILURE_KINDS = {"none", "design", "implementation", "environment", "conflict"}
 VALID_ENV_SKIP_CHECKS = {
     "runtime_host_available",
@@ -985,6 +997,98 @@ def validate_target_publish_policy(
                 "workflow_graph output_refs must stay under target_publish_policy.publish_root when target_publish_policy.enabled=true: "
                 + ", ".join(sorted(outside_publish_root)),
             )
+
+
+def validate_target_claude_guard(
+    target_claude_guard: Dict[str, Any],
+    spec: Dict[str, Any],
+    errors: List[str],
+    warnings: List[str],
+) -> None:
+    """Validate target project CLAUDE.md runtime guard policy."""
+
+    guard_required = guard_required_by_spec(spec)
+    if not target_claude_guard:
+        if guard_required:
+            add_warn(warnings, "target_claude_guard is not declared; develop will apply the default CLAUDE.md runtime guard")
+        return
+
+    enabled = target_claude_guard.get("enabled")
+    if not isinstance(enabled, bool):
+        add_error(errors, "target_claude_guard.enabled must be boolean")
+        return
+    if enabled is False:
+        if guard_required:
+            add_error(errors, "target_claude_guard.enabled=false is not allowed for managed runtime or target publish workflows")
+        return
+
+    file_value = normalize_relative_path(str(target_claude_guard.get("file", "")))
+    if file_value != "CLAUDE.md":
+        add_error(errors, "target_claude_guard.file currently must be CLAUDE.md")
+
+    mode = str(target_claude_guard.get("mode", "")).strip()
+    if mode not in VALID_TARGET_CLAUDE_GUARD_MODES:
+        add_error(errors, f"target_claude_guard.mode must be one of {sorted(VALID_TARGET_CLAUDE_GUARD_MODES)}")
+
+    block_id = str(target_claude_guard.get("block_id", "")).strip()
+    if not block_id:
+        add_error(errors, "target_claude_guard.block_id is required")
+    elif not re.match(r"^[A-Za-z0-9_.-]+$", block_id):
+        add_error(errors, "target_claude_guard.block_id must contain only letters, numbers, underscore, dot, or dash")
+
+    required_for = target_claude_guard.get("required_for", [])
+    if not isinstance(required_for, list):
+        add_error(errors, "target_claude_guard.required_for must be a list")
+        required_values: List[str] = []
+    else:
+        required_values = [str(item).strip() for item in required_for if str(item).strip()]
+        for idx, value in enumerate(required_values):
+            if value not in VALID_REQUIRED_FOR:
+                add_error(errors, f"target_claude_guard.required_for[{idx}] must be one of {sorted(VALID_REQUIRED_FOR)}")
+    publish_policy = spec.get("target_publish_policy", {})
+    if isinstance(publish_policy, dict) and publish_policy.get("enabled") is True and "target_publish_policy" not in required_values:
+        add_error(errors, "target_claude_guard.required_for must include target_publish_policy when target_publish_policy.enabled=true")
+
+    merge_policy = require_mapping(target_claude_guard.get("merge_policy", {}), "target_claude_guard.merge_policy", errors)
+    for key, allowed_values in VALID_MERGE_VALUES.items():
+        value = str(merge_policy.get(key, "")).strip()
+        if value not in allowed_values:
+            add_error(errors, f"target_claude_guard.merge_policy.{key} must be one of {sorted(allowed_values)}")
+
+    content = require_mapping(target_claude_guard.get("content", {}), "target_claude_guard.content", errors)
+    runtime_entry = normalize_relative_path(str(content.get("runtime_entry", "")))
+    if runtime_entry != DEFAULT_RUNTIME_ENTRY:
+        add_error(errors, f"target_claude_guard.content.runtime_entry must be {DEFAULT_RUNTIME_ENTRY}")
+
+    actions = content.get("allowed_actions", [])
+    if not isinstance(actions, list):
+        add_error(errors, "target_claude_guard.content.allowed_actions must be a list")
+        action_values: List[str] = []
+    else:
+        action_values = [str(item).strip() for item in actions if str(item).strip()]
+        if sorted(action_values) != sorted(DEFAULT_ALLOWED_ACTIONS):
+            add_error(errors, f"target_claude_guard.content.allowed_actions must be exactly {DEFAULT_ALLOWED_ACTIONS}")
+
+    blocked_behavior = str(content.get("blocked_behavior", "")).strip()
+    if blocked_behavior not in VALID_BLOCKED_BEHAVIOR:
+        add_error(errors, f"target_claude_guard.content.blocked_behavior must be one of {sorted(VALID_BLOCKED_BEHAVIOR)}")
+
+    failed_behavior = str(content.get("failed_behavior", "")).strip()
+    if failed_behavior not in VALID_FAILED_BEHAVIOR:
+        add_error(errors, f"target_claude_guard.content.failed_behavior must be one of {sorted(VALID_FAILED_BEHAVIOR)}")
+
+    trusted_publisher = str(content.get("trusted_publisher", "")).strip()
+    if trusted_publisher != "target-runtime-finalizer.py":
+        add_error(errors, "target_claude_guard.content.trusted_publisher must be target-runtime-finalizer.py")
+
+    forbidden = content.get("forbidden_operations", [])
+    if not isinstance(forbidden, list):
+        add_error(errors, "target_claude_guard.content.forbidden_operations must be a list")
+    else:
+        forbidden_values = {str(item).strip() for item in forbidden if str(item).strip()}
+        missing = sorted(set(DEFAULT_FORBIDDEN_OPERATIONS) - forbidden_values)
+        if missing:
+            add_error(errors, "target_claude_guard.content.forbidden_operations missing required operations: " + ", ".join(missing))
 
 
 def validate_node_loop_policy(
@@ -2139,6 +2243,13 @@ def validate_spec(spec: Dict[str, Any]) -> Dict[str, Any]:
         else {}
     )
     validate_target_publish_policy(target_publish_policy, workflow_graph, generated_runtime_contract, errors, warnings)
+
+    target_claude_guard = (
+        require_mapping(spec.get("target_claude_guard", {}), "target_claude_guard", errors)
+        if "target_claude_guard" in spec
+        else {}
+    )
+    validate_target_claude_guard(target_claude_guard, spec, errors, warnings)
 
     test_contract = require_mapping(spec.get("test_contract", {}), "test_contract", errors)
     validate_test_contract(test_contract, runtime_contract, stage_ids, slot_map, intent_flows, registered_entries, errors, warnings)

@@ -106,6 +106,8 @@ Claude Code 加载插件后，会在 `SessionStart` 自动执行 Python runtime 
 
 发布目标 workflow 时，`workflowprogram-publish` 会检查 develop/S5/design-review/managed/target-design-source 证据；publish 不负责临时补设计源，也不修复缺失的 traceability 或 acceptance tests。
 
+managed runtime 目标 workflow 还会维护目标项目 `CLAUDE.md` 中的 WorkflowProgram runtime guard block。该 block 用于提醒 Claude Code 只通过 runtime 的 `run/status/resume/diagnose` 派单推进，并禁止手工补最终报告、manifest、latest marker 或 runtime 失败后继续伪造完成；发布前会校验该 block 存在且有效。
+
 ## Python Runtime
 
 - 插件在 `SessionStart` 通过 `${CLAUDE_PLUGIN_ROOT}/scripts/bootstrap-python-runtime.py` 准备私有 Python 依赖。

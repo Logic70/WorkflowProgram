@@ -537,9 +537,9 @@ target_publish_policy:
 8. `validate-target-publish-state.py` 必须能在发布后或审计时复核 final manifest/latest marker/run root/state/provenance/required reports 同属当前 run，且 manifest 必须带 `producer=target-runtime-finalizer.py`；`target-state=FAIL` 但 final manifest 手写 `COMPLETE` 必须失败。
 7. `generated_runtime_contract.runtime_capabilities` 必须包含 `target_atomic_publish`。
 
-#### 2.5.5E `target_claude_guard`（目标项目 CLAUDE.md 防绕过提示层，待实现）
+#### 2.5.5E `target_claude_guard`（目标项目 CLAUDE.md 防绕过提示层，已实现）
 
-`workflow-spec.yaml.target_claude_guard` 是待实现字段，用于声明是否在目标项目 `CLAUDE.md` 中维护 WorkflowProgram runtime guard block。它解决的是“目标项目上下文中能否持续看到防绕过约束”，不是可信执行边界；可信执行仍由 `target-workflow-runner.py`、`target-runtime-finalizer.py` 与 validators 保证。
+`workflow-spec.yaml.target_claude_guard` 用于声明是否在目标项目 `CLAUDE.md` 中维护 WorkflowProgram runtime guard block。它解决的是“目标项目上下文中能否持续看到防绕过约束”，不是可信执行边界；可信执行仍由 `target-workflow-runner.py`、`target-runtime-finalizer.py` 与 validators 保证。
 
 ```yaml
 target_claude_guard:
