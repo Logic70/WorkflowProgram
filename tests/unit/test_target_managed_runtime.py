@@ -13,6 +13,9 @@ ROOT = Path(__file__).resolve().parents[2]
 RUNNER = ROOT / ".claude" / "scripts" / "target-workflow-runner.py"
 VALIDATOR = ROOT / ".claude" / "scripts" / "validate-target-runtime-state.py"
 FINALIZER = ROOT / ".claude" / "scripts" / "target-runtime-finalizer.py"
+GENERATE_RUNTIME = ROOT / ".claude" / "scripts" / "generate-target-runtime.py"
+GENERATED_RUNTIME_VALIDATOR = ROOT / ".claude" / "scripts" / "validate-generated-runtime.py"
+PUBLISH_STATE_VALIDATOR = ROOT / ".claude" / "scripts" / "validate-target-publish-state.py"
 SPEC = ROOT / "tests" / "spec-fixtures" / "valid-minimal.yaml"
 
 
@@ -24,6 +27,32 @@ def write_target_fixture(tmp_path: Path, *, include_owner: bool = True) -> Path:
         skill.parent.mkdir(parents=True)
         skill.write_text("---\nname: example-skill\n---\n", encoding="utf-8")
     return target
+
+
+def write_persistent_spec(target: Path, spec_path: Path = SPEC) -> Path:
+    destination = target / ".workflowprogram" / "design" / "workflow-spec.yaml"
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    destination.write_text(spec_path.read_text(encoding="utf-8"), encoding="utf-8")
+    return destination
+
+
+def generate_runtime_for_target(target: Path, spec_path: Path) -> None:
+    out_root = target / ".workflowprogram" / "runtime"
+    completed = subprocess.run(
+        [
+            sys.executable,
+            str(GENERATE_RUNTIME),
+            "--spec",
+            str(spec_path),
+            "--out-root",
+            str(out_root),
+            "--json",
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert completed.returncode == 0, completed.stderr or completed.stdout
 
 
 def sha256_file(path: Path) -> str:
@@ -305,6 +334,24 @@ def test_target_runtime_finalizer_publishes_current_run_outputs(tmp_path: Path) 
     assert manifest["run_id"] == run_root.name
     assert latest["run_id"] == run_root.name
     assert json.loads((run_root / "target-state.json").read_text(encoding="utf-8"))["finalizer_status"] == "PASS"
+    publish_validation = subprocess.run(
+        [
+            sys.executable,
+            str(PUBLISH_STATE_VALIDATOR),
+            "--spec",
+            str(SPEC),
+            "--target-root",
+            str(target),
+            "--run-root",
+            str(run_root),
+            "--json",
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert publish_validation.returncode == 0, publish_validation.stderr or publish_validation.stdout
+    assert json.loads(publish_validation.stdout)["status"] == "PASS"
 
 
 def test_target_runtime_finalizer_blocks_report_mismatch(tmp_path: Path) -> None:
@@ -507,6 +554,60 @@ def test_target_publish_policy_requires_capability(tmp_path: Path) -> None:
     assert any("target_atomic_publish" in item for item in payload["errors"])
 
 
+def test_target_publish_policy_rejects_finalizer_owned_required_report(tmp_path: Path) -> None:
+    spec = yaml.safe_load(SPEC.read_text(encoding="utf-8"))
+    spec["target_publish_policy"]["required_reports"].append(
+        {
+            "path": spec["target_publish_policy"]["manifest_path"],
+            "status_field": "status",
+            "pass_values": ["COMPLETE"],
+        }
+    )
+    invalid = tmp_path / "invalid-finalizer-owned-report.yaml"
+    invalid.write_text(yaml.safe_dump(spec, allow_unicode=True, sort_keys=False), encoding="utf-8")
+    completed = subprocess.run(
+        [
+            sys.executable,
+            str(ROOT / ".claude" / "scripts" / "validate-workflow-spec.py"),
+            "--spec",
+            str(invalid),
+            "--json",
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert completed.returncode == 1
+    payload = json.loads(completed.stdout)
+    assert any("finalizer owns that manifest" in item for item in payload["errors"])
+
+
+def test_target_publish_policy_rejects_finalizer_owned_graph_refs(tmp_path: Path) -> None:
+    spec = yaml.safe_load(SPEC.read_text(encoding="utf-8"))
+    manifest_path = spec["target_publish_policy"]["manifest_path"]
+    latest_marker = spec["target_publish_policy"]["latest_marker"]
+    spec["workflow_graph"]["nodes"][0]["input_refs"].append(manifest_path)
+    spec["workflow_graph"]["nodes"][0]["output_refs"].append(latest_marker)
+    invalid = tmp_path / "invalid-finalizer-owned-graph-refs.yaml"
+    invalid.write_text(yaml.safe_dump(spec, allow_unicode=True, sort_keys=False), encoding="utf-8")
+    completed = subprocess.run(
+        [
+            sys.executable,
+            str(ROOT / ".claude" / "scripts" / "validate-workflow-spec.py"),
+            "--spec",
+            str(invalid),
+            "--json",
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert completed.returncode == 1
+    payload = json.loads(completed.stdout)
+    assert any("input_refs must not depend on finalizer-owned" in item for item in payload["errors"])
+    assert any("output_refs must not write finalizer-owned" in item for item in payload["errors"])
+
+
 def test_target_managed_runtime_exception_writes_failure_evidence(tmp_path: Path) -> None:
     spec = yaml.safe_load(SPEC.read_text(encoding="utf-8"))
     spec.pop("workflow_graph", None)
@@ -551,3 +652,252 @@ def test_target_managed_runtime_exception_writes_failure_evidence(tmp_path: Path
     assert validation.returncode == 1
     validation_payload = json.loads(validation.stdout)
     assert validation_payload["status"] == "FAIL"
+
+
+def test_generated_runtime_rejects_prompt_heavy_managed_command(tmp_path: Path) -> None:
+    target = write_target_fixture(tmp_path)
+    spec_path = write_persistent_spec(target)
+    generate_runtime_for_target(target, spec_path)
+    command_path = target / ".claude" / "commands" / "example.md"
+    command_path.parent.mkdir(parents=True, exist_ok=True)
+    command_path.write_text(
+        """---
+description: Prompt-heavy command that must be rejected
+---
+
+Run `.workflowprogram/runtime/workflow-entry.py run --request "$ARGUMENTS"`.
+
+Step 1: manually execute each workflow node if the runtime reports FAIL.
+Step 2: write `run_manifest.json` with status `COMPLETE` after copying reports.
+""",
+        encoding="utf-8",
+    )
+
+    completed = subprocess.run(
+        [
+            sys.executable,
+            str(GENERATED_RUNTIME_VALIDATOR),
+            "--spec",
+            str(spec_path),
+            "--target-root",
+            str(target),
+            "--json",
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert completed.returncode == 1
+    payload = json.loads(completed.stdout)
+    assert payload["status"] == "FAIL"
+    assert any("wrapper-only" in error for error in payload["errors"])
+
+
+def test_generated_runtime_rejects_local_shared_control_plane_script(tmp_path: Path) -> None:
+    target = write_target_fixture(tmp_path)
+    spec_path = write_persistent_spec(target)
+    generate_runtime_for_target(target, spec_path)
+    stale_runner = target / ".workflowprogram" / "runtime" / "target-workflow-runner.py"
+    stale_runner.write_text("# stale local control plane\n", encoding="utf-8")
+
+    completed = subprocess.run(
+        [
+            sys.executable,
+            str(GENERATED_RUNTIME_VALIDATOR),
+            "--spec",
+            str(spec_path),
+            "--target-root",
+            str(target),
+            "--json",
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert completed.returncode == 1
+    payload = json.loads(completed.stdout)
+    assert payload["status"] == "FAIL"
+    assert any("shared control-plane script" in error for error in payload["errors"])
+
+
+def test_generated_runtime_requires_publish_state_validation_marker(tmp_path: Path) -> None:
+    target = write_target_fixture(tmp_path)
+    spec_path = write_persistent_spec(target)
+    generate_runtime_for_target(target, spec_path)
+    entry_path = target / ".workflowprogram" / "runtime" / "workflow-entry.py"
+    entry_path.write_text(
+        entry_path.read_text(encoding="utf-8").replace("validate_target_publish_state", "skip_publish_state_validation"),
+        encoding="utf-8",
+    )
+
+    completed = subprocess.run(
+        [
+            sys.executable,
+            str(GENERATED_RUNTIME_VALIDATOR),
+            "--spec",
+            str(spec_path),
+            "--target-root",
+            str(target),
+            "--json",
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert completed.returncode == 1
+    payload = json.loads(completed.stdout)
+    assert payload["status"] == "FAIL"
+    assert any("validate-target-publish-state.py execution marker" in error for error in payload["errors"])
+
+
+def test_publish_state_validator_rejects_forged_complete_manifest(tmp_path: Path) -> None:
+    target = write_target_fixture(tmp_path)
+    spec_path = write_persistent_spec(target)
+    run_root = tmp_path / "run"
+    run_root.mkdir()
+    (run_root / "target-state.json").write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "schema_name": "target-workflow-runtime-state",
+                "run_id": run_root.name,
+                "status": "FAIL",
+                "failure_kind": "implementation",
+                "failure_reason": "runtime failed",
+                "finalizer_status": "FAIL",
+                "published": False,
+                "node_results_path": "node-results.json",
+                "artifact_provenance_path": "artifact-provenance.json",
+                "events_path": "target-events.jsonl",
+            },
+            indent=2,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    (run_root / "node-results.json").write_text(json.dumps({"schema_version": 1, "nodes": []}) + "\n", encoding="utf-8")
+    (run_root / "artifact-provenance.json").write_text(json.dumps({"schema_version": 1, "artifacts": []}) + "\n", encoding="utf-8")
+    final_root = target / "outputs" / "target-workflow"
+    final_root.mkdir(parents=True)
+    (final_root / "run-manifest.json").write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "status": "COMPLETE",
+                "verdict": "PASS",
+                "run_id": run_root.name,
+                "run_root": str(run_root),
+            },
+            indent=2,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    (final_root / ".workflowprogram-latest.json").write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "status": "COMPLETE",
+                "run_id": run_root.name,
+                "run_root": str(run_root),
+                "manifest": "outputs/target-workflow/run-manifest.json",
+            },
+            indent=2,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    completed = subprocess.run(
+        [
+            sys.executable,
+            str(PUBLISH_STATE_VALIDATOR),
+            "--spec",
+            str(spec_path),
+            "--target-root",
+            str(target),
+            "--run-root",
+            str(run_root),
+            "--json",
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert completed.returncode == 1
+    payload = json.loads(completed.stdout)
+    assert payload["status"] == "FAIL"
+    assert any("producer" in error or "target-state status" in error for error in payload["errors"])
+
+
+def test_publish_state_validator_rejects_stale_latest_marker(tmp_path: Path) -> None:
+    target = write_target_fixture(tmp_path)
+    spec_path = write_persistent_spec(target)
+    run_root = tmp_path / "run"
+    completed = subprocess.run(
+        [
+            sys.executable,
+            str(RUNNER),
+            "run",
+            "--spec",
+            str(spec_path),
+            "--run-root",
+            str(run_root),
+            "--target-root",
+            str(target),
+            "--entry-skill",
+            "example",
+            "--runtime-provider",
+            "fixture_host",
+            "--json",
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert completed.returncode == 0, completed.stderr or completed.stdout
+
+    finalized = subprocess.run(
+        [
+            sys.executable,
+            str(FINALIZER),
+            "--spec",
+            str(spec_path),
+            "--run-root",
+            str(run_root),
+            "--target-root",
+            str(target),
+            "--state",
+            str(run_root / "target-state.json"),
+            "--json",
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert finalized.returncode == 0, finalized.stderr or finalized.stdout
+    latest_path = target / "outputs" / "target-workflow" / ".workflowprogram-latest.json"
+    latest = json.loads(latest_path.read_text(encoding="utf-8"))
+    latest["run_id"] = "older-run"
+    latest_path.write_text(json.dumps(latest, indent=2) + "\n", encoding="utf-8")
+
+    completed = subprocess.run(
+        [
+            sys.executable,
+            str(PUBLISH_STATE_VALIDATOR),
+            "--spec",
+            str(spec_path),
+            "--target-root",
+            str(target),
+            "--run-root",
+            str(run_root),
+            "--json",
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert completed.returncode == 1
+    payload = json.loads(completed.stdout)
+    assert payload["status"] == "FAIL"
+    assert any("latest marker" in error for error in payload["errors"])

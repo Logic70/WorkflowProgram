@@ -204,6 +204,8 @@ def validate_generated_runtime(spec_path: Path, target_root: Path) -> Dict[str, 
                     errors.append("entry wrapper is missing TARGET_PUBLISH_FINALIZER_ENABLED marker")
                 if "target-runtime-finalizer.py" not in entry_text:
                     errors.append("entry wrapper is missing target-runtime-finalizer.py integration marker")
+                if "validate_target_publish_state(" not in entry_text:
+                    errors.append("entry wrapper is missing validate-target-publish-state.py execution marker")
                 if "target_atomic_publish" not in expected_runtime_capabilities:
                     errors.append(
                         "generated_runtime_contract.runtime_capabilities must include target_atomic_publish when target_publish_policy.enabled=true"
@@ -240,6 +242,24 @@ def validate_generated_runtime(spec_path: Path, target_root: Path) -> Dict[str, 
             shared_script_values = [str(item).strip() for item in shared_scripts] if isinstance(shared_scripts, list) else []
             if "target-runtime-finalizer.py" not in shared_script_values:
                 errors.append("runtime manifest shared_scripts must include target-runtime-finalizer.py when target_publish_policy.enabled=true")
+            if "validate-target-publish-state.py" not in shared_script_values:
+                errors.append("runtime manifest shared_scripts must include validate-target-publish-state.py when target_publish_policy.enabled=true")
+
+        if managed_runtime:
+            runtime_root = target_root / normalized.get("runtime_root", "")
+            forbidden_local_shared_patterns = (
+                "target-workflow-runner.py*",
+                "target-runtime-finalizer.py*",
+                "validate-target-runtime-state.py*",
+                "validate-target-publish-state.py*",
+            )
+            if runtime_root.exists():
+                for pattern in forbidden_local_shared_patterns:
+                    for path in sorted(runtime_root.glob(pattern)):
+                        errors.append(
+                            "managed-runtime shared control-plane script must not be vendored under generated runtime root: "
+                            f"{path.relative_to(target_root).as_posix()}"
+                        )
 
         if managed_runtime and main_entry:
             registry = spec.get("registry", {}) if isinstance(spec.get("registry", {}), dict) else {}
@@ -263,6 +283,24 @@ def validate_generated_runtime(spec_path: Path, target_root: Path) -> Dict[str, 
                         errors.append("managed-runtime command must invoke .workflowprogram/runtime/workflow-entry.py")
                     prompt_heavy_markers = ["### Stage", "按顺序调用每个阶段", "不要跳过", "主控模型不得手写"]
                     prompt_heavy_markers.extend(["outputs/stride-audit", "手写报告", "逐节点手写", "直接生成报告"])
+                    prompt_heavy_markers.extend(
+                        [
+                            "Step 1",
+                            "Step 2",
+                            "run_manifest.json",
+                            "run-manifest.json",
+                            ".report-latest",
+                            ".workflowprogram-latest.json",
+                            "copying reports",
+                            "copy outputs",
+                            "manual execute",
+                            "manually execute",
+                            "status `COMPLETE`",
+                            "status COMPLETE",
+                            "doctor",
+                            "contract",
+                        ]
+                    )
                     matched = [marker for marker in prompt_heavy_markers if marker in command_text]
                     if matched:
                         errors.append(f"managed-runtime command must be wrapper-only; prompt-heavy markers found: {matched}")

@@ -426,6 +426,11 @@ target_publish_policy:
         - PASS
         - BLOCKED
   publish_artifacts: []
+  # Final manifest/latest marker are owned by target-runtime-finalizer.py.
+  # Do not list manifest_path or latest_marker in required_reports.
+  # Do not reference manifest_path/latest_marker from workflow_graph node refs.
+  # validate-target-publish-state.py rejects hand-written COMPLETE manifests,
+  # stale latest markers, and target-state/report/provenance mismatches.
 
 # 可选能力搜索与推荐契约
 # capability_discovery:

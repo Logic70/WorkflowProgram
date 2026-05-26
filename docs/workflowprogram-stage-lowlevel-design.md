@@ -533,6 +533,8 @@ target_publish_policy:
 4. `workflow_graph.nodes[*].output_refs` 中的文件类输出必须位于 `publish_root` 下；运行时实际先写到 `RUN_ROOT/<output_ref>`。
 5. `target-runtime-finalizer.py` 只消费当前 run 的 `target-state.json`、`node-results.json`、`artifact-provenance.json` 与 `required_reports`；任一不一致时写回 `target-state.status=FAIL`。
 6. 只有 finalizer 可以写最终 `run-manifest.json`、latest marker 和最终发布目录。业务节点、doctor、报告脚本不得自行声明最终 `PASS/COMPLETE`。
+7. `required_reports` 只能引用 finalizer 发布前已经存在于当前 `RUN_ROOT` 的 gate/doctor/contract 报告，不得引用 finalizer 自己生成的 `manifest_path` 或 `latest_marker`；`workflow_graph.nodes[*].input_refs/output_refs` 同样不得读取或写入这些 finalizer-owned 文件。
+8. `validate-target-publish-state.py` 必须能在发布后或审计时复核 final manifest/latest marker/run root/state/provenance/required reports 同属当前 run，且 manifest 必须带 `producer=target-runtime-finalizer.py`；`target-state=FAIL` 但 final manifest 手写 `COMPLETE` 必须失败。
 7. `generated_runtime_contract.runtime_capabilities` 必须包含 `target_atomic_publish`。
 
 #### 2.5.5A `workflow_graph`（目标工作流业务图契约）
@@ -1145,6 +1147,7 @@ WorkflowProgram 自身必须按原子能力组织，每个 Stage 必须可拆分
 23. 若声明 `target_runtime_policy.mode=managed_runtime`，则 validator 必须要求 `target_managed_runtime` capability，并拒绝 graph outputs 与 immutable paths 冲突。
 24. 若声明 `target_executor_policy`，validator 必须拒绝 unsupported provider、缺 evidence_dir、默认 provider 不在 allowlist，以及任何隐式 `claude_cli` executor 假设。
 25. 若声明 `target_publish_policy.enabled=true`，则 validator 必须要求 `target_atomic_publish` capability，并拒绝 graph outputs 位于 `publish_root` 外。
+26. 若声明 `target_runtime_policy.mode=managed_runtime`，`validate-generated-runtime.py` 必须拒绝 prompt-heavy command：command 只能 wrapper-only 启动 `.workflowprogram/runtime/workflow-entry.py`，不得包含逐节点执行、报告复制、doctor/contract 调用或 manifest/latest marker 写入说明。
 26. `design-review-packet.json`、`issues.json`、`closure.json` 与 `gate-validation.json` 必须存在；`gate-validation.json.status` 必须为 `PASS`。
 27. `closure.json.artifact_fingerprints` 必须覆盖当前 packet 中记录的 S1/S2/S3/YAML 输入，且不得存在 stale artifact。
 

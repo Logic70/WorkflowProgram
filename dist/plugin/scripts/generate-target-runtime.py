@@ -141,6 +141,7 @@ PROBE_HOST_SCRIPT = "probe-host-capabilities.py"
 APPLY_HOST_BOOTSTRAP_SCRIPT = "apply-host-bootstrap.py"
 ENVIRONMENT_REMEDIATION_SCRIPT = "generate-environment-remediation.py"
 TARGET_FINALIZER_SCRIPT = "target-runtime-finalizer.py"
+TARGET_PUBLISH_STATE_VALIDATOR_SCRIPT = "validate-target-publish-state.py"
 RUNTIME_CAPABILITIES = {contract["runtime_capabilities"]!r}
 CAPABILITY_DISCOVERY_ENABLED = {capability_discovery_enabled_flag!r}
 TEAM_ORCHESTRATION_ENABLED = {team_enabled_flag!r}
@@ -326,6 +327,22 @@ def finalize_target_runtime(plugin_root: Path, spec_path: Path, target_root: Pat
     )
 
 
+def validate_target_publish_state(plugin_root: Path, spec_path: Path, target_root: Path, run_root: Path) -> Tuple[int, Dict[str, Any], str]:
+    return run_command(
+        [
+            str(plugin_python(plugin_root)),
+            str(plugin_root / "scripts" / TARGET_PUBLISH_STATE_VALIDATOR_SCRIPT),
+            "--spec",
+            str(spec_path),
+            "--target-root",
+            str(target_root),
+            "--run-root",
+            str(run_root),
+            "--json",
+        ],
+    )
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run generated workflow deterministic entry wrapper")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -468,6 +485,7 @@ def main() -> int:
         return 1
 
     target_finalizer = None
+    target_publish_state_validation = None
     if TARGET_PUBLISH_FINALIZER_ENABLED:
         finalizer_code, finalizer_payload, finalizer_text = finalize_target_runtime(plugin_root, spec_path, target_root, run_root)
         target_finalizer = finalizer_payload or {{"status": "FAIL", "error": finalizer_text or "target runtime finalizer failed"}}
@@ -482,6 +500,34 @@ def main() -> int:
                 "runner": runner_payload,
                 "state_validation": state_payload,
                 "target_finalizer": target_finalizer,
+            }}
+            if args.json:
+                print(json.dumps(payload, ensure_ascii=False, indent=2))
+            else:
+                print(payload["error"])
+            return 1
+        publish_state_code, publish_state_payload, publish_state_text = validate_target_publish_state(
+            plugin_root,
+            spec_path,
+            target_root,
+            run_root,
+        )
+        target_publish_state_validation = publish_state_payload or {{
+            "status": "FAIL",
+            "error": publish_state_text or "target publish state validation failed",
+        }}
+        if publish_state_code != 0 or target_publish_state_validation.get("status") != "PASS":
+            payload = {{
+                "status": "FAIL",
+                "failure_kind": "implementation",
+                "error": publish_state_text or "target publish state validation failed",
+                "run_root": str(run_root),
+                "target_root": str(target_root),
+                "spec": str(spec_path),
+                "runner": runner_payload,
+                "state_validation": state_payload,
+                "target_finalizer": target_finalizer,
+                "target_publish_state_validation": target_publish_state_validation,
             }}
             if args.json:
                 print(json.dumps(payload, ensure_ascii=False, indent=2))
@@ -514,6 +560,7 @@ def main() -> int:
         "runner": runner_payload,
         "state_validation": state_payload,
         "target_finalizer": target_finalizer,
+        "target_publish_state_validation": target_publish_state_validation,
     }}
     if required_host_missing(host_report):
         summary["status"] = "FAIL"
@@ -800,6 +847,7 @@ def manifest_payload(
             "target-workflow-runner.py",
             "validate-target-runtime-state.py",
             "target-runtime-finalizer.py",
+            "validate-target-publish-state.py",
             "discover-host-capabilities.py",
             "apply-host-bootstrap.py",
             "probe-host-capabilities.py",

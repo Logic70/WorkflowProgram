@@ -21,7 +21,7 @@
 - 主产品入口的确定性脚本链为 `workflow-entry.py -> (validate spec/view/lowlevel/target-runtime, managed-assets, probe/apply bootstrap) -> workflow-runner.py -> validate-run-state.py`；叶子 skill 不应只靠提示词顺序隐式串联这些脚本。
 - 生成后的目标工作流也必须交付自己的 `.workflowprogram/runtime/` 控制面包装层；当前固定模式为 `shared-control-plane-wrapper`，但目标业务图执行必须由 `target_runtime_policy.mode=managed_runtime` 下的 `target-workflow-runner.py` 消费 `workflow_graph.nodes`，不得只靠 command prompt 口头顺序。
 - 目标业务图 executor 必须由 `target_executor_policy` 声明；不得硬编码或默认假设 `claude -p` 可用。ClaudeCode 当前会话、第三方 API 模型或人工协作只能走 `current_agent` / `manual` 证据模式，由 finalizer 复核后才能 PASS。
-- 生成后的目标工作流若有最终报告、manifest、latest marker 或长期复用输出，还必须交付 `target_publish_policy` 和 `target-runtime-finalizer.py` 事务层；节点输出先进入 run-scoped workspace，最终 `PASS/COMPLETE` 只能由 finalizer 在校验当前 run 证据后原子发布。
+- 生成后的目标工作流若有最终报告、manifest、latest marker 或长期复用输出，还必须交付 `target_publish_policy` 和 `target-runtime-finalizer.py` 事务层；节点输出先进入 run-scoped workspace，最终 `PASS/COMPLETE` 只能由 finalizer 在校验当前 run 证据后原子发布。`target_publish_policy.required_reports` 与 `workflow_graph` 节点 refs 不得引用 finalizer 自己生成的 manifest/latest marker，`validate-target-publish-state.py` 负责验证最终目录没有被模型或业务脚本在 runtime 失败后手写伪造成 `COMPLETE`。
 - 目标项目写入采用 staged candidate + managed apply 流程。
 - 运行证据统一写入 `TARGET_ROOT/.workflowprogram/runs/<run-id>/`。
 - 若工作流启用 `capability_discovery`，则在 `host_capabilities` 最终定稿前，必须先生成候选能力推荐与结构化人工指引。
@@ -360,7 +360,7 @@ TARGET_ROOT/
   - `workflow-runner.py run`
   - `validate-run-state.py`
 - 编排结果必须落盘到 `RUN_ROOT/outputs/stages/entry-orchestration-summary.json`。
-- 目标工作流自己的 deterministic runtime 入口是 `TARGET_ROOT/.workflowprogram/runtime/workflow-entry.py`，并沿用 shared-control-plane-wrapper：`discover(optional) -> probe/apply-bootstrap -> environment-remediation -> target-workflow-runner -> validate-target-runtime-state -> target-runtime-finalizer(optional)`。
+- 目标工作流自己的 deterministic runtime 入口是 `TARGET_ROOT/.workflowprogram/runtime/workflow-entry.py`，并沿用 shared-control-plane-wrapper：`discover(optional) -> probe/apply-bootstrap -> environment-remediation -> target-workflow-runner -> validate-target-runtime-state -> target-runtime-finalizer(optional) -> validate-target-publish-state(optional)`。
 
 ## 5D. 目标工作流发布环节
 

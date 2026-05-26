@@ -346,7 +346,7 @@
           </div>
           <div class="note-strip">
             <strong>目标 executor：</strong>
-            <span>生成的目标 runtime 不假设 <code>claude -p</code> 可用；<code>target_executor_policy</code> 选择自动 provider，或要求 <code>current_agent/manual</code> 为每个节点提交 executor evidence，再由 finalizer 决定是否可发布。</span>
+            <span>生成的目标 runtime 不假设 <code>claude -p</code> 可用；<code>target_executor_policy</code> 选择自动 provider，或要求 <code>current_agent/manual</code> 为每个节点提交 executor evidence，再由 finalizer 决定是否可发布；required reports 与 workflow graph refs 不得指向 finalizer-owned manifest/latest marker，<code>validate-target-publish-state.py</code> 会拒绝手写 COMPLETE manifest 或旧 latest marker。</span>
           </div>
         </section>
 
@@ -571,6 +571,7 @@
                 <li><code>target-workflow-runner.py</code>：生成目标工作流 <code>workflow_graph</code> 执行约束层</li>
                 <li><code>target_executor_policy</code>：目标节点 executor provider 与 manual/current-agent evidence 契约</li>
                 <li><code>target-runtime-finalizer.py</code>：生成目标工作流最终产物事务发布层</li>
+                <li><code>validate-target-publish-state.py</code>：复核 final manifest、latest marker、run root、state、provenance 与 required reports 是否同属当前 run</li>
                 <li><code>workflowprogram-validate</code> / <code>workflow-s5-judge.py</code>：结果判定层</li>
                 <li><code>runtime_smoke.py</code>：动态补证据层</li>
               </ul>

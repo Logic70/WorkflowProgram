@@ -676,6 +676,25 @@ def workflow_graph_output_refs(workflow_graph: Dict[str, Any]) -> List[str]:
     return refs
 
 
+def workflow_graph_input_refs(workflow_graph: Dict[str, Any]) -> List[str]:
+    """Return normalized input refs declared by target workflow graph nodes."""
+
+    if not isinstance(workflow_graph, dict):
+        return []
+    refs: List[str] = []
+    nodes = workflow_graph.get("nodes", [])
+    if not isinstance(nodes, list):
+        return refs
+    for raw_node in nodes:
+        if not isinstance(raw_node, dict):
+            continue
+        for item in raw_node.get("input_refs", []):
+            text = str(item).strip().replace("\\", "/")
+            if text:
+                refs.append(text)
+    return refs
+
+
 def is_runtime_file_ref(ref: str) -> bool:
     """Return true for path-like refs that should map to runtime files."""
 
@@ -887,10 +906,50 @@ def validate_target_publish_policy(
             pass_values = report.get("pass_values", [])
             if not safe_relative_path(path):
                 add_error(errors, f"{prefix}.path must be a safe relative path")
+            normalized_report_path = normalize_relative_path(path)
+            if manifest_path and normalized_report_path == manifest_path:
+                add_error(
+                    errors,
+                    f"{prefix}.path must not equal target_publish_policy.manifest_path because the finalizer owns that manifest",
+                )
+            if latest_marker and normalized_report_path == latest_marker:
+                add_error(
+                    errors,
+                    f"{prefix}.path must not equal target_publish_policy.latest_marker because the finalizer owns that marker",
+                )
             if not status_field:
                 add_error(errors, f"{prefix}.status_field is required")
             if not isinstance(pass_values, list) or not [str(item).strip() for item in pass_values if str(item).strip()]:
                 add_error(errors, f"{prefix}.pass_values must be a non-empty list")
+
+    finalizer_owned_paths = {value for value in (manifest_path, latest_marker) if value}
+    if finalizer_owned_paths:
+        finalizer_owned_inputs = sorted(
+            {
+                normalize_relative_path(ref)
+                for ref in workflow_graph_input_refs(workflow_graph)
+                if normalize_relative_path(ref) in finalizer_owned_paths
+            }
+        )
+        if finalizer_owned_inputs:
+            add_error(
+                errors,
+                "workflow_graph input_refs must not depend on finalizer-owned publish artifacts before finalizer runs: "
+                + ", ".join(finalizer_owned_inputs),
+            )
+        finalizer_owned_outputs = sorted(
+            {
+                normalize_relative_path(ref)
+                for ref in workflow_graph_output_refs(workflow_graph)
+                if normalize_relative_path(ref) in finalizer_owned_paths
+            }
+        )
+        if finalizer_owned_outputs:
+            add_error(
+                errors,
+                "workflow_graph output_refs must not write finalizer-owned publish artifacts: "
+                + ", ".join(finalizer_owned_outputs),
+            )
 
     publish_artifacts = target_publish_policy.get("publish_artifacts", [])
     if publish_artifacts is not None and not isinstance(publish_artifacts, list):

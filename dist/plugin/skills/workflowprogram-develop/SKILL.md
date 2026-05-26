@@ -51,6 +51,9 @@ disable-model-invocation: true
 - 若 `target_executor_policy` 选中的 provider 不是自动可执行节点的 provider，`target-workflow-runner.py` 不得直接给出 `PASS`；只能在 evidence 完整时进入 `BLOCKED` 并交由 `target-runtime-finalizer.py` 复核后提升为 `PASS`。
 - 新生成的目标工作流若产出最终报告、manifest、latest marker 或长期复用输出，必须声明 `target_publish_policy.enabled=true`，并将 `generated_runtime_contract.runtime_capabilities` 同步包含 `target_atomic_publish`；节点只能先写 `RUN_ROOT` 下的 run-scoped outputs，最终发布由 `target-runtime-finalizer.py` 统一校验 `target-state.json`、`node-results.json`、`artifact-provenance.json` 和 required reports 后原子写入 `publish_root`。
 - 业务节点、报告脚本、doctor 或 manifest 生成脚本不得自行声明最终 `PASS/COMPLETE`；只要 finalizer 的 required report、contract、provenance 或 latest marker 校验失败，目标运行最终状态必须为 `FAIL/implementation`，不得复用旧产物补齐。
+- 对 `target_publish_policy.enabled=true` 的工作流，还必须通过 `validate-target-publish-state.py` 验证 final manifest/latest marker/run root/state/provenance 一致；任何手写 `COMPLETE`、旧 latest marker 或绕过 finalizer 的发布结果都不能作为可信结果。
+- `target_publish_policy.required_reports` 不得包含 finalizer 自己生成的 `manifest_path` 或 `latest_marker`；required reports 只能是 finalizer 发布前当前 run root 中已经存在的 gate/doctor/contract 报告。
+- `workflow_graph.nodes[*].input_refs/output_refs` 不得读取或写入 finalizer-owned `manifest_path` / `latest_marker`；这些文件只能由 finalizer 发布后写入并由 `validate-target-publish-state.py` 复核。
 - node 是流程单位，agent 是执行角色；只有专业知识、上下文窗口、失败归因、并行审查或工具权限形成独立边界时，才为 node 指派独立 agent。
 - 若某个目标业务节点需要持续执行直到 verifier/test 通过，应在该 `workflow_graph.nodes[*].loop_policy` 中声明 Ralph-style loop；适用场景包括逆向分析、迁移修复、报告收敛和 TDD 实现，不适用于宿主安装或人工审批。
 - 若 `RUN_ROOT/outputs/stages/change-context.json.change_policy_required=true`，必须先读取既有设计与 managed 状态，生成 `existing-workflow-readback.json`、`change-policy.json` 和 `impact-analysis.json`，再生成候选资产；这些文件是本次修改的运行证据，不得写成 `workflow-spec.yaml` 顶层字段。

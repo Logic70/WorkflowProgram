@@ -7,7 +7,7 @@
 > 复杂、loop、工具重、逆向、安全或多下游节点的 node-design 必须参考 `target-node-design-template.md`，并能通过 `validate-target-node-design.py`。
 > 新生成目标工作流默认使用 `target_runtime_policy.mode=managed_runtime`：用户命令只作为 wrapper 启动 `.workflowprogram/runtime/workflow-entry.py`，目标业务节点由 `target-workflow-runner.py` 按 `workflow_graph.nodes` 执行并记录 provenance。
 > 目标 runtime 不假设 `claude -p` 可用；执行节点必须通过 `target_executor_policy` 选择 `fixture_host` / `command_adapter` 自动 provider，或通过 `current_agent` / `manual` provider 提交结构化 executor evidence，再由 finalizer 决定能否 PASS。
-> 若目标 workflow 会生成最终报告或可复用输出，默认启用 `target_publish_policy.enabled=true`：节点只能先写 run-scoped outputs，`target-runtime-finalizer.py` 统一校验 state/node/provenance/report 后原子发布，禁止业务节点直接声明 final PASS/COMPLETE。
+> 若目标 workflow 会生成最终报告或可复用输出，默认启用 `target_publish_policy.enabled=true`：节点只能先写 run-scoped outputs，`target-runtime-finalizer.py` 统一校验 state/node/provenance/report 后原子发布，禁止业务节点直接声明 final PASS/COMPLETE；`validate-target-publish-state.py` 会拒绝手写 `COMPLETE` manifest、旧 latest marker 或 target-state/report/provenance 不一致的最终目录。`required_reports` 和 `workflow_graph` 节点输入/输出都不得引用 finalizer 自己生成的 manifest/latest marker。
 
 ## Workflow Identity
 

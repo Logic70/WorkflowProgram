@@ -1,6 +1,6 @@
 {
   "name": "workflowprogram-cn",
-  "version": "0.1.14",
+  "version": "0.1.15",
   "description": "Workflow development toolkit for Claude Code with reusable commands, skills, agents, and validation assets for designing and evolving workflow repositories",
   "author": {
     "name": "Logic_70",

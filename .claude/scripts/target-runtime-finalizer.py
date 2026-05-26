@@ -95,7 +95,7 @@ def mark_state_failed(state_path: Path, reason: str, *, failure_kind: str = "imp
     write_json(state_path, state)
 
 
-def mark_state_published(state_path: Path, manifest_path: str) -> None:
+def mark_state_published(state_path: Path, manifest_path: str, publish_seal: Dict[str, Any]) -> None:
     state = load_json(state_path)
     state["status"] = "PASS"
     state["failure_kind"] = "none"
@@ -103,6 +103,7 @@ def mark_state_published(state_path: Path, manifest_path: str) -> None:
     state["finalizer_status"] = "PASS"
     state["published"] = True
     state["publish_manifest"] = manifest_path
+    state["publish_seal"] = publish_seal
     state["finalized_at"] = utc_now()
     state["updated_at"] = utc_now()
     write_json(state_path, state)
@@ -200,13 +201,14 @@ def verify_manual_executor_evidence(
     return errors
 
 
-def verify_required_reports(run_root: Path, policy: Dict[str, Any]) -> List[str]:
+def collect_required_report_seals(run_root: Path, policy: Dict[str, Any]) -> Tuple[List[Dict[str, Any]], List[str]]:
     errors: List[str] = []
+    seals: List[Dict[str, Any]] = []
     reports = policy.get("required_reports", [])
     if reports is None:
         reports = []
     if not isinstance(reports, list):
-        return ["target_publish_policy.required_reports must be a list"]
+        return seals, ["target_publish_policy.required_reports must be a list"]
     for idx, raw_report in enumerate(reports):
         if not isinstance(raw_report, dict):
             errors.append(f"target_publish_policy.required_reports[{idx}] must be object")
@@ -217,10 +219,24 @@ def verify_required_reports(run_root: Path, policy: Dict[str, Any]) -> List[str]
         if not field or not pass_values:
             errors.append(f"target_publish_policy.required_reports[{idx}] requires status_field and pass_values")
             continue
-        payload = load_json(run_root / rel)
+        report_path = run_root / rel
+        payload = load_json(report_path)
         observed = dot_get(payload, field)
+        seals.append(
+            {
+                "path": rel,
+                "status_field": field,
+                "observed": observed,
+                "sha256": sha256_file(report_path) if report_path.is_file() else "",
+            }
+        )
         if str(observed).strip() not in pass_values:
             errors.append(f"required report {rel} field {field} must be one of {pass_values}, got {observed}")
+    return seals, errors
+
+
+def verify_required_reports(run_root: Path, policy: Dict[str, Any]) -> List[str]:
+    _seals, errors = collect_required_report_seals(run_root, policy)
     return errors
 
 
@@ -307,7 +323,8 @@ def finalize_run(spec_path: Path, run_root: Path, target_root: Path, state_path:
     state = load_json(state_path)
     artifacts, artifact_errors = verify_run_artifacts(run_root, state, policy)
     errors.extend(artifact_errors)
-    errors.extend(verify_required_reports(run_root, policy))
+    required_report_seals, required_report_errors = collect_required_report_seals(run_root, policy)
+    errors.extend(required_report_errors)
     planned, plan_errors = planned_publish_files(run_root, policy, artifacts)
     errors.extend(plan_errors)
     if errors:
@@ -331,10 +348,22 @@ def finalize_run(spec_path: Path, run_root: Path, target_root: Path, state_path:
         shutil.rmtree(stage_root)
     stage_root.mkdir(parents=True, exist_ok=True)
     published = copy_planned_files(planned, stage_root, publish_root)
+    node_results_path = run_root / str(state.get("node_results_path", "node-results.json"))
+    provenance_path = run_root / str(state.get("artifact_provenance_path", "artifact-provenance.json"))
+    publish_seal = {
+        "producer": "target-runtime-finalizer.py",
+        "source_state_status": str(state.get("status", "")),
+        "state_sha256": sha256_file(state_path),
+        "node_results_sha256": sha256_file(node_results_path),
+        "artifact_provenance_sha256": sha256_file(provenance_path),
+        "required_reports": required_report_seals,
+    }
     manifest_rel = manifest_path[len(publish_root) + 1:] if manifest_path.startswith(publish_root + "/") else Path(manifest_path).name
     latest_rel = latest_marker[len(publish_root) + 1:] if latest_marker.startswith(publish_root + "/") else Path(latest_marker).name
     manifest_payload = {
         "schema_version": 1,
+        "producer": "target-runtime-finalizer.py",
+        "finalizer_status": "PASS",
         "status": "COMPLETE",
         "verdict": "PASS",
         "run_id": run_id,
@@ -345,6 +374,7 @@ def finalize_run(spec_path: Path, run_root: Path, target_root: Path, state_path:
         "workflow_version": str(spec.get("meta", {}).get("version", "")) if isinstance(spec.get("meta", {}), dict) else "",
         "artifact_count": len(published),
         "artifacts": published,
+        **publish_seal,
     }
     write_json(stage_root / manifest_rel, manifest_payload)
     marker_payload = {
@@ -357,7 +387,7 @@ def finalize_run(spec_path: Path, run_root: Path, target_root: Path, state_path:
     }
     write_json(stage_root / latest_rel, marker_payload)
     atomic_replace_dir(stage_root, final_root, run_id)
-    mark_state_published(state_path, manifest_path)
+    mark_state_published(state_path, manifest_path, publish_seal)
     payload = {
         "schema_version": 1,
         "status": "PASS",

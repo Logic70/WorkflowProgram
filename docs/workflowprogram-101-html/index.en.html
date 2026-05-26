@@ -261,7 +261,7 @@
           </div>
           <div class="note-strip">
             <strong>Target executor:</strong>
-            <span>The generated target runtime no longer assumes <code>claude -p</code> exists. <code>target_executor_policy</code> chooses an automatic provider, or requires <code>current_agent/manual</code> executor evidence per node before the finalizer can publish.</span>
+            <span>The generated target runtime no longer assumes <code>claude -p</code> exists. <code>target_executor_policy</code> chooses an automatic provider, or requires <code>current_agent/manual</code> executor evidence per node before the finalizer can publish; required reports and workflow graph refs must not point at finalizer-owned manifests/latest markers, and <code>validate-target-publish-state.py</code> rejects hand-written COMPLETE manifests and stale latest markers.</span>
           </div>
         </section>
 
@@ -288,7 +288,7 @@
 
           <div class="note-strip">
             <strong>Current mapping</strong>
-            <span>`workflow-entry.py` sequences the product chain. `workflow-runner.py` governs WorkflowProgram S0-S6. `target-workflow-runner.py` governs generated target `workflow_graph` execution with `target_executor_policy`. `target-runtime-finalizer.py` publishes current-run target outputs atomically. `workflowprogram-validate` and `workflow-s5-judge.py` produce the verdict.</span>
+            <span>`workflow-entry.py` sequences the product chain. `workflow-runner.py` governs WorkflowProgram S0-S6. `target-workflow-runner.py` governs generated target `workflow_graph` execution with `target_executor_policy`. `target-runtime-finalizer.py` publishes current-run target outputs atomically, and `validate-target-publish-state.py` checks the final published directory. `workflowprogram-validate` and `workflow-s5-judge.py` produce the verdict.</span>
           </div>
 
           <div class="note-strip">

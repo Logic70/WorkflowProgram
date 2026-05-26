@@ -277,6 +277,7 @@ def validate_package(
             "scripts/target-workflow-runner.py",
             "scripts/validate-target-runtime-state.py",
             "scripts/target-runtime-finalizer.py",
+            "scripts/validate-target-publish-state.py",
             "scripts/validate-workflow-spec.py",
         ]
         missing = [rel for rel in required if not (package_root / rel).exists()]
