@@ -116,9 +116,10 @@ def is_safe_run_ref(path_text: str) -> bool:
 
 
 def is_safe_node_design_ref(path_text: str) -> bool:
-    return is_safe_run_ref(path_text) and (
+    return _safe_relative(path_text) and (
         path_text.startswith("outputs/stages/target-node-designs/")
         or path_text.startswith("outputs/stages/node-designs/")
+        or path_text.startswith(".workflowprogram/design/node-designs/")
     )
 
 
@@ -131,7 +132,10 @@ def is_safe_persistent_ref(path_text: str) -> bool:
 
 
 def is_safe_persistent_node_design_ref(path_text: str) -> bool:
-    return is_safe_persistent_ref(path_text) and path_text.startswith(".workflowprogram/design/source/target-node-designs/")
+    return _safe_relative(path_text) and (
+        path_text.startswith(".workflowprogram/design/source/target-node-designs/")
+        or path_text.startswith(".workflowprogram/design/node-designs/")
+    )
 
 
 def canonical_default_run_refs() -> Dict[str, str]:
@@ -208,7 +212,7 @@ def resolve_target_design_refs(
                 resolved.persistent_node_designs[node] = text
                 if not is_safe_persistent_node_design_ref(text):
                     resolved.errors.append(
-                        f"design_refs.persistent.node_designs.{node} must stay under .workflowprogram/design/source/target-node-designs/: {text}"
+                        f"design_refs.persistent.node_designs.{node} must stay under .workflowprogram/design/source/target-node-designs/ or .workflowprogram/design/node-designs/: {text}"
                     )
         elif raw_persistent_nodes is not None:
             resolved.errors.append("design_refs.persistent.node_designs must be a mapping")
@@ -226,7 +230,7 @@ def resolve_target_design_refs(
             resolved.node_designs[node] = text
             if not is_safe_node_design_ref(text):
                 resolved.errors.append(
-                    f"design_refs.node_designs.{node} must stay under outputs/stages/target-node-designs/ or outputs/stages/node-designs/: {text}"
+                    f"design_refs.node_designs.{node} must stay under outputs/stages/target-node-designs/, outputs/stages/node-designs/, or .workflowprogram/design/node-designs/: {text}"
                 )
             elif is_legacy_node_design_ref(text):
                 used_legacy = True
@@ -293,8 +297,10 @@ def artifact_kind_for_path(path_text: str) -> str | None:
     if (
         "/outputs/stages/target-node-designs/" in cleaned
         or "/outputs/stages/node-designs/" in cleaned
+        or "/.workflowprogram/design/node-designs/" in cleaned
         or cleaned.startswith("outputs/stages/target-node-designs/")
         or cleaned.startswith("outputs/stages/node-designs/")
+        or cleaned.startswith(".workflowprogram/design/node-designs/")
     ):
         return "node_design"
     if cleaned.endswith("outputs/stages/target-implementation-plan.md") or cleaned.endswith("outputs/stages/s3-implementation-plan.md"):

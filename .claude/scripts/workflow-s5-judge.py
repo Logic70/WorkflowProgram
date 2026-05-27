@@ -376,8 +376,18 @@ def design_ref_path_is_safe(path_text: str, *, node_design: bool = False) -> boo
     if any(part in {"", ".", ".."} for part in parts):
         return False
     if node_design:
-        return path_text.startswith("outputs/stages/target-node-designs/") or path_text.startswith("outputs/stages/node-designs/")
+        return (
+            path_text.startswith("outputs/stages/target-node-designs/")
+            or path_text.startswith("outputs/stages/node-designs/")
+            or path_text.startswith(".workflowprogram/design/node-designs/")
+        )
     return path_text.startswith("outputs/stages/")
+
+
+def design_ref_path_root(path_text: str, run_root: Path, target_root: Path) -> Path:
+    if path_text.startswith(".workflowprogram/"):
+        return target_root / path_text
+    return run_root / path_text
 
 
 def workflow_graph_node_ids(spec: Dict[str, Any]) -> set[str]:
@@ -413,6 +423,7 @@ def add_design_lineage_checks(
     checks: Dict[str, List[Dict[str, str]]],
     spec: Dict[str, Any],
     run_root: Path,
+    target_root: Path,
     stage_history: List[str],
     result: str,
 ) -> None:
@@ -470,7 +481,9 @@ def add_design_lineage_checks(
             node_key = str(node_id).strip()
             rel_path = str(raw_path).strip()
             safe = design_ref_path_is_safe(rel_path, node_design=True)
-            exists = safe and (run_root / rel_path).exists()
+            node_design_path = design_ref_path_root(rel_path, run_root, target_root)
+            spec_for_node_design = target_root / ".workflowprogram" / "design" / "workflow-spec.yaml" if rel_path.startswith(".workflowprogram/") else run_root / "workflow-spec.yaml"
+            exists = safe and node_design_path.exists()
             node_declared = node_key in declared_nodes
             add_check(
                 checks["artifacts"],
@@ -483,9 +496,9 @@ def add_design_lineage_checks(
                 node_design_validation = run_validator(
                     "validate-target-node-design.py",
                     "--node-design",
-                    str(run_root / rel_path),
+                    str(node_design_path),
                     "--spec",
-                    str(run_root / "workflow-spec.yaml"),
+                    str(spec_for_node_design),
                     "--node-id",
                     node_key,
                 )
@@ -1517,7 +1530,7 @@ def build_checks(
                 f"Observed runner-summary entry_skill={summary_entry or '<missing>'}; status={summary_status or '<missing>'}; expected entry_skill={entry_skill}; status={result}",
                 "outputs/stages/runner-summary.json",
             )
-        add_design_lineage_checks(checks, spec, run_root, stage_history, result)
+        add_design_lineage_checks(checks, spec, run_root, target_root, stage_history, result)
         if isinstance(spec.get("design_refs"), dict) and spec.get("design_refs"):
             target_design_validation = run_validator(
                 "validate-target-design-governance.py",

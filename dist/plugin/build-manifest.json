@@ -1,10 +1,10 @@
 {
   "manifest_version": 1,
-  "generated_at": "2026-05-27T03:00:17Z",
+  "generated_at": "2026-05-27T06:48:40Z",
   "builder": "tools/build_plugin.py",
   "plugin_name": "workflowprogram-cn",
   "plugin_version": "0.1.17",
-  "source_commit": "5bcc58f3e871ab5e8a1dae005999ac75a4281c36",
+  "source_commit": "cade8dd141b5f8e4bb84a0506d56b8f74a88529d",
   "source_dirty": true,
   "files": [
     {
@@ -274,8 +274,8 @@
     },
     {
       "path": "scripts/lib/target_design_refs.py",
-      "sha256": "f9f469b3a530bf69fc601f98d39d35faa83859bede0cb9b30034b2dc9bf4ad12",
-      "size": 13680
+      "sha256": "5bc02338e32f9c23968924d4577e2a22591d328c156d7927ad381de287f2029a",
+      "size": 14048
     },
     {
       "path": "scripts/lib/yaml_utils.py",
@@ -449,8 +449,8 @@
     },
     {
       "path": "scripts/workflow-s5-judge.py",
-      "sha256": "463ff601aa07907a0805cc3a45bf79bfc3336dde7fefbf0d074b9f3ab76ddf9e",
-      "size": 123853
+      "sha256": "16ab57cd930340436848d19531ffca4412494bc3f9b8cb92342c739c99cac15f",
+      "size": 124459
     },
     {
       "path": "skills/commit/SKILL.md",

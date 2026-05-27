@@ -53,6 +53,26 @@ def test_canonical_refs() -> None:
     assert refs.node_designs["build_dfd"] == "outputs/stages/target-node-designs/build_dfd.md"
 
 
+def test_persistent_node_design_refs_are_allowed() -> None:
+    refs = resolve_target_design_refs(
+        {
+            "design_refs": {
+                "node_designs": {
+                    "build_dfd": ".workflowprogram/design/node-designs/build_dfd.md",
+                },
+                "persistent": {
+                    "node_designs": {
+                        "review": ".workflowprogram/design/node-designs/review.md",
+                    }
+                },
+            }
+        }
+    )
+    assert not refs.errors
+    assert refs.node_designs["build_dfd"] == ".workflowprogram/design/node-designs/build_dfd.md"
+    assert refs.persistent_node_designs["review"] == ".workflowprogram/design/node-designs/review.md"
+
+
 def test_legacy_aliases_warn() -> None:
     refs = resolve_target_design_refs(
         {
@@ -112,10 +132,12 @@ def test_artifact_kind_mapping() -> None:
     assert artifact_kind_for_path(expected["design_overview"]) == "design_source"
     assert artifact_kind_for_path(expected["acceptance_tests"]) == "acceptance_tests"
     assert artifact_kind_for_path("outputs/stages/node-designs/x.md") == "node_design"
+    assert artifact_kind_for_path(".workflowprogram/design/node-designs/x.md") == "node_design"
 
 
 def main() -> int:
     test_canonical_refs()
+    test_persistent_node_design_refs_are_allowed()
     test_legacy_aliases_warn()
     test_unsafe_paths_error()
     test_existing_run_refs_prefer_existing_canonical()
