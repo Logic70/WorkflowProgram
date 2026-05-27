@@ -73,6 +73,19 @@ When those optional layers are enabled, common additional evidence includes:
 - `RUN_ROOT/outputs/stages/environment-remediation-report.json`
 - `RUN_ROOT/outputs/stages/team-plan.json`
 
+## Code Maintenance Gates Are Layered Too
+
+WorkflowProgram maintenance no longer treats every small commit as a full release validation:
+
+- `quality-gate.py commit`
+  - fast commit gate for diff checks, core JSON, minimal spec, and template schema
+- `quality-gate.py integration`
+  - for runtime, runner, finalizer, schema, generator, publish/package, or test harness changes
+- `quality-gate.py release`
+  - before publishing a plugin version; it must cover build, version consistency, full repository validation, plugin bootstrap, and smoke matrix
+
+The rule is: simplify commit gates, not release gates.
+
 ## Practical Template
 
 As soon as a workflow becomes slightly non-trivial, you usually want at least:

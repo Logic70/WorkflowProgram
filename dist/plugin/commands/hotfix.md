@@ -53,7 +53,8 @@ argument-hint: [description]
 
 1. 通过 `git diff` 识别受影响文件。
 2. 如项目具备关联测试，则优先运行相关测试。
-3. 若没有明确的关联测试，则回退到 `CLAUDE.md` 中定义的完整测试命令。
+3. 若没有明确的关联测试，则运行 `python3 .claude/scripts/quality-gate.py commit`。
+4. 若热修复触及 runtime、runner、finalizer、schema、生成器、publish/package 或测试 harness，则升级运行 `python3 .claude/scripts/quality-gate.py integration`。
 
 **Verify**: 校验通过后才能继续准备提交。
 

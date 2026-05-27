@@ -73,7 +73,20 @@
 - `RUN_ROOT/outputs/stages/environment-remediation-report.json`
 - `RUN_ROOT/outputs/stages/team-plan.json`
 
-## 6.5 提炼模板
+## 6.5 代码维护门禁也分层
+
+WorkflowProgram 自身维护不再把每次小提交都升级为完整发布验证：
+
+- `quality-gate.py commit`
+  - 快速提交门禁，检查 diff、核心 JSON、最小 spec 和模板 schema。
+- `quality-gate.py integration`
+  - 改到 runtime、runner、finalizer、schema、生成器、publish/package 或测试 harness 时运行。
+- `quality-gate.py release`
+  - 发布插件版本前运行，必须覆盖构建、版本一致性、完整仓库校验、插件 bootstrap 和 smoke matrix。
+
+原则是：提交门禁可以精简，发布门禁不能精简。
+
+## 6.6 提炼模板
 
 只要 workflow 稍微复杂一点，最好至少拆出：
 

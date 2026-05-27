@@ -43,7 +43,9 @@
 
 - 子代理提示词必须完整内联
 - 总 fan-out 数量不超过 4
-- 测试/校验阶段使用 `CLAUDE.md` 中定义的测试命令
+- 测试/校验阶段默认使用 `python3 .claude/scripts/quality-gate.py commit`
+- 若范围触及 runtime、runner、finalizer、schema、生成器、publish/package 或测试 harness，则测试/校验阶段升级为 `python3 .claude/scripts/quality-gate.py integration`
+- 只有插件版本发布前才使用 `python3 .claude/scripts/quality-gate.py release`
 
 **Verify**: 每条检查链路都返回可被聚合的结果。
 

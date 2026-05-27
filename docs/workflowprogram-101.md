@@ -481,6 +481,14 @@ AI -> candidate -> managed plan -> apply-staged -> TARGET_ROOT/.claude/*
 
 这是当前实现里最关键的职责边界之一。
 
+代码维护和插件发布也沿用同一个思路：提交门禁只做快速质量检查，集成门禁覆盖 runtime/schema/publish 类风险，发布门禁才跑完整构建、插件 bootstrap 和 smoke matrix。
+
+```bash
+python3 .claude/scripts/quality-gate.py commit
+python3 .claude/scripts/quality-gate.py integration
+python3 .claude/scripts/quality-gate.py release
+```
+
 ## 6.4 提炼模板
 
 任何稍复杂的 workflow 都应该至少拆出：

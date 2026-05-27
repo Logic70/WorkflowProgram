@@ -140,7 +140,10 @@ WorkflowProgram-CN/
 ## Development Commands
 
 - Run：在 Claude Code 中打开本仓库后直接调用上述命令
-- Test：
+- Commit Gate：`python3 .claude/scripts/quality-gate.py commit`
+- Integration Gate：`python3 .claude/scripts/quality-gate.py integration`
+- Release Gate：`python3 .claude/scripts/quality-gate.py release`
+- Full Repository Validator：
   - Windows: `powershell -ExecutionPolicy Bypass -File .claude/scripts/validate-workflow.ps1`
   - macOS/Linux: `python3 .claude/scripts/validate-workflow.py`
 - Runtime Smoke：`python3 tools/runtime_smoke.py --fixture empty-project`
@@ -161,8 +164,9 @@ WorkflowProgram-CN/
 
 ## Testing Rules
 
-- 测试命令：`powershell -ExecutionPolicy Bypass -File .claude/scripts/validate-workflow.ps1`
-- 共享工作流变更在交付前必须通过全部仓库校验。
+- 日常提交默认运行 `python3 .claude/scripts/quality-gate.py commit`，不要把每个小改动都升级成完整 smoke matrix。
+- 涉及 runtime、runner、finalizer、schema、生成器、publish/package 或测试 harness 的改动，必须运行 `python3 .claude/scripts/quality-gate.py integration`。
+- 发布 WorkflowProgram 插件版本前必须运行 `python3 .claude/scripts/quality-gate.py release`；发布门禁包含构建、版本一致性、完整仓库校验、插件 bootstrap 和 deterministic smoke matrix。
 - 新增用户可见命令或技能时，必须同步更新 `README.md`、`CLAUDE.md` 和 `.claude/settings.json`。
 - 可复用的长期约束应写入 `.claude/rules/constraints.md`。
 

@@ -117,6 +117,16 @@ managed runtime 目标 workflow 还会维护目标项目 `CLAUDE.md` 中的 Work
 - 如果出现 `Unknown skill: workflowprogram-orchestrate`，先执行 `/reload-plugins` 或重启 `claude`，并使用 `/workflowprogram-cn:workflowprogram-orchestrate ...` 入口；不要让模型手写 `Skill(workflowprogram-orchestrate)`。
 - 如果出现 `bin/workflowprogram-python: Permission denied`，说明安装缓存中的 launcher 缺少执行权限。更新并重新安装最新 marketplace 载荷；临时修复可执行 `chmod +x ~/.claude/plugins/cache/logic70-plugins/workflowprogram-cn/0.1.16/bin/workflowprogram-*`。
 
+## 开发与发布门禁
+
+源码仓维护使用三层门禁：
+
+- Commit Gate：`python3 .claude/scripts/quality-gate.py commit`，用于普通提交前的快速检查。
+- Integration Gate：`python3 .claude/scripts/quality-gate.py integration`，用于 runtime、runner、finalizer、schema、生成器、publish/package 或测试 harness 变更。
+- Release Gate：`python3 .claude/scripts/quality-gate.py release`，用于发布 WorkflowProgram 插件版本前；它会重建 `dist/plugin/`，检查版本一致性，运行完整仓库校验、插件 bootstrap 和 deterministic smoke matrix。
+
+提交门禁可以轻量化；发布门禁不能轻量化，因为用户最终安装的是 `dist/plugin/` marketplace 载荷。
+
 ## 运行时模型
 
 - 源码层 agent：`.claude/agents/`

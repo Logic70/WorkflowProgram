@@ -1388,11 +1388,12 @@ WorkflowProgram 自身必须按原子能力组织，每个 Stage 必须可拆分
 ### 实现方案
 
 - 主承载：`workflowprogram-validate`
-- 工具承载：`validate-workflow.py/.ps1`、`runtime_smoke.py`
+- 工具承载：`quality-gate.py`、`validate-workflow.py/.ps1`、`runtime_smoke.py`
 
 ### 承载文件
 
 - [workflowprogram-validate/SKILL.md](/mnt/d/Code/WorkflowProgram-CN/.claude/skills/workflowprogram-validate/SKILL.md)
+- [quality-gate.py](/mnt/d/Code/WorkflowProgram-CN/.claude/scripts/quality-gate.py)
 - [validate-workflow.py](/mnt/d/Code/WorkflowProgram-CN/.claude/scripts/validate-workflow.py)
 - [validate-workflow.ps1](/mnt/d/Code/WorkflowProgram-CN/.claude/scripts/validate-workflow.ps1)
 - [runtime_smoke.py](/mnt/d/Code/WorkflowProgram-CN/tools/runtime_smoke.py)

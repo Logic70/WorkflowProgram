@@ -46,7 +46,17 @@ Body: 解释为什么改，而不是重复描述改了什么。
 - `ci`
 - `build`
 
-## Step 4: 确认并提交
+## Step 4: 运行提交门禁
+
+在提交前运行：
+
+```bash
+python3 .claude/scripts/quality-gate.py commit
+```
+
+该门禁只做快速提交质量检查：`git diff --check`、核心 JSON 元数据解析、最小 spec fixture 和 YAML 模板 schema 校验。不要在普通提交前默认运行完整 smoke matrix；如果改动触及 runtime、runner、finalizer、schema、生成器或 publish 逻辑，再升级运行 `python3 .claude/scripts/quality-gate.py integration`。
+
+## Step 5: 确认并提交
 
 1. 展示生成的提交信息
 2. 等待用户确认或修改

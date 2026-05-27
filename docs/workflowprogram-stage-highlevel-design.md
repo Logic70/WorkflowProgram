@@ -54,6 +54,7 @@
 - 决策 D18：修改已有目标工作流不新增 `workflowprogram-change` 入口，而是在 `workflowprogram-develop` 内启用 controlled evolution；`change-policy.json`、`impact-analysis.json`、`existing-workflow-readback.json` 是单次运行证据，不是 `workflow-spec.yaml` 顶层字段。
 - 决策 D19：change policy 的提示词规则是“候选资产生成前先分析”，确定性硬门禁是 `workflow-entry.py` 在 managed apply 前复核 `route-intent.json`、`change-context.json`、policy、impact、审批与 stale context。
 - 决策 D20：S3 完成后必须经过内部 `workflow-design-reviewer` 的隔离上下文审视，并由 `validate-design-review-gate.py` 形成确定性写入门禁；设计审视产物属于本轮 run evidence，不写入 `workflow-spec.yaml` 顶层。
+- 决策 D22：WorkflowProgram 自身代码提交与插件发布采用分层质量门禁；`quality-gate.py commit` 只做快速提交检查，`quality-gate.py integration` 覆盖 runtime/schema/publish 类改动，`quality-gate.py release` 保留构建、版本一致性、完整仓库校验、插件 bootstrap 与 smoke matrix。
 
 ## 3. 项目结构（高层）
 

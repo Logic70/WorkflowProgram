@@ -86,13 +86,15 @@ CI=true /ship
 
 ## Stage 3: 运行校验
 
-**Goal**: 确认仓库通过项目定义的测试命令。
+**Goal**: 确认仓库通过本次变更所需的分层门禁。
 
-1. 运行 `CLAUDE.md` 中定义的测试命令。
-2. 若失败，分析失败原因并给出修复建议。
-3. 在校验未通过前不得继续准备提交。
+1. 默认运行 `python3 .claude/scripts/quality-gate.py commit`。
+2. 如果变更涉及 runtime、runner、finalizer、schema、生成器、publish/package 或测试 harness，升级运行 `python3 .claude/scripts/quality-gate.py integration`。
+3. 如果本次交付目标是发布 WorkflowProgram 插件版本，运行 `python3 .claude/scripts/quality-gate.py release`。
+4. 若失败，分析失败原因并给出修复建议。
+5. 在门禁未通过前不得继续准备提交。
 
-**Verify**: 测试命令成功退出。
+**Verify**: 对应层级的 quality gate 成功退出。
 
 **On failure**：展示失败原因并停止。
 

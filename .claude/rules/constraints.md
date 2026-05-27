@@ -40,7 +40,8 @@
 ## 校验
 
 - ALWAYS 在仓库结构或注册规则变更后同步维护 `.claude/scripts/validate-workflow.ps1`。
-- ALWAYS 在交付共享工作流变更前执行仓库校验。
+- ALWAYS 普通提交前运行 `quality-gate.py commit`；runtime/schema/publish/harness 改动运行 `quality-gate.py integration`；插件版本发布前运行 `quality-gate.py release`。
+- ALWAYS 保持发布门禁覆盖构建产物、版本一致性、完整仓库校验、插件 bootstrap 和 smoke matrix。
 - ALWAYS 在验证脚本中检查外部工具链可用性（信息级别，不阻塞）。
 - NEVER 在未说明原因和运行成本前引入重量级共享 hooks。
 

@@ -187,6 +187,18 @@ AI never writes directly into the target project. Instead it:
 | S5 Judge | Workflow-level verdict based on `test_contract` | `s5-validation-summary.json`, `validation-runtime-report.md` |
 | Runtime Smoke | End-to-end dynamic harness | `tools/runtime_smoke.py` |
 
+### Code And Release Gates
+
+WorkflowProgram itself uses three quality gates. The goal is to keep normal commits fast without weakening the release gate for the installed marketplace payload.
+
+| Gate | Command | When To Use |
+|------|---------|-------------|
+| Commit Gate | `python3 .claude/scripts/quality-gate.py commit` | Fast pre-commit checks: diff, core JSON metadata, minimal spec, and template schema |
+| Integration Gate | `python3 .claude/scripts/quality-gate.py integration` | Changes touching runtime, runner, finalizer, schema, generators, publish/package, or smoke harness logic |
+| Release Gate | `python3 .claude/scripts/quality-gate.py release` | Before publishing a WorkflowProgram plugin version; includes build, version consistency, full repository validation, plugin bootstrap, and smoke matrix |
+
+The rule is to simplify commit gates, not release gates. Before publishing, validate the built `dist/plugin/` payload, not only the source tree.
+
 ### Feedback Loop
 
 - `lessons.md`: append-only log for failures, conflicts, and candidate constraints
@@ -218,6 +230,15 @@ WorkflowProgram-CN/
 ## Development And Validation
 
 ```bash
+# Fast pre-commit quality gate
+python .claude/scripts/quality-gate.py commit
+
+# Integration gate for runtime/schema/generator/publish changes
+python .claude/scripts/quality-gate.py integration
+
+# Release gate before publishing a WorkflowProgram plugin version
+python .claude/scripts/quality-gate.py release
+
 # Repository-level validation
 python .claude/scripts/validate-workflow.py
 

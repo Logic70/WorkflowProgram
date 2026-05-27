@@ -204,6 +204,18 @@ AI 不直接写目标项目。而是：
 | S5 Judge | workflow 级 verdict（消费 test_contract） | `s5-validation-summary.json`, `validation-runtime-report.md` |
 | Runtime Smoke | 动态端到端 harness | `tools/runtime_smoke.py` |
 
+### 代码与发布门禁
+
+WorkflowProgram 自身维护使用三层质量门禁，避免日常提交被完整发布验证拖慢，同时保证发布前的插件载荷可信：
+
+| 门禁 | 命令 | 使用场景 |
+|------|------|----------|
+| Commit Gate | `python3 .claude/scripts/quality-gate.py commit` | 普通提交前的快速检查：diff、核心 JSON 元数据、最小 spec 和模板 schema |
+| Integration Gate | `python3 .claude/scripts/quality-gate.py integration` | 改到 runtime、runner、finalizer、schema、生成器、publish/package 或测试 harness 时 |
+| Release Gate | `python3 .claude/scripts/quality-gate.py release` | 发布 WorkflowProgram 插件版本前，包含构建、版本一致性、完整仓库校验、插件 bootstrap 和 smoke matrix |
+
+原则是精简提交门禁，不精简发布门禁。发布插件前必须验证 `dist/plugin/` 产物，而不是只验证源码。
+
 ### 经验闭环
 
 - `lessons.md`：追加式日志，记录失败经验和待提炼约束
@@ -234,6 +246,15 @@ WorkflowProgram-CN/
 ## 开发与验证
 
 ```bash
+# 快速提交门禁
+python .claude/scripts/quality-gate.py commit
+
+# runtime / schema / generator / publish 相关改动的集成门禁
+python .claude/scripts/quality-gate.py integration
+
+# 发布 WorkflowProgram 插件版本前的发布门禁
+python .claude/scripts/quality-gate.py release
+
 # 仓库结构校验
 python .claude/scripts/validate-workflow.py
 

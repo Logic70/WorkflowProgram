@@ -641,6 +641,13 @@
 
           <div class="compare-grid">
             <div class="compare-card safe">
+              <h3>代码维护与发布门禁</h3>
+              <pre style="background:rgba(0,0,0,.04);padding:12px;border-radius:12px;overflow-x:auto;font-family:var(--mono);font-size:.88em"><code>python3 .claude/scripts/quality-gate.py commit
+python3 .claude/scripts/quality-gate.py integration
+python3 .claude/scripts/quality-gate.py release</code></pre>
+              <p>提交门禁可以精简；发布门禁必须覆盖构建、版本一致性、完整仓库校验、插件 bootstrap 和 smoke matrix。</p>
+            </div>
+            <div class="compare-card safe">
               <h3>当前实现里的设计层与执行层命令</h3>
               <pre style="background:rgba(0,0,0,.04);padding:12px;border-radius:12px;overflow-x:auto;font-family:var(--mono);font-size:.88em"><code>python3 .claude/scripts/validate-workflow.py
 python3 .claude/scripts/validate-workflow-spec.py --spec &lt;workflow-spec.yaml&gt;

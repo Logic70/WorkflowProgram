@@ -55,8 +55,8 @@ $forbiddenLegacyPaths = @(
 )
 
 $activeDesignDocs = @{
-    "docs\workflowprogram-stage-highlevel-design.md" = @("runtime_contract", "test_contract", "generated_runtime_contract", "shared-control-plane-wrapper", "capability_discovery", "host-capability-candidates.json", "host-bootstrap-instructions.md", "host_capabilities", "agent_team_contract", "workflow-entry.py", "workflowprogram-validate", "runtime_smoke.py", "validation-runtime-report.md", "s5-validation-summary.json")
-    "docs\workflowprogram-stage-lowlevel-design.md" = @("runtime_contract", "test_contract", "generated_runtime_contract", "runtime_capabilities", "capability_discovery", "host_capabilities", "agent_team_contract", "discover-host-capabilities.py", "probe-host-capabilities.py", "apply-host-bootstrap.py", "control-plane helper", "workflow-entry.py", "runtime_contract.<field>", "implemented_now", "runner 只负责控制面", "workflowprogram-validate", "runtime_smoke.py", "validation-runtime-report.md", "s5-validation-summary.json")
+    "docs\workflowprogram-stage-highlevel-design.md" = @("runtime_contract", "test_contract", "generated_runtime_contract", "shared-control-plane-wrapper", "capability_discovery", "host-capability-candidates.json", "host-bootstrap-instructions.md", "host_capabilities", "agent_team_contract", "workflow-entry.py", "workflowprogram-validate", "runtime_smoke.py", "quality-gate.py", "validation-runtime-report.md", "s5-validation-summary.json")
+    "docs\workflowprogram-stage-lowlevel-design.md" = @("runtime_contract", "test_contract", "generated_runtime_contract", "runtime_capabilities", "capability_discovery", "host_capabilities", "agent_team_contract", "discover-host-capabilities.py", "probe-host-capabilities.py", "apply-host-bootstrap.py", "control-plane helper", "workflow-entry.py", "runtime_contract.<field>", "implemented_now", "runner 只负责控制面", "workflowprogram-validate", "runtime_smoke.py", "quality-gate.py", "validation-runtime-report.md", "s5-validation-summary.json")
     "docs\workflowprogram-stage-consistency-check.md" = @("runtime_contract", "test_contract", "当前无显式冲突")
 }
 
@@ -111,6 +111,7 @@ $requiredPaths = @(
     ".claude\scripts\validate-run-state.py",
     ".claude\scripts\validate-workflow-draft.py",
     ".claude\scripts\validate-workflow-spec.py",
+    ".claude\scripts\quality-gate.py",
     ".claude\scripts\validate-workflow.ps1",
     ".claude\scripts\validate-workflow.py",
     ".claude\scripts\workflow-entry.py",
@@ -448,6 +449,7 @@ if (Test-Path $distRoot) {
         "dist\plugin\scripts\probe-host-capabilities.py",
         "dist\plugin\scripts\apply-host-bootstrap.py",
         "dist\plugin\scripts\stage-progress.py",
+        "dist\plugin\scripts\quality-gate.py",
         "dist\plugin\scripts\validate-generated-runtime.py",
         "dist\plugin\scripts\validate-workflow-maintenance.py",
         "dist\plugin\scripts\validate-workflow-lowlevel.py",
@@ -502,6 +504,7 @@ if (Test-Path $distRoot) {
             $hasRouteIntent = $false
             $hasRuntimeHost = $false
             $hasStageProgress = $false
+            $hasQualityGate = $false
             $hasValidateRunState = $false
             $hasValidateWorkflowSpec = $false
             $hasWorkflowRunner = $false
@@ -534,6 +537,9 @@ if (Test-Path $distRoot) {
                 if ($fileEntry.path -eq "scripts/stage-progress.py") {
                     $hasStageProgress = $true
                 }
+                if ($fileEntry.path -eq "scripts/quality-gate.py") {
+                    $hasQualityGate = $true
+                }
                 if ($fileEntry.path -eq "scripts/validate-run-state.py") {
                     $hasValidateRunState = $true
                 }
@@ -560,6 +566,13 @@ if (Test-Path $distRoot) {
             }
             else {
                 Add-Error "build-manifest must include scripts/stage-progress.py"
+            }
+
+            if ($hasQualityGate) {
+                Add-Pass "build-manifest tracks scripts/quality-gate.py"
+            }
+            else {
+                Add-Error "build-manifest must include scripts/quality-gate.py"
             }
 
             if ($hasRouteIntent) {

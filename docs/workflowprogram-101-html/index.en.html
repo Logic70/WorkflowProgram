@@ -380,6 +380,16 @@
             <strong>Optional evidence layers also exist</strong>
             <span>If the workflow declares external capabilities or an explicit team contract, validation also consumes capability reports, remediation guidance, and team fan-out / join evidence.</span>
           </div>
+
+          <div class="compare-grid">
+            <article class="compare-card">
+              <h3>Code and release gates</h3>
+              <pre><code>python3 .claude/scripts/quality-gate.py commit
+python3 .claude/scripts/quality-gate.py integration
+python3 .claude/scripts/quality-gate.py release</code></pre>
+              <p>Commit gates stay fast; release gates still validate build output, version consistency, repository checks, plugin bootstrap, and smoke matrix.</p>
+            </article>
+          </div>
         </section>
 
         <section class="panel" id="lessons">
