@@ -1,10 +1,10 @@
 {
   "manifest_version": 1,
-  "generated_at": "2026-05-27T02:15:41Z",
+  "generated_at": "2026-05-27T02:57:37Z",
   "builder": "tools/build_plugin.py",
   "plugin_name": "workflowprogram-cn",
   "plugin_version": "0.1.16",
-  "source_commit": "069bd3c8217fce1e5c060facf2af711c9899f925",
+  "source_commit": "6a2a5fe015fac5a325df362180ace324cdd48caa",
   "source_dirty": true,
   "files": [
     {
@@ -304,8 +304,8 @@
     },
     {
       "path": "scripts/quality-gate.py",
-      "sha256": "a0c1c72509bc44c061a18be76c8805f4ed138596f3536ea9882c0f589ee01d14",
-      "size": 12533
+      "sha256": "e2edbddabbea4761287e8a435a974494fac7af9e47c4d71725aa20cd77f49c12",
+      "size": 12529
     },
     {
       "path": "scripts/resolve-change-context.py",

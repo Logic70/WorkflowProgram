@@ -211,7 +211,7 @@ def release_steps(include_claude_cli: bool) -> list[GateStep]:
     return [
         step("build_plugin", "Rebuild dist/plugin from the canonical source tree.", [sys.executable, "tools/build_plugin.py"], timeout=300),
         internal_step("version_consistency", "Verify source and dist plugin version metadata agree.", version_consistency),
-        step("git_diff_check", "Reject whitespace and conflict-marker issues after the build.", ["git", "-c", "core.autocrlf=false", "diff", "--check"]),
+        internal_step("diff_added_line_check", "Reject added-line trailing whitespace and conflict markers after the build.", diff_added_line_check),
         step("repository_validator", "Run the full WorkflowProgram repository validator.", [sys.executable, ".claude/scripts/validate-workflow.py"], timeout=300),
         step("plugin_bootstrap", "Verify the built marketplace payload can bootstrap its local Python runtime.", [sys.executable, "tools/test_plugin_bootstrap.py", "--json"], timeout=300),
         step("runtime_smoke_matrix", "Run the deterministic runtime smoke matrix before release.", matrix_cmd, timeout=1800),
