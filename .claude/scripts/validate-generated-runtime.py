@@ -44,6 +44,90 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
+def normalize_rel_path(value: str) -> str:
+    normalized = str(value).strip().replace("\\", "/")
+    while normalized.startswith("./"):
+        normalized = normalized[2:]
+    return normalized
+
+
+def registry_file_map(spec: Dict[str, Any]) -> Dict[str, str]:
+    registry = spec.get("registry", {}) if isinstance(spec.get("registry", {}), dict) else {}
+    result: Dict[str, str] = {}
+    for bucket in ("agents", "skills"):
+        entries = registry.get(bucket, [])
+        if not isinstance(entries, list):
+            continue
+        for raw_entry in entries:
+            if not isinstance(raw_entry, dict):
+                continue
+            name = str(raw_entry.get("name", "")).strip()
+            file_name = str(raw_entry.get("file", "")).strip()
+            if name and file_name:
+                result[name] = file_name
+    return result
+
+
+def node_prompt_boundary_errors(spec: Dict[str, Any], target_root: Path, target_publish_policy: Dict[str, Any]) -> List[str]:
+    """Validate prompt assets that are used as managed-runtime node owners."""
+
+    graph = spec.get("workflow_graph", {}) if isinstance(spec.get("workflow_graph", {}), dict) else {}
+    nodes = graph.get("nodes", []) if isinstance(graph.get("nodes", []), list) else []
+    registry = registry_file_map(spec)
+    manifest_path = normalize_rel_path(str(target_publish_policy.get("manifest_path", "")))
+    latest_marker = normalize_rel_path(str(target_publish_policy.get("latest_marker", "")))
+    finalizer_owned = {item for item in (manifest_path, latest_marker) if item}
+    finalizer_owned_names = {Path(item).name for item in finalizer_owned if Path(item).name}
+    run_root_markers = (
+        "WORKFLOWPROGRAM_OUTPUT_ROOT",
+        "active run root",
+        "current run root",
+        "RUN_ROOT",
+        "run-scoped",
+    )
+    errors: List[str] = []
+    checked: set[str] = set()
+
+    for raw_node in nodes:
+        if not isinstance(raw_node, dict):
+            continue
+        owner = str(raw_node.get("owner", "")).strip()
+        if not owner or owner.startswith("script:"):
+            continue
+        file_name = registry.get(owner, "")
+        if not file_name:
+            continue
+        normalized_file = normalize_rel_path(file_name)
+        prompt_path = target_root / normalized_file
+        if normalized_file in checked:
+            continue
+        checked.add(normalized_file)
+        if not prompt_path.exists() or not prompt_path.is_file():
+            continue
+        try:
+            prompt_text = prompt_path.read_text(encoding="utf-8")
+        except Exception:
+            continue
+        for marker in sorted(finalizer_owned | finalizer_owned_names):
+            if marker and marker in prompt_text:
+                errors.append(
+                    f"managed-runtime node owner prompt must not reference finalizer-owned publish artifact "
+                    f"{marker}: {normalized_file}"
+                )
+        node_output_refs = [
+            normalize_rel_path(str(item))
+            for item in raw_node.get("output_refs", [])
+            if str(item).strip()
+        ] if isinstance(raw_node.get("output_refs", []), list) else []
+        mentions_node_output = any(ref and ref in prompt_text for ref in node_output_refs)
+        if mentions_node_output and not any(marker in prompt_text for marker in run_root_markers):
+            errors.append(
+                "managed-runtime node owner prompt mentions workflow output refs but is missing "
+                f"active-run-root/WORKFLOWPROGRAM_OUTPUT_ROOT guidance: {normalized_file}"
+            )
+    return errors
+
+
 def validate_generated_runtime(spec_path: Path, target_root: Path) -> Dict[str, Any]:
     errors: List[str] = []
     warnings: List[str] = []
@@ -316,6 +400,8 @@ def validate_generated_runtime(spec_path: Path, target_root: Path) -> Dict[str, 
             else:
                 guard_errors = guard_validation_errors(guard_path.read_text(encoding="utf-8"), spec)
                 errors.extend(f"managed-runtime target CLAUDE guard invalid: {item}" for item in guard_errors)
+        if managed_runtime and target_publish_enabled:
+            errors.extend(node_prompt_boundary_errors(spec, target_root, target_publish_policy))
     except Exception as exc:
         errors.append(str(exc))
 

@@ -842,6 +842,45 @@ def test_generated_runtime_requires_executor_evidence_blocked_finalizer_skip_mar
     assert any("executor-evidence BLOCKED finalizer skip marker" in error for error in payload["errors"])
 
 
+def test_generated_runtime_rejects_node_owner_prompt_publish_bypass(tmp_path: Path) -> None:
+    target = write_target_fixture(tmp_path)
+    spec_path = write_persistent_spec(target)
+    generate_runtime_for_target(target, spec_path)
+    write_wrapper_command(target)
+    apply_claude_guard(target, spec_path, tmp_path / "guard-run")
+    owner_prompt = target / ".claude" / "skills" / "example" / "SKILL.md"
+    owner_prompt.write_text(
+        """---
+name: example-skill
+---
+
+Write outputs/target-workflow/intake-summary.md directly, then update
+run-manifest.json with status COMPLETE.
+""",
+        encoding="utf-8",
+    )
+
+    completed = subprocess.run(
+        [
+            sys.executable,
+            str(GENERATED_RUNTIME_VALIDATOR),
+            "--spec",
+            str(spec_path),
+            "--target-root",
+            str(target),
+            "--json",
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert completed.returncode == 1
+    payload = json.loads(completed.stdout)
+    assert payload["status"] == "FAIL"
+    assert any("finalizer-owned publish artifact" in error for error in payload["errors"])
+    assert any("active-run-root/WORKFLOWPROGRAM_OUTPUT_ROOT guidance" in error for error in payload["errors"])
+
+
 def test_target_claude_guard_create_append_replace_and_conflict(tmp_path: Path) -> None:
     target = write_target_fixture(tmp_path)
     spec_path = write_persistent_spec(target)

@@ -45,6 +45,7 @@ design_refs:
 - Writes:
 - Must not mutate:
 - Persistence rule:
+- Managed runtime output boundary: output refs are written under the active run root / `WORKFLOWPROGRAM_OUTPUT_ROOT`; final publish paths, latest markers, and manifests are owned only by `target-runtime-finalizer.py`.
 
 ## 6. Internal Execution Plan / 内部执行编排
 

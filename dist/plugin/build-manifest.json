@@ -1,17 +1,12 @@
 {
   "manifest_version": 1,
-  "generated_at": "2026-05-28T02:14:08Z",
+  "generated_at": "2026-05-28T03:06:05Z",
   "builder": "tools/build_plugin.py",
   "plugin_name": "workflowprogram-cn",
   "plugin_version": "0.1.19",
-  "source_commit": "66b3c2ede45dd13b5a396bd0ff9cba8dfcf2b19b",
+  "source_commit": "068e6d61508eafe06d655a21c3af01e7a8620ce4",
   "source_dirty": true,
   "files": [
-    {
-      "path": ".claude-plugin/README.md",
-      "sha256": "5c4aaa4bf04887ce4c7d602d2636658babb92fa02d3b57c21fe31b79f9101bc0",
-      "size": 8757
-    },
     {
       "path": ".claude-plugin/marketplace.json",
       "sha256": "278d4a4c87c55cdcf9645b8bd289628a15cd61e7f51d467a0009ae49b6727ada",
@@ -21,6 +16,11 @@
       "path": ".claude-plugin/plugin.json",
       "sha256": "271677fefb2b5592b2aa904e98f8c1d9ffa7fe13a32bf76110bb365f79fa9112",
       "size": 607
+    },
+    {
+      "path": ".claude-plugin/README.md",
+      "sha256": "5c4aaa4bf04887ce4c7d602d2636658babb92fa02d3b57c21fe31b79f9101bc0",
+      "size": 8757
     },
     {
       "path": "agents/logic-reviewer.md",
@@ -354,8 +354,8 @@
     },
     {
       "path": "scripts/validate-generated-runtime.py",
-      "sha256": "fbee45bc539b7e95ff7ce704be1d5cb38a78804e4b4073f799c58a7c2319046a",
-      "size": 19217
+      "sha256": "d90df4a431ccb75f0f89e095b1946eb2902b5468c7caf76d39c1051076ad6278",
+      "size": 22972
     },
     {
       "path": "scripts/validate-lessons-delta.py",
@@ -489,13 +489,13 @@
     },
     {
       "path": "skills/workflow-spec-support/spec-template.md",
-      "sha256": "5d7e11a827152e2c54dcd7926dfe53a87ad7ff2da78748be7ed8361e64107ef4",
-      "size": 8085
+      "sha256": "44584d441b96764799fcfaf670916f476ed04312db789655acf58be7caf11b00",
+      "size": 8391
     },
     {
       "path": "skills/workflow-spec-support/target-node-design-template.md",
-      "sha256": "94873588243433bc8fe6d4429e95ff5dc701312daff2c8d7ece241748bacc72a",
-      "size": 3209
+      "sha256": "663bb4a768c45e2b112901125f63a796de6cf9a7167579c0f2baf0294a081343",
+      "size": 3427
     },
     {
       "path": "skills/workflow-spec-support/test-scenarios-template.md",
@@ -514,8 +514,8 @@
     },
     {
       "path": "skills/workflowprogram-develop/SKILL.md",
-      "sha256": "ba85c1131884e127577de734ebaf09df857206318d6ad21d1b3d57e2ef998069",
-      "size": 19705
+      "sha256": "de17ae500eca464255312fc5da54bdd645a28c64d39dc319b6452f92e349c8e0",
+      "size": 20113
     },
     {
       "path": "skills/workflowprogram-iterate/SKILL.md",
