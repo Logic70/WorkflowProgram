@@ -208,6 +208,8 @@ def validate_generated_runtime(spec_path: Path, target_root: Path) -> Dict[str, 
                     errors.append("entry wrapper is missing target-runtime-finalizer.py integration marker")
                 if "validate_target_publish_state(" not in entry_text:
                     errors.append("entry wrapper is missing validate-target-publish-state.py execution marker")
+                if "runner_blocked_phase" not in entry_text or 'runner_blocked_phase == "executor_evidence"' not in entry_text:
+                    errors.append("entry wrapper is missing executor-evidence BLOCKED finalizer skip marker")
                 if "target_atomic_publish" not in expected_runtime_capabilities:
                     errors.append(
                         "generated_runtime_contract.runtime_capabilities must include target_atomic_publish when target_publish_policy.enabled=true"

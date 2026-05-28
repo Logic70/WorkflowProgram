@@ -1,17 +1,12 @@
 {
   "manifest_version": 1,
-  "generated_at": "2026-05-27T07:26:36Z",
+  "generated_at": "2026-05-27T09:33:52Z",
   "builder": "tools/build_plugin.py",
   "plugin_name": "workflowprogram-cn",
   "plugin_version": "0.1.18",
-  "source_commit": "b9f2f66e8b68d693a5b2a3233e0d91d116bf03bd",
+  "source_commit": "1d456f4f935cc88b18017d091b15a6d82b6895e9",
   "source_dirty": true,
   "files": [
-    {
-      "path": ".claude-plugin/README.md",
-      "sha256": "16a4a4883e6860be6636685403cded3eb36b6868568cc643fc72e6d933683d13",
-      "size": 8757
-    },
     {
       "path": ".claude-plugin/marketplace.json",
       "sha256": "2feb0ce6a1725befb8616a32351af0d915b8b9e1d01e0704feeecdb8a0c58aeb",
@@ -21,6 +16,11 @@
       "path": ".claude-plugin/plugin.json",
       "sha256": "6ff8e2554be25d56338e6224160d17e2951c674c6877ca1e8e1f38336a9f470e",
       "size": 607
+    },
+    {
+      "path": ".claude-plugin/README.md",
+      "sha256": "16a4a4883e6860be6636685403cded3eb36b6868568cc643fc72e6d933683d13",
+      "size": 8757
     },
     {
       "path": "agents/logic-reviewer.md",
@@ -189,8 +189,8 @@
     },
     {
       "path": "scripts/generate-target-runtime.py",
-      "sha256": "6b6e5a1c8c00a589b562e2d03f79f3b5c3032c1ffcff8c51f9aec94d023eb665",
-      "size": 34883
+      "sha256": "050e51e336c69e9e046548061c699a276a6a007f5a4101e821ff0db54334fec1",
+      "size": 35190
     },
     {
       "path": "scripts/generate-workflow-lowlevel.py",
@@ -339,8 +339,8 @@
     },
     {
       "path": "scripts/target-workflow-runner.py",
-      "sha256": "41abfb0df4efa13a735bcb1ac10fb8590ad1705e9ba48bfb01b6439b0489a3af",
-      "size": 32797
+      "sha256": "0885ea5dc45c4dc60de62b605989762e0490a21da98cb174bf86bd1a71cb8507",
+      "size": 35557
     },
     {
       "path": "scripts/validate-change-policy.py",
@@ -354,8 +354,8 @@
     },
     {
       "path": "scripts/validate-generated-runtime.py",
-      "sha256": "c9a291b6484c45d2ac3b78c7b5e4632b9ef144bfc9424e3fe2232b579cda8505",
-      "size": 18979
+      "sha256": "fbee45bc539b7e95ff7ce704be1d5cb38a78804e4b4073f799c58a7c2319046a",
+      "size": 19217
     },
     {
       "path": "scripts/validate-lessons-delta.py",
@@ -394,8 +394,8 @@
     },
     {
       "path": "scripts/validate-target-runtime-state.py",
-      "sha256": "816c30c1321064e416ada9317e8f9a69fa71e4ff84be2016587f8cd1167be274",
-      "size": 9410
+      "sha256": "d994c54710c3e8a9c170bc2aa542ba8e55e77125c44c291567f1125b24e8dbb6",
+      "size": 9677
     },
     {
       "path": "scripts/validate-workflow-draft.py",

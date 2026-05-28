@@ -492,6 +492,7 @@ def run_graph(args: argparse.Namespace) -> Dict[str, Any]:
     status = "PASS"
     failure_kind = "none"
     failure_reason = ""
+    blocked_context: Dict[str, Any] = {}
     manual_finalizer_required = provider in MANUAL_EXECUTOR_PROVIDERS
 
     append_event(run_root, "TargetRuntimeStarted", status="running", entry_skill=args.entry_skill, provider=provider)
@@ -562,6 +563,40 @@ def run_graph(args: argparse.Namespace) -> Dict[str, Any]:
             changes = immutable_changes(before, after)
             missing_outputs = check_outputs(output_root, node)
             if not owner_success:
+                if provider in MANUAL_EXECUTOR_PROVIDERS:
+                    node_status = "BLOCKED"
+                    failure_reason = f"awaiting manual/current-agent executor evidence for node {node_id}: {owner_message}"
+                    attempts.append(
+                        {
+                            "attempt": attempt,
+                            "status": "BLOCKED",
+                            "reason": "executor_evidence_required",
+                            "message": owner_message,
+                            "executor_evidence_path": executor_evidence_rel,
+                        }
+                    )
+                    blocked_context = {
+                        "phase": "executor_evidence",
+                        "node_id": node_id,
+                        "owner": owner_name,
+                        "owner_kind": owner.get("kind", ""),
+                        "attempt": attempt,
+                        "reason": owner_message,
+                        "executor_evidence_path": executor_evidence_rel,
+                        "input_refs": [str(item).strip() for item in node.get("input_refs", []) if str(item).strip()],
+                        "output_refs": [str(item).strip() for item in node.get("output_refs", []) if str(item).strip()],
+                    }
+                    append_event(
+                        run_root,
+                        "ManualExecutorEvidenceRequired",
+                        node_id=node_id,
+                        owner=owner_name,
+                        provider=provider,
+                        evidence_path=executor_evidence_rel,
+                        reason=owner_message,
+                        attempt=attempt,
+                    )
+                    break
                 attempts.append({"attempt": attempt, "status": "FAIL", "reason": "owner_failed", "message": owner_message})
                 failure_reason = owner_message
             elif changes:
@@ -594,17 +629,32 @@ def run_graph(args: argparse.Namespace) -> Dict[str, Any]:
             node_result["executor_provider"] = provider
         node_results.append(node_result)
         if node_status != "PASS":
-            status = "FAIL"
-            failure_kind = "implementation"
-            if not failure_reason and attempts:
-                failure_reason = str(attempts[-1].get("reason", "node_failed"))
-            append_event(run_root, "NodeGateFailed", node_id=node_id, owner=owner_name, reason=failure_reason or "node_failed")
+            if node_status == "BLOCKED":
+                status = "BLOCKED"
+                failure_kind = "none"
+                append_event(
+                    run_root,
+                    "NodeGateBlocked",
+                    node_id=node_id,
+                    owner=owner_name,
+                    reason=failure_reason or "executor_evidence_required",
+                )
+            else:
+                status = "FAIL"
+                failure_kind = "implementation"
+                if not failure_reason and attempts:
+                    failure_reason = str(attempts[-1].get("reason", "node_failed"))
+                append_event(run_root, "NodeGateFailed", node_id=node_id, owner=owner_name, reason=failure_reason or "node_failed")
             break
 
     if status == "PASS" and manual_finalizer_required:
         status = "BLOCKED"
         failure_kind = "none"
         failure_reason = "current-agent/manual executor evidence requires finalizer verification"
+        blocked_context = {
+            "phase": "finalizer_verification",
+            "reason": failure_reason,
+        }
         append_event(run_root, "ManualExecutorAwaitingFinalizer", status=status, provider=provider)
     append_event(run_root, "TargetRuntimeCompleted", status=status, failure_kind=failure_kind, reason=failure_reason)
     state = {
@@ -626,6 +676,9 @@ def run_graph(args: argparse.Namespace) -> Dict[str, Any]:
         "artifact_provenance_path": "artifact-provenance.json",
         "updated_at": utc_now(),
     }
+    if blocked_context:
+        state["blocked_phase"] = blocked_context.get("phase", "")
+        state["current_node"] = blocked_context
     write_json(run_root / "node-results.json", {"schema_version": 1, "nodes": node_results})
     write_json(run_root / "artifact-provenance.json", {"schema_version": 1, "artifacts": provenance})
     write_json(run_root / "target-state.json", state)
@@ -643,6 +696,9 @@ def run_graph(args: argparse.Namespace) -> Dict[str, Any]:
         "node_count": len(node_results),
         "artifact_count": len(provenance),
     }
+    if blocked_context:
+        summary["blocked_phase"] = blocked_context.get("phase", "")
+        summary["current_node"] = blocked_context
     write_json(run_root / "outputs" / "stages" / "target-runtime-summary.json", summary)
     return summary
 
@@ -712,7 +768,13 @@ def command_status(args: argparse.Namespace) -> int:
         print(json.dumps(payload, ensure_ascii=False, indent=2))
     else:
         print(f"[{payload.get('status', 'UNKNOWN')}] {state_path}")
-    return 0 if payload.get("status") == "PASS" else 1
+    if payload.get("status") == "PASS":
+        return 0
+    if payload.get("status") == "BLOCKED":
+        return 2
+    if payload.get("status") == "ENVIRONMENT-SKIP":
+        return 3
+    return 1
 
 
 def main() -> int:

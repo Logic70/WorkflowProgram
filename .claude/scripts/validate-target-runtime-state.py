@@ -167,15 +167,17 @@ def validate_state(state_path: Path) -> Dict[str, Any]:
         node_status = str(raw_node.get("status", "")).strip()
         if not node_id:
             errors.append(f"nodes[{idx}].node_id is required")
-        if node_status not in {"PASS", "FAIL"}:
-            errors.append(f"nodes[{idx}].status must be PASS or FAIL")
+        if node_status not in {"PASS", "FAIL", "BLOCKED"}:
+            errors.append(f"nodes[{idx}].status must be PASS, FAIL, or BLOCKED")
+        if node_status == "BLOCKED" and not (status == "BLOCKED" and manual_provider):
+            errors.append(f"BLOCKED node is only allowed for BLOCKED current_agent/manual target state: {node_id}")
         if status == "PASS" and node_status != "PASS":
             errors.append(f"PASS target state cannot contain failed node: {node_id}")
         outputs = raw_node.get("outputs", [])
         if not isinstance(outputs, list):
             errors.append(f"nodes[{idx}].outputs must be a list")
             outputs = []
-        if status in {"PASS", "BLOCKED"}:
+        if status in {"PASS", "BLOCKED"} and node_status == "PASS":
             for output in outputs:
                 rel = str(output).strip()
                 if rel and not rel.startswith("$") and "/" in rel and rel not in provenance_paths:
@@ -185,7 +187,7 @@ def validate_state(state_path: Path) -> Dict[str, Any]:
 
     if status == "PASS" and failure_kind != "none":
         errors.append("PASS target state must use failure_kind=none")
-    if status != "PASS" and failure_kind == "none":
+    if status not in {"PASS", "BLOCKED"} and failure_kind == "none":
         warnings.append("non-PASS target state should usually provide a non-none failure_kind")
 
     return {

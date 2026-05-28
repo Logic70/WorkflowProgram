@@ -205,7 +205,7 @@ def test_unsupported_executor_provider_fails_without_publish(tmp_path: Path) -> 
     assert not (target / "outputs" / "target-workflow").exists()
 
 
-def test_default_current_agent_provider_requires_evidence(tmp_path: Path) -> None:
+def test_default_current_agent_provider_blocks_for_executor_evidence(tmp_path: Path) -> None:
     target = write_target_fixture(tmp_path)
     run_root = tmp_path / "run"
     completed = subprocess.run(
@@ -227,10 +227,28 @@ def test_default_current_agent_provider_requires_evidence(tmp_path: Path) -> Non
         text=True,
         check=False,
     )
-    assert completed.returncode == 1
+    assert completed.returncode == 2
     payload = json.loads(completed.stdout)
-    assert payload["status"] == "FAIL"
-    assert "executor evidence missing" in payload["failure_reason"]
+    assert payload["status"] == "BLOCKED"
+    assert payload["failure_kind"] == "none"
+    assert payload["blocked_phase"] == "executor_evidence"
+    assert payload["current_node"]["node_id"] == "intake"
+    assert payload["current_node"]["executor_evidence_path"] == "outputs/stages/executor-evidence/intake.json"
+    assert payload["current_node"]["input_refs"] == ["$ARGUMENTS"]
+    assert payload["current_node"]["output_refs"] == ["outputs/target-workflow/intake-summary.md"]
+    state = json.loads((run_root / "target-state.json").read_text(encoding="utf-8"))
+    assert state["status"] == "BLOCKED"
+    assert state["blocked_phase"] == "executor_evidence"
+    node_payload = json.loads((run_root / "node-results.json").read_text(encoding="utf-8"))
+    assert node_payload["nodes"][0]["status"] == "BLOCKED"
+
+    validation = subprocess.run(
+        [sys.executable, str(VALIDATOR), "--state", str(run_root / "target-state.json"), "--json"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert validation.returncode == 0, validation.stderr or validation.stdout
     assert not (target / "outputs" / "target-workflow").exists()
 
 
@@ -790,6 +808,38 @@ def test_generated_runtime_requires_publish_state_validation_marker(tmp_path: Pa
     payload = json.loads(completed.stdout)
     assert payload["status"] == "FAIL"
     assert any("validate-target-publish-state.py execution marker" in error for error in payload["errors"])
+
+
+def test_generated_runtime_requires_executor_evidence_blocked_finalizer_skip_marker(tmp_path: Path) -> None:
+    target = write_target_fixture(tmp_path)
+    spec_path = write_persistent_spec(target)
+    generate_runtime_for_target(target, spec_path)
+    write_wrapper_command(target)
+    apply_claude_guard(target, spec_path, tmp_path / "guard-run")
+    entry_path = target / ".workflowprogram" / "runtime" / "workflow-entry.py"
+    entry_path.write_text(
+        entry_path.read_text(encoding="utf-8").replace("runner_blocked_phase", "runner_phase_without_blocked_marker"),
+        encoding="utf-8",
+    )
+
+    completed = subprocess.run(
+        [
+            sys.executable,
+            str(GENERATED_RUNTIME_VALIDATOR),
+            "--spec",
+            str(spec_path),
+            "--target-root",
+            str(target),
+            "--json",
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert completed.returncode == 1
+    payload = json.loads(completed.stdout)
+    assert payload["status"] == "FAIL"
+    assert any("executor-evidence BLOCKED finalizer skip marker" in error for error in payload["errors"])
 
 
 def test_target_claude_guard_create_append_replace_and_conflict(tmp_path: Path) -> None:

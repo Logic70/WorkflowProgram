@@ -485,7 +485,12 @@ def main() -> int:
 
     target_finalizer = None
     target_publish_state_validation = None
-    if TARGET_PUBLISH_FINALIZER_ENABLED:
+    runner_status = str(runner_payload.get("status", "")).strip()
+    runner_blocked_phase = str(runner_payload.get("blocked_phase", "")).strip()
+    should_run_target_finalizer = TARGET_PUBLISH_FINALIZER_ENABLED and not (
+        runner_status == "BLOCKED" and runner_blocked_phase == "executor_evidence"
+    )
+    if should_run_target_finalizer:
         finalizer_code, finalizer_payload, finalizer_text = finalize_target_runtime(plugin_root, spec_path, target_root, run_root)
         target_finalizer = finalizer_payload or {{"status": "FAIL", "error": finalizer_text or "target runtime finalizer failed"}}
         if finalizer_code != 0 or target_finalizer.get("status") != "PASS":
